@@ -4,6 +4,7 @@ import Timeslots from "./Timeslots"
 import Searchbar from "./Searchbar"
 
 import { useState, useEffect } from "react"
+import axios from "axios";
 
 export default function HospitalBloodBooking({ pageType }) {
   const prefix = pageType === "home" ? "home_" : "hospital_"
@@ -26,16 +27,51 @@ export default function HospitalBloodBooking({ pageType }) {
     if (step === "calendar") setStep("hospitals")
   }
 
+  const [showHospitals, setShowHospitals] = useState([]);
+  const [filteredHospitals, setFilteredHospitals] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const hospitalsToShow = searchQuery.trim() === "" ? showHospitals : filteredHospitals;
+  
+  useEffect (()=> {
+      axios.get("http://localhost:8000/api/hospital")
+          .then((res)=> {
+              setShowHospitals(res.data)
+              setFilteredHospitals(res.data);
+          })
+          .catch((error)=>{
+              console.error("Error fetching hospitals:", error)
+          })
+  }, [])
+  
+  const handleSearch = (term) => {
+    setSearchQuery(term);
+
+    if (term.trim() === "") {
+      setFilteredHospitals(showHospitals);
+    } else {
+      const filtered = showHospitals.filter(h =>
+        h.name.toLowerCase().includes(term.toLowerCase())
+      );
+      setFilteredHospitals(filtered);
+    }
+  };
+
   return (
     <div className="booking"> 
-      <Searchbar /> 
+      <Searchbar 
+        onSearch = { handleSearch }
+      /> 
       
       {/* Step 1: Hospitals list */} 
       {step === "hospitals" && ( 
-        <Hospitals onSelect={(h) => { 
-          setHospital(h); 
-          setStep("calendar"); 
-        }} /> 
+        <Hospitals 
+          showHospitals={hospitalsToShow}
+          searchQuery={ searchQuery }
+          onSelect={(h) => { 
+            setHospital(h); 
+            setStep("calendar"); 
+          }}
+        /> 
       )} 
       
       {/* Step 2: Calendar step */} 

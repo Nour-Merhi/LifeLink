@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\HomeAppointmentController;
 use App\Http\Controllers\AuthenticatedSessionController;
+use App\Http\Controllers\HospitalsController;
 
 
 Route::post('/login', [AuthenticatedSessionController::class, 'login']);
@@ -24,3 +25,7 @@ Route::middleware('auth:sanctum')->prefix('/blood')->group(function(){
 Route::get('/test', function () {
     return response()->json(['message' => 'API connected successfully!']);
 });
+
+//Hospital Route
+Route::get('/hospital', [HospitalsController::class, 'index']);
+Route::get('/hospital/{id}', [HospitalsController::class, 'getHospital']);
