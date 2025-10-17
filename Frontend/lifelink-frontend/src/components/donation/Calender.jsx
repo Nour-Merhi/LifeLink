@@ -3,7 +3,13 @@ import Timeslots from "./Timeslots";
 import timeslots from "../../../timeSlots";
 
 
-export default function CalendarStep({ onSelectDate }) {
+export default function CalendarStep({ 
+    onSelectDate, 
+    pageType, 
+    thankMessHospital, 
+    setThankMessHospital,
+    setStep
+}) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth(); 
@@ -75,7 +81,14 @@ return (
             {selected ? (
                     <>
                         <p>Available Dates</p>
-                        <Timeslots timeslots={timeslots} selectedDate = {selectedDate} />
+                        <Timeslots 
+                            timeslots={timeslots} 
+                            selectedDate = {selectedDate}
+                            pageType = {pageType}
+                            setStep = {setStep} 
+                            thankMessHospital = {thankMessHospital}
+                            setThankMessHospital = {setThankMessHospital}
+                        />
 
                     </>
             ) : (

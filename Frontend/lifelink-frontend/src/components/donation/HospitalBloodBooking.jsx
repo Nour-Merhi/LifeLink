@@ -23,13 +23,7 @@ export default function HospitalBloodBooking({ pageType }) {
   }, [step, hospital, date, time, prefix])
 
   const handleBack = () => {
-    if (step === "timeslots") setStep("calendar")
-    else if (step === "calendar") setStep("hospitals")
-  }
-
-  const onClose = () => {
-    setThankMessHospital(false);
-    
+    if (step === "calendar") setStep("hospitals")
   }
 
   return (
@@ -47,21 +41,13 @@ export default function HospitalBloodBooking({ pageType }) {
       {/* Step 2: Calendar step */} 
       {step === "calendar" && ( 
         <Calendar 
+          pageType= {pageType}
           hospital={hospital} 
-          onSelectDate={(d) => { 
-            setDate(d); }} 
-        /> 
-      )} 
-      
-      {/* Step 3: Timeslots */} 
-      {step === "timeslots" && ( 
-        <Timeslots 
-          page = "hospital"
+          setStep = {setStep}
           thankMessHospital = {thankMessHospital}
           setThankMessHospital = {setThankMessHospital}
-          selectedDate={date} 
-          hospital={hospital}
-         
+          onSelectDate={(d) => { 
+            setDate(d); }} 
         /> 
       )} 
         

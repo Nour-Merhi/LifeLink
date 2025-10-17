@@ -12,11 +12,11 @@
         </div>
 
         <div className="app-info">
-            <div>
+            <div className="pb-3">
                 <small>Hospital:</small>
                 <small>Al Rasool Al Aazam Hospital</small>
             </div>
-            <div>
+            <div className="pb-3">
                 <small>Date:</small>
                 <small>13 August 2025</small>
             </div>

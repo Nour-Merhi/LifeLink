@@ -41,11 +41,11 @@ export default function AliveOragnForm(){
 
     return (
         <section className="organ organ-alive">
-            <div className="title linear-blue">
+            <div id="live-donor" className="title linear-blue">
                 <h2 className="text-center">Live Organ Donation Registration</h2>
             </div>
             
-            <div id="live-donor" className="form-box-container">
+            <div  className="form-box-container">
 
                     <div className="form">
                         <form action="#" className="form-info" onSubmit= { handleSubmit } >

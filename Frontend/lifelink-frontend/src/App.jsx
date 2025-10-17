@@ -38,8 +38,8 @@ function App() {
         {/* Donation layout */}
         <Route path="/donation" element={<Donation />}>
           <Route index element={<DonationWelcome />} />
-          <Route path="home-blood-donation" element={<HomeBloodBooking />} />
-          <Route path="hospital-blood-donation" element={<HospitalBloodBooking />} />
+          <Route path="home-blood-donation" element={<HomeBloodBooking pageType="home" />} />
+          <Route path="hospital-blood-donation" element={<HospitalBloodBooking pageType="hospital"/>} />
           <Route path="/donation/after-death-donation" element={<OrganDead />} />
           <Route path="/donation/alive-organ-donation" element={<OrganAlive />} />
           <Route path="/donation/financial-support" element={<FinancialSupport />} />

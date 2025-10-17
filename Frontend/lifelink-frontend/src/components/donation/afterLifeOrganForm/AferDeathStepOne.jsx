@@ -35,11 +35,11 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
         <>
         <ScrollToTop />
 
-        <div className="title linear-blue">
+        <div  id="after-death-donor" className="title linear-blue">
             <h3 className="text-center">General Information</h3>
         </div>
         
-        <div className="organ form-box-container" id="after-death-donor">
+        <div className="organ form-box-container">
 
             <div className="form">
                 <form action="#" className="form-info" onSubmit= { handleSubmit }>

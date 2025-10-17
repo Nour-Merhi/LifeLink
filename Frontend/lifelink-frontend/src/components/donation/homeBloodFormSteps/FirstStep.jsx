@@ -57,7 +57,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                         <form action="#" className="form" onSubmit= { handleSubmit }>
                             <div className="form-group">
                                 <div>
-                                    <label for="first-name">First Name</label>
+                                    <label htmlFor="first-name">First Name</label>
                                     <input 
                                         onChange={ handleChange }
                                         type="text" 

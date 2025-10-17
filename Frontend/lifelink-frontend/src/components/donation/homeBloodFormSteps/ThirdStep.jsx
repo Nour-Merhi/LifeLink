@@ -6,7 +6,7 @@ import ScrollToTop from "../../ScrollToTop";
 import ThankModalHomeBlood from "../ThankModals/ThankModalHomeBlood";
 
 
-export default function ThirdStep({ prevStep, pageType="home", homeBloodFormData }){
+export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
      const navigate = useNavigate()
      const [thankMessHome, setThankMessHome] = useState(false);
 
@@ -26,7 +26,7 @@ export default function ThirdStep({ prevStep, pageType="home", homeBloodFormData
         setThankMessHome (false);
         navigate("/donation/home-blood-donation");
      }
-     console.log(homeBloodFormData)
+     
     return (
         <section className="donation-section">
             <ScrollToTop />

@@ -7,7 +7,7 @@ import HomeBloodForm from "./HomeBloodForm"
 import { useState, useEffect } from "react" 
 import { useNavigate } from "react-router-dom"
 
-export default function HomeBloodBooking() { 
+export default function HomeBloodBooking({ pageType }) { 
   const [step, setStep] = useState(localStorage.getItem("step") || "hospitals"); 
   const [hospital, setHospital] = useState(localStorage.getItem("hospital") || null); 
   const [date, setDate] = useState(localStorage.getItem("date") || null); 
@@ -26,8 +26,7 @@ export default function HomeBloodBooking() {
   }, [step, hospital, date, time, form]); 
     
     const handleBack = () => { 
-      if (step === "timeslots") setStep("calendar"); 
-      else if (step === "calendar") setStep("hospitals"); 
+      if (step === "calendar") setStep("hospitals"); 
     };
 
     
@@ -47,21 +46,13 @@ export default function HomeBloodBooking() {
       {/* Step 2: Calendar step */} 
       {step === "calendar" && ( 
         <Calendar 
+          pageType={ pageType }
           hospital={hospital} 
           onSelectDate={(d) => { 
             setDate(d); }} 
         /> 
       )} 
       
-      {/* Step 3: Timeslots */} 
-      {step === "timeslots" && ( 
-        <Timeslots 
-          page= "home"
-          selectedDate={date} 
-          hospital={hospital}
-           
-          /> 
-        )} 
 
         {/* Back button */} 
         {step !== "hospitals" && ( 

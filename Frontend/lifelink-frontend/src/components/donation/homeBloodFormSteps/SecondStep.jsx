@@ -152,7 +152,6 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 id="healthy-no" 
                                                 name="not_healthy" 
                                                 value="no"
-                                                 checked={medicalConditions.not_healthy === false} 
                                             required/>
                                             No</label>
                                         
@@ -180,7 +179,6 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 id="surgery-no" 
                                                 name="has_surgery" 
                                                 value="no"
-                                                checked={medicalConditions.has_surgery === false} 
                                             required/>
                                             No</label>
                                     </div>
@@ -207,7 +205,6 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 id="travel-no" 
                                                 name="has_travel" 
                                                 value="no"
-                                                checked={medicalConditions.has_tarvel === false} 
                                             required/>
                                             No</label>
                                     </div>
@@ -235,7 +232,6 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 id="medicine-no" 
                                                 name="take_medicine" 
                                                 value="no" 
-                                                checked={medicalConditions.take_medicine === false}
                                             required/>
                                             No</label>
                                     </div>
@@ -264,7 +260,6 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 id="disease-no" 
                                                 name="has_disease" 
                                                 value="no" 
-                                                checked={medicalConditions.has_disease === false}
                                             required/>
                                             No</label>
                                     </div> 
