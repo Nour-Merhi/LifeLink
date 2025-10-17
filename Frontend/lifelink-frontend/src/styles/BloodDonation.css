@@ -1,0 +1,507 @@
+:root{
+  --light-grey: #B3B3B3;
+  --grey-color : #D9D9D9;
+  --frame-color: #F5F5F5;
+  --shadow-color: #D8D8D8;
+  --red-color: #F12C31;
+  --light-red: #FFE2E2;
+  --icon-square: #FFF2F2;
+  --cancel-step-grey: #e6e6e6;
+}
+
+/*Search*/
+.search{
+    background-color: #ffffff;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+    margin-bottom: 20px;
+}
+
+.find-hospital {
+  margin-left: 20px;
+}
+.find-hospital > h2{
+  font-size: 36px;
+  font-weight: 500;
+}
+.find-hospital > p{
+  font-size: 16px;
+  font-weight: 300;
+  margin-top: -5px;
+}
+
+.search-bar{
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border: 1px solid var(--light-grey);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin-top:20px;
+  color: var(--light-grey);
+  font-size: 16px;
+}
+.search-bar > p{
+  font-size: 16px;
+  margin-left: 10px;
+}
+.search-bar > input {
+  position: absolute;
+  width: 90%;
+  margin-left: 30px;
+}
+.search-bar > input:focus{
+  outline: none;
+}
+
+/*Urgent Needs*/
+.urgent-needs > h1{
+  font-size: 25px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  margin-left: 15px;
+  color: var(--red-color);
+}
+
+.urgent-needs > .hospital-info{
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  background-color: var(--light-red);
+  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  position: relative;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 15px; 
+}
+
+.urgent-needs > .hospital-info:hover{
+  border: 2px solid var(--red-color);
+}
+
+.info{
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+}
+.details{
+  display: flex;
+  flex-direction: row;
+  margin-left: -22px;
+  
+}
+
+.details > .location , 
+.details > .distance,
+.details > .rating{
+  display: flex;
+  align-items: center;
+  margin-left: 20px;
+}
+
+.slots{
+  position: absolute;
+  right: 0;
+  margin-right: 20px;
+  text-align: right;
+}
+
+.hospital-icon{
+  background-color: var(--icon-square);
+  padding: 10px;
+  border-radius: 5px ;
+  color: var(--red-color);
+  margin-right: 15px;
+  font-size: 25px;
+}
+
+.info > h2{
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.details > div > small{
+  font-size: 12px;
+  margin-left: 5px;
+  color: black;
+}
+.details > div {
+  font-size: 12px;
+  margin-top: 3px;
+}
+.details > .location {
+   color: var(--red-color);
+   margin-right: 60px;
+}
+.details > .distance{
+  color: rgb(18, 120, 252);
+}
+
+.slots > small{
+  font-size: 12px;
+}
+.slots > h2{
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--red-color);
+  margin-bottom: -8px;
+}
+
+.urgent-blood-types{
+  padding: 7px;
+  border-radius: 50px;
+  color: white;
+  font-size: 12px;
+  margin-left: 5px;
+}
+
+/*Registered hospitals*/
+.urgent-needs > .register-hospital{
+  color:black;
+}
+.urgent-needs > #registered-hospital{
+  background-color: white;
+}
+
+/*Calendar*/
+.calendar-container{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+  height: 480px;
+  gap: 20px;
+  padding: 10px 0px;
+}
+.calendar-step{
+  flex: 0 0 65%;
+  background-color: white;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  border-radius: 20px;
+  padding: 15px;
+  height: 100%;
+  
+}
+
+/*Time Slots*/
+.timeslot-panel {
+  flex: 0 0 33%;
+  background-color: white;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  border-radius: 20px;
+  height: 100%;
+  padding: 20px 13px 20px 20px;
+  text-align: center;
+  font-weight: 700;
+
+  display: flex;            
+  flex-direction: column;   
+  overflow: hidden;        
+}
+
+.dates-available {
+  flex: 1 1 auto;           
+  overflow-y: auto;         
+}
+
+.timeslot-panel > p{
+  margin-bottom: 15px;
+  margin-top: 4px
+}
+.select-date{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin: 15px 20px 30px 20px ;
+}
+
+#dates{
+  transition: 0.3s ease;
+}
+
+.time-slot-btn{
+  width: 100%;
+}
+
+.times{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 17px 18px;
+  margin: 5px 0;
+  border-radius: 10px;
+  font-weight: 400;
+}
+
+#go-back-btn{
+  margin-left: 6px;
+}
+
+.confirm-time-btn {
+  background: linear-gradient(to right, var(--red-color), #A6191C);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 17px 18px;
+  font-size: 16px;
+  cursor: pointer;
+  width: 100%;
+  position: static;     
+  margin-top: auto;    
+}
+
+/*Home Blood Donation*/
+.donation-section{
+  background-color: var(--frame-color);
+  min-height: 100vh;
+}
+
+.container{
+  max-width: 850px;
+  max-height: 1075px;
+  margin: auto;
+}
+.steps{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.step-at{
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  width: 100%
+}
+.span{
+  border-radius: 50px;
+  background-color: var(--cancel-step-grey);
+  color: white;
+  padding: 10px 21px;
+  font-size: 24px;
+  font-weight: 600;
+}
+.small-line{
+  height: 4px;
+  width: 130px;
+  background-color: var(--cancel-step-grey);
+  margin: 0 10px;
+  border-radius: 2px;
+}
+
+.step-at > .active-step{
+  background: linear-gradient(to right, var(--red-color), #A6191C) ;
+}
+
+.form-container{
+  background-color: white;
+  box-shadow: 0 4px 10px var(--shadow-color) ;
+  border-radius: 0 0 20px 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 16px;
+  gap: 20px;
+}
+.form-group > div{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.form-group > div > select,
+.form-group > div > input, 
+.form-group > div > textarea{
+  width: 100%;
+  height: 50px;
+  border-radius: 10px;
+  padding: 0 20px;
+  background-color: var(--frame-color);
+}
+
+textarea::placeholder{
+  padding-top: 12.5px;
+}
+input:focus, select:focus, textarea:focus{
+  outline: none;
+}
+input::placeholder, textarea::placeholder{
+  color: var(--grey-color);
+  font-weight: 300;
+}
+
+.form-box{
+  border-radius: 20px 20px 0 0;
+  padding: 15px 18px;
+  margin-top: 30px;
+  background: linear-gradient(to right, var(--red-color), #A6191C) ;
+  color: white;
+  font-weight: 600;
+  font-size: 24px;
+}
+label {
+  margin: 0 8px 8px 8px;
+  font-weight: 400;
+  font-size: 15px;
+}
+
+.line{
+  background-color: var(--frame-color);
+  height: 4px;
+  width: 100%;
+  border-radius: 2px;
+  margin: 20px 0;
+}
+
+.cancel-btn, .next-step-btn{
+  padding: 10px 20px;
+  margin: 0 5px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+.buttons-align{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-actions{
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cancel-btn{
+  background-color: var(--cancel-step-grey);
+  font-weight: 400;
+}
+.next-step-btn{
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+.next-step-btn:hover{
+  transform: scale(1.05);          
+}
+
+/*step two form*/
+.thin-line{
+  height: 1px;
+  width: 100%;
+  background-color: var(--light-grey);
+  margin: 20px 0;
+  border-radius:  3px;
+}
+.yes-no-questions{
+  margin: 45px 10px ;
+}
+.questions{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.questions > p{
+  flex: 1 0;
+  font-size: 18px;
+  font-weight: 400;
+  max-width: 420px;
+}
+.yes-no{
+  display: flex;
+  gap: 25px;
+  margin-right: 50px;
+}
+.yes-no > label{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 400;
+}
+.yes-no > label > input{
+  width: 18px;
+  height: 18px;
+}
+
+label > input:checked{
+  accent-color: var(--red-color);
+}
+
+/*step three form*/
+.check-box{
+  margin-bottom: 10px;
+}
+.check-box > input{
+  margin: 10px;
+}
+.check-box > label{
+  font-size: 18px;
+}
+
+.whats-next{
+  background-color: var(--light-red);
+  border: 1px solid #FF6E6E;
+  border-radius: 10px;
+  margin: 20px 0;
+  padding: 20px;
+}
+.whats-next > div{
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.whats-next ul {
+  list-style: disc;            /* show dots */
+  list-style-position: outside;
+  padding-left: 1.25rem;      /* or 20px / 40px depending on design */
+  margin: 0 2rem;
+}
+
+/* ensure li renders as list-item */
+.whats-next li {
+  display: list-item;
+  font-weight: 300;
+}
+
+
+/* Target the scrolling area */
+.dates-available {
+  flex: 1 1 auto;
+  overflow-y: auto;            /* thickness */
+  padding-right: 5px;
+  /* optional: smoother scroll */
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar track */
+.dates-available::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* Track background */
+.dates-available::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Thumb (the draggable part) */
+.dates-available::-webkit-scrollbar-thumb {
+  background-color: var(--grey-color);
+  border-radius: 10px;
+}
+
