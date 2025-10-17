@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Hospitals;
+use App\Models\Hospital;
 use Illuminate\Http\Request;
 
 class HospitalsController extends Controller
@@ -12,9 +12,15 @@ class HospitalsController extends Controller
      */
     public function index()
     {
-        //
+        return response()->json(Hospital::all(), 200);
     }
-
+    public function getHospital($id){
+        $hospital = Hospital::find($id);
+        if(!$hospital){
+            return response()->json(['message'=> 'Hospital not found'], 404);
+        }
+        return response()->json($hospital, 200);
+    }
     /**
      * Show the form for creating a new resource.
      */
