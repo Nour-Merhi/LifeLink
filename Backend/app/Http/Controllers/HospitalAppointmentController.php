@@ -2,25 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Hospital_Appointment;
+use App\Models\HospitalAppointment;
+use App\Models\Hospital;
 use Illuminate\Http\Request;
 
 class HospitalAppointmentController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    
     public function index()
     {
         //
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        //
+        
     }
 
     /**
@@ -28,7 +24,24 @@ class HospitalAppointmentController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $data = $request->all();
+
+        $hospitalName = $request->input('hospital_name');
+        $appointmentTime = $request-> input('appointment_time');
+        $appointmentDate = $request->input('appointment_date');
+
+        $hospital = Hospital::where('name', $hospitalName)->first();
+         if (!$hospital) {
+            return response()->json([
+                'message' => 'Hospital not found.'
+            ], 404);
+        }
+        $hospital_id = $hospital->id;
+
+        HospitalAppointment::create([
+            
+        ]);
+
     }
 
     /**

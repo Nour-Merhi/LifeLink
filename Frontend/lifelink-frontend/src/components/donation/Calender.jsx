@@ -8,7 +8,9 @@ export default function CalendarStep({
     pageType, 
     thankMessHospital, 
     setThankMessHospital,
-    setStep
+    setStep,
+    setTime,
+    hospitalAppt
 }) {
   const today = new Date();
   const year = today.getFullYear();
@@ -26,7 +28,6 @@ export default function CalendarStep({
   for (let i = 0; i < firstDay; i++) days.push(null); // empty slots
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
    
-  
 return (
     <div className="calendar-container">
             <div className="calendar-step">
@@ -85,7 +86,9 @@ return (
                             timeslots={timeslots} 
                             selectedDate = {selectedDate}
                             pageType = {pageType}
-                            setStep = {setStep} 
+                            setStep = {setStep}
+                            setTime = {setTime} 
+                            hospitalAppt ={hospitalAppt}
                             thankMessHospital = {thankMessHospital}
                             setThankMessHospital = {setThankMessHospital}
                         />

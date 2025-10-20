@@ -1,33 +1,42 @@
 import Searchbar from "./Searchbar" 
 import Hospitals from "./Hospitals"
 import Calendar from "./Calender" 
-import Timeslots from "./Timeslots"
-import HomeBloodForm from "./HomeBloodForm"
 
 import { useState, useEffect } from "react" 
-import { useNavigate } from "react-router-dom"
 
 export default function HomeBloodBooking({ pageType }) { 
-  const [step, setStep] = useState(localStorage.getItem("step") || "hospitals"); 
-  const [hospital, setHospital] = useState(localStorage.getItem("hospital") || null); 
-  const [date, setDate] = useState(localStorage.getItem("date") || null); 
-  const [time, setTime] = useState(localStorage.getItem("time") || null); 
-  const [form, setForm] = useState(localStorage.getItem("form") || null);
+  const [step, setStep] = useState(()=> localStorage.getItem("step") || "hospitals"); 
 
-  const navigate = useNavigate();
+  const [hospital, setHospital] = useState(() => {
+    const stored = localStorage.getItem("hospital");
+    return stored ? JSON.parse(stored) : null;
+  }); 
+  const [date, setDate] = useState(() => localStorage.getItem("date") || null); 
+
+  const [homeVisitData, setHomeVisitData] = useState ({
+    hospital_name: hospital ? hospital.name : '',
+    appointment_time: '',
+    appointment_date: date || '',
+    home_form_data: {}
+  })
   
-  useEffect(() => { 
-    localStorage.setItem("step", step); 
+   useEffect(() => {
+    localStorage.setItem("step", step);
+    if (hospital) localStorage.setItem("hospital", JSON.stringify(hospital));
+    if (date) localStorage.setItem("date", date);
+  }, [step, hospital, date]);
+  
+  useEffect(() => {
+    setHomeVisitData((prev) => ({
+      ...prev,
+      hospital_name: hospital ? hospital.name : "",
+      appointment_date: date || "",
+    }));
+  }, [hospital, date]);
     
-    if (hospital) localStorage.setItem("hospital", hospital); 
-    if (date) localStorage.setItem("date", date); 
-    if (time) localStorage.setItem("time", time); 
-    if (form) localStorage.setItem("form", form);
-  }, [step, hospital, date, time, form]); 
-    
-    const handleBack = () => { 
-      if (step === "calendar") setStep("hospitals"); 
-    };
+  const handleBack = () => { 
+    if (step === "calendar") setStep("hospitals"); 
+  };
 
     
   return ( 
@@ -37,10 +46,13 @@ export default function HomeBloodBooking({ pageType }) {
       
       {/* Step 1: Hospitals list */} 
       {step === "hospitals" && ( 
-        <Hospitals onSelect={(h) => { 
-          setHospital(h); 
-          setStep("calendar"); 
-        }} /> 
+        <Hospitals 
+          onSelect={(h) => { 
+            setHospital(h); 
+            setStep("calendar"); 
+           
+          }} 
+        /> 
       )} 
       
       {/* Step 2: Calendar step */} 
@@ -48,7 +60,9 @@ export default function HomeBloodBooking({ pageType }) {
         <Calendar 
           pageType={ pageType }
           hospital={hospital} 
+          setHomeVisitData = {setHomeVisitData}
           onSelectDate={(d) => { 
+            setDate(d);
             setDate(d); }} 
         /> 
       )} 

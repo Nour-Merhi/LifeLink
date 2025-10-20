@@ -2,7 +2,17 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ThankModalHospital from "../donation/ThankModals/ThankModalHospitalBlood.jsx";
 
-export default function Timeslots({ timeslots, selectedDate, pageType, thankMessHospital, setThankMessHospital, setStep }) {
+export default function Timeslots({
+   timeslots, 
+   selectedDate, 
+   pageType, 
+   thankMessHospital, 
+   setThankMessHospital, 
+   setStep, 
+   setTime,
+   hospitalAppt
+  }) 
+  {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedTime, setSelectedTime] = useState("");
 
@@ -67,6 +77,7 @@ export default function Timeslots({ timeslots, selectedDate, pageType, thankMess
               navigate("/donation/home-blood-from")
             }else if(pageType === "hospital"){
               console.log("→ navigating to hospital ");
+              setTime(selectedTime)
               setThankMessHospital(true)
             }
           }}
@@ -76,7 +87,7 @@ export default function Timeslots({ timeslots, selectedDate, pageType, thankMess
       )}
 
       {(pageType === "hospital" && thankMessHospital) &&
-        <ThankModalHospital onClose={ onClose } />
+        <ThankModalHospital hospitalAppt= {hospitalAppt} onClose={ onClose } />
       }
     </>
   );

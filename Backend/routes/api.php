@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\HomeAppointmentController;
 use App\Http\Controllers\AuthenticatedSessionController;
+use App\Htpp\Controllers\HospitalAppointmentController;
 use App\Http\Controllers\HospitalsController;
 
 
@@ -29,3 +30,6 @@ Route::get('/test', function () {
 //Hospital Route
 Route::get('/hospital', [HospitalsController::class, 'index']);
 Route::get('/hospital/{id}', [HospitalsController::class, 'getHospital']);
+
+//Hospital Appointment Route 
+Route::post('/hospital/appointments', [HospitalAppointmentController::class, 'store']);
