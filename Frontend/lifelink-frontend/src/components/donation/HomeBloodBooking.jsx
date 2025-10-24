@@ -4,12 +4,18 @@ import Calendar from "./Calender"
 
 import { useState, useEffect } from "react" 
 
-export default function HomeBloodBooking({ pageType }) { 
+export default function HomeBloodBooking({ pageType }) {
+  const prefix = pageType === "home" ? "home_" : "hospital_" 
   const [step, setStep] = useState(()=> localStorage.getItem("step") || "hospitals"); 
 
   const [hospital, setHospital] = useState(() => {
-    const stored = localStorage.getItem("hospital");
-    return stored ? JSON.parse(stored) : null;
+     const stored = localStorage.getItem(prefix + "hospital");
+    try {
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      console.warn("Invalid JSON in hospital localStorage:", stored);
+      return null;
+    }
   }); 
   const [date, setDate] = useState(() => localStorage.getItem("date") || null); 
 
