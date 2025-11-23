@@ -23,8 +23,24 @@ export default function Timeslots({
     setSelectedTime("");
   }, [selectedDate]);
 
+  // Normalize date strings for comparison (handle different formats)
+  const normalizeDate = (dateStr) => {
+    if (!dateStr) return '';
+    // If it's already in YYYY-MM-DD format, return as is
+    if (typeof dateStr === 'string') {
+      // Remove time portion if present
+      return dateStr.split('T')[0].split(' ')[0];
+    }
+    return dateStr.toString().split('T')[0].split(' ')[0];
+  };
+
+  const normalizedSelectedDate = normalizeDate(selectedDate);
+
   const filterSlots = (timeslots || []).filter(
-    (slot) => slot.date === selectedDate?.toString()
+    (slot) => {
+      const slotDate = normalizeDate(slot.date);
+      return slotDate === normalizedSelectedDate;
+    }
   );
 
   const onClose = () => {
@@ -44,21 +60,33 @@ export default function Timeslots({
                 className="time-slot-btn"
                 disabled={slot.status === "booked"}
                 onClick={() => {
-                  setSelectedTime(slot.time);
-                  setSelectedSlot(slot.id);
+                  if (slot.status !== "booked") {
+                    setSelectedTime(slot.time);
+                    setSelectedSlot(slot.id);
+                  }
+                }}
+                style={{
+                  cursor: slot.status === "booked" ? "not-allowed" : "pointer",
+                  opacity: slot.status === "booked" ? 0.5 : 1
                 }}
               >
                 <div
                   className={`times ${
                     slot.status === "booked"
-                      ? "bg-gray-200 text-gray-400 opacity-50"
+                      ? "bg-gray-300 text-gray-500 opacity-60 booked-slot"
                       : selectedSlot === slot.id
                       ? "bg-red-600 text-white"
-                      : "bg-gray-200"
+                      : "bg-gray-200 hover:bg-gray-300"
                   }`}
                 >
                   <h3>{slot.time}</h3>
-                  <span>{slot.status === "booked" ? "Booked" : "Available"}</span>
+                  <span>
+                    {slot.status === "booked" 
+                      ? slot.max_capacity && slot.bookings_count 
+                        ? `Booked (${slot.bookings_count}/${slot.max_capacity})` 
+                        : "Booked"
+                      : "Available"}
+                  </span>
                 </div>
               </button>
             </div>
@@ -71,8 +99,9 @@ export default function Timeslots({
           type="button"
           className="confirm-time-btn"
           onClick={() => {
-            console.log("clickeddd")
+            // Store time in localStorage for home bookings
             if(pageType === "home"){
+              localStorage.setItem("appointment_time", selectedTime);
               console.log("→ navigating to home form");
               navigate("/donation/home-blood-from")
             }else if(pageType === "hospital"){

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('blood_types', function (Blueprint $table) {
             $table->id();
+            $table->string('code')->unique();
             $table->string('type');
             $table->string('rh_factor');
             $table->timestamps();

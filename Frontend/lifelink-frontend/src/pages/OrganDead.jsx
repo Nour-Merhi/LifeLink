@@ -14,8 +14,31 @@ export default function OrganDead() {
 
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
+        // Step 1
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
         birth_date: "",
-        age: null
+        age: null,
+        gender: "",
+        address: "",
+        emergency_contact: "",
+        emergency_contact_number: "",
+        // Step 2
+        marital_status: "",
+        education_level: "",
+        professional_status: "",
+        work_type: "",
+        mother_name: "",
+        spouse_name: "",
+        id_photo: null,
+        father_id_photo: null,
+        mother_id_photo: null,
+        // Step 3
+        pledged_organs: [],
+        blood_type: ""
     });
 
     const nextStep = () => setStep((prev) => prev + 1);
@@ -24,6 +47,34 @@ export default function OrganDead() {
     const handleCloseModal = () => {
         setThankMess(false);
         setStep(1);
+        // Reset all form data
+        setFormData({
+            // Step 1
+            first_name: "",
+            middle_name: "",
+            last_name: "",
+            email: "",
+            phone: "",
+            birth_date: "",
+            age: null,
+            gender: "",
+            address: "",
+            emergency_contact: "",
+            emergency_contact_number: "",
+            // Step 2
+            marital_status: "",
+            education_level: "",
+            professional_status: "",
+            work_type: "",
+            mother_name: "",
+            spouse_name: "",
+            id_photo: null,
+            father_id_photo: null,
+            mother_id_photo: null,
+            // Step 3
+            pledged_organs: [],
+            blood_type: ""
+        });
     };
 
     useEffect(() => {
@@ -168,6 +219,7 @@ export default function OrganDead() {
                     setThankMess={setThankMess}
                     afterDeathFormData={formData}
                     setAfterDeathFormData={setFormData}
+                    onReset={handleCloseModal}
                 />
             )}
 

@@ -115,9 +115,9 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                     required/>
                                 </div>
                                 <div>
-                                    <label for="gender">Gender</label>
+                                    <label htmlFor="gender">Gender</label>
                                     <select id="gender" name="gender" onChange={ handleChange }>
-                                        <option value="" disabled selected>Select a Gender</option>
+                                        <option value="" disabled>Select a Gender</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
                                     </select>

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('home_appointments', function(Blueprint $table){
             $table->id();
+            $table->string('code')->unique();
             $table->foreignID('donor_id')->references('id')->on('donors')->onDelete('cascade');
             $table->foreignId('hospital_id')->references('id')->on('hospitals')->onDelete('cascade');
             $table->foreignId('appointment_id')->references('id')->on('appointments')->onDelete('cascade');

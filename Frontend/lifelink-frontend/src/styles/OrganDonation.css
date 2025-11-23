@@ -383,6 +383,7 @@
 .auth-container > p{
     color: #858585;
     margin-bottom: 20px;
+    text-align: center;
 }
 
 .auth-toggle {

@@ -1,0 +1,250 @@
+import { useState, useEffect } from "react";
+import { IoClose } from "react-icons/io5";
+import { IoSearchSharp } from "react-icons/io5";
+import { SpinnerDotted } from 'spinners-react';
+import axios from "axios";
+
+export default function AssignPhlebotomistModal({ onClose, orders = [], onAssignSuccess }) {
+    const [phlebotomists, setPhlebotomists] = useState([]);
+    const [filteredPhlebotomists, setFilteredPhlebotomists] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [assigning, setAssigning] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedPhlebotomist, setSelectedPhlebotomist] = useState(null);
+    const [error, setError] = useState("");
+
+    // Fetch phlebotomists on mount
+    useEffect(() => {
+        fetchPhlebotomists();
+    }, []);
+
+    // Filter phlebotomists based on search
+    useEffect(() => {
+        if (searchTerm.trim() === "") {
+            setFilteredPhlebotomists(phlebotomists);
+        } else {
+            const filtered = phlebotomists.filter((phleb) => {
+                const fullName = `${phleb.user?.first_name || ''} ${phleb.user?.middle_name || ''} ${phleb.user?.last_name || ''}`.trim();
+                const license = phleb.license_number || '';
+                const hospital = phleb.hospital?.name || '';
+                
+                return fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       license.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       hospital.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+            setFilteredPhlebotomists(filtered);
+        }
+    }, [searchTerm, phlebotomists]);
+
+    const fetchPhlebotomists = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const response = await axios.get('http://localhost:8000/api/admin/dashboard/get-phlebotomists');
+            const phlebotomistsData = response.data.phlebotomists || [];
+            setPhlebotomists(phlebotomistsData);
+            setFilteredPhlebotomists(phlebotomistsData);
+        } catch (err) {
+            console.error('Error fetching phlebotomists:', err);
+            setError(err.response?.data?.message || 'Failed to load phlebotomists');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAssign = async () => {
+        // Validate phlebotomist selection - check if id exists
+        if (!selectedPhlebotomist || !selectedPhlebotomist.id) {
+            setError("Please select a phlebotomist");
+            return;
+        }
+
+        // Validate orders
+        if (!orders || !Array.isArray(orders) || orders.length === 0) {
+            setError("No orders selected");
+            return;
+        }
+
+        // Clear any previous errors before proceeding
+        setError("");
+        setAssigning(true);
+
+        try {
+            // Assign phlebotomist to all selected orders
+            const assignmentPromises = orders.map(async (order) => {
+                const orderCode = order.id || order.code;
+                return axios.post(`http://localhost:8000/api/admin/dashboard/home-visit-orders/${encodeURIComponent(orderCode)}/assign-phlebotomist`, {
+                    phlebotomist_id: selectedPhlebotomist.id
+                });
+            });
+
+            await Promise.all(assignmentPromises);
+
+            // Success - notify parent to refetch orders
+            if (onAssignSuccess) {
+                onAssignSuccess();
+            }
+            onClose();
+        } catch (err) {
+            console.error('Error assigning phlebotomist:', err);
+            setError(err.response?.data?.message || err.response?.data?.error || 'Failed to assign phlebotomist');
+        } finally {
+            setAssigning(false);
+        }
+    };
+
+    const getPhlebotomistName = (phleb) => {
+        if (!phleb.user) return 'Unknown';
+        const nameParts = [
+            phleb.user.first_name,
+            phleb.user.middle_name,
+            phleb.user.last_name
+        ].filter(Boolean);
+        return nameParts.join(' ') || 'Unknown';
+    };
+
+    const getAvailabilityBadge = (availability) => {
+        const badges = {
+            'available': 'badge-success',
+            'onDuty': 'badge-success',
+            'unavailable': 'badge-danger'
+        };
+        return badges[availability] || 'badge-pending';
+    };
+
+    return (
+        <div className="modal" onClick={onClose}>
+            <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-title">
+                    <h3>Assign Phlebotomist to {orders.length} Order{orders.length > 1 ? 's' : ''}</h3>
+                    <button className="close-btn" onClick={onClose}>
+                        <IoClose />
+                    </button>
+                </div>
+
+                <div className="modal-form">
+                    {orders && orders.length > 0 && (
+                        <div className="order-info" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+                            <h4>Selected Orders ({orders.length}):</h4>
+                            <div style={{ maxHeight: '120px', overflowY: 'auto', marginTop: '10px' }}>
+                                {orders.map((order, idx) => (
+                                    <div key={order.id || idx} style={{ marginBottom: '8px', fontSize: '14px' }}>
+                                        <strong>{order.name}</strong> - {order.id} ({order.date} at {order.time})
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="search-input" style={{ marginBottom: '20px' }}>
+                        <IoSearchSharp />
+                        <input
+                            type="search"
+                            placeholder="Search by name, license, or hospital..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="error-message" style={{ color: '#F12C31', marginBottom: '15px', padding: '10px', backgroundColor: '#fee', borderRadius: '5px' }}>
+                            {error}
+                        </div>
+                    )}
+
+                    {loading ? (
+                        <div className="loader" style={{ textAlign: 'center', padding: '40px' }}>
+                            <SpinnerDotted size={50} thickness={125} speed={100} color="#f01010ff" />
+                            <p>Loading phlebotomists...</p>
+                        </div>
+                    ) : (
+                        <div className="phlebotomist-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                            {filteredPhlebotomists.length > 0 ? (
+                                filteredPhlebotomists.map((phleb) => (
+                                    <div
+                                        key={phleb.id}
+                                        className={`phlebotomist-item ${selectedPhlebotomist?.id === phleb.id ? 'selected' : ''}`}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            // Use a callback to ensure state is set properly
+                                            setSelectedPhlebotomist(phleb);
+                                            setError(""); // Clear error when phlebotomist is selected
+                                        }}
+                                        style={{
+                                            padding: '15px',
+                                            marginBottom: '10px',
+                                            border: selectedPhlebotomist?.id === phleb.id ? '2px solid #f01010' : '1px solid #ddd',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            backgroundColor: selectedPhlebotomist?.id === phleb.id ? '#fff5f5' : '#fff',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <h4 style={{ margin: '0 0 5px 0' }}>{getPhlebotomistName(phleb)}</h4>
+                                                <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                                                    License: {phleb.license_number || 'N/A'}
+                                                </p>
+                                                <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                                                    Hospital: {phleb.hospital?.name || 'N/A'}
+                                                </p>
+                                                {phleb.user?.phone_nb && (
+                                                    <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                                                        Phone: {phleb.user.phone_nb}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className={`badge ${getAvailabilityBadge(phleb.availability)}`}>
+                                                    {phleb.availability || 'available'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                                    <p>No phlebotomists found</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="modal-footer form-submit-btn">
+                    <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={onClose}
+                        disabled={assigning}
+                        style={{ marginRight: '10px' }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        className="submit-btn"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAssign();
+                        }}
+                        disabled={!selectedPhlebotomist || assigning || !orders || orders.length === 0}
+                    >
+                        {assigning ? (
+                            <>
+                                <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" style={{ marginRight: '8px' }} />
+                                Assigning...
+                            </>
+                        ) : (
+                            'Assign Phlebotomist'
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+

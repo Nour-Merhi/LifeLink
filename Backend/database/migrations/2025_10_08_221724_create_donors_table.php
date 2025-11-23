@@ -13,12 +13,13 @@ return new class extends Migration
     {
         Schema::create('donors', function (Blueprint $table){
             $table->id();
-            $table->foreignId('userID')->refernces('id')->on('users')->onDelete('cascade');
-            $table->boolean('organ_consent');
-            $table->boolean('availability');
+            $table->string('code')->unique();
+            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->boolean('organ_consent')->default(0);
+            $table->boolean('availability')->default(1);
             $table->date('last_donation')->nullable();
-            $table->integer('donation_nb');
-            $table->boolean('eligibility');
+            $table->integer('donation_nb')->default(0);
+            $table->boolean('eligibility')->default(1);
             $table->string('gender');
             $table->date('date_of_birth');
             $table->foreignId('blood_type_id')->references('id')->on('blood_types')->onDelete('cascade');

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeathFormData}){
+export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeathFormData, setAfterDeathFormData}){
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -11,13 +11,28 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
         }
     }, [afterDeathFormData, navigate]);
 
-    const [maritalState, setMartialState] = useState("")
-    const [profState, setProfState] = useState ("")
+    const [maritalState, setMartialState] = useState(afterDeathFormData.marital_status || "")
+    const [profState, setProfState] = useState(afterDeathFormData.professional_status || "")
+    const [educationLevel, setEducationLevel] = useState(afterDeathFormData.education_level || "")
     const [fileName, setFileName] = useState("");
+    const [fatherFileName, setFatherFileName] = useState("");
+    const [motherFileName, setMotherFileName] = useState("");
 
     const handleFileChange = (e) => {
         if (e.target.files.length > 0) {
-        setFileName(e.target.files[0].name);
+            setFileName(e.target.files[0].name);
+        }
+    };
+
+    const handleFatherFileChange = (e) => {
+        if (e.target.files.length > 0) {
+            setFatherFileName(e.target.files[0].name);
+        }
+    };
+
+    const handleMotherFileChange = (e) => {
+        if (e.target.files.length > 0) {
+            setMotherFileName(e.target.files[0].name);
         }
     };
 
@@ -30,6 +45,21 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
             return;
         }
 
+        // Collect form data - use state values for controlled inputs
+        const formData = {
+            marital_status: maritalState,
+            education_level: educationLevel,
+            professional_status: profState,
+            work_type: e.target['work-type']?.value || null,
+            mother_name: e.target['mother-name']?.value || null,
+            spouse_name: e.target['w/h-name']?.value || null,
+            id_photo: e.target.pers?.files[0] || null,
+            father_id_photo: e.target.father?.files[0] || null,
+            mother_id_photo: e.target.mother?.files[0] || null,
+        };
+        
+        // Update parent form data
+        setAfterDeathFormData(prev => ({ ...prev, ...formData }));
         nextStep();
     };
 
@@ -81,7 +111,7 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                                 onChange={(e) => setMartialState(e.target.value)} 
                                                 required
                                             >
-                                                <option value="" disabled selected>Select a state</option>
+                                                <option value="" disabled>Select a state</option>
                                                 <option value="single">Single</option>
                                                 <option value="married">Married</option>
                                                 <option value="divorced">Divorced or separated</option>
@@ -91,10 +121,12 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                         <div>
                                             <label htmlFor="education-level">Education Level</label>
                                             <select 
-                                                id="education-level" 
+                                                id="education-level"
+                                                value={educationLevel}
+                                                onChange={(e) => setEducationLevel(e.target.value)}
                                                 required
                                             >
-                                                <option value="" disabled selected>Select one</option>
+                                                <option value="" disabled>Select one</option>
                                                 <option value="elementary">Elementary</option>
                                                 <option value="intermediate">Intermediate</option>
                                                 <option value="secondary">Secondary</option>
@@ -110,7 +142,7 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                                 onChange={ (e) => setProfState(e.target.value) }
                                                 required
                                             >
-                                                <option value="" disabled selected>Select a state</option>
+                                                <option value="" disabled>Select a state</option>
                                                 <option value="no-work">I do not work</option>
                                                 <option value="working">I work</option>
                                             </select>
@@ -120,7 +152,7 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                     {maritalState === "single" &&
                                         <div className="form-group">
                                             <div>
-                                                <label for="mother-name">Mother's Full Name</label>
+                                                <label htmlFor="mother-name">Mother's Full Name</label>
                                                 <input type="text" id="mother-name" name="mother-name" placeholder="Enter mother's full name"required/>
                                             </div>
                                         </div>
@@ -129,7 +161,7 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                     {(maritalState === "married" || maritalState === "divorced" || maritalState === "widowed") && (
                                         <div className="form-group">
                                             <div>
-                                                <label for="w/h-name">Wife / Husband 's Full Name</label>
+                                                <label htmlFor="w/h-name">Wife / Husband 's Full Name</label>
                                                 <input type="text" id="w/h-name" name="wife/hus-name" placeholder="Enter full name" required/>
                                             </div>
                                         </div>
@@ -139,7 +171,7 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                     {profState === "working" &&
                                         <div className="form-group">
                                             <div>
-                                                <label for="work-type">State Your Work Type</label>
+                                                <label htmlFor="work-type">State Your Work Type</label>
                                                 <input type="text" id="work-type" name="work-type" placeholder="Enter your work description" required/>
                                             </div>
                                         </div>
@@ -173,13 +205,13 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                                     type="text"
                                                     name="father_Id"
                                                     readOnly
-                                                    value= { fileName }
+                                                    value= { fatherFileName }
                                                     placeholder="No file chosen"
                                                     className="file-name-display"
                                                 />
                                                 <label className="file-upload-btn">
                                                     Browse File
-                                                    <input type="file" name="father" onChange={handleFileChange} style={{ display: "none" }} />
+                                                    <input type="file" name="father" onChange={handleFatherFileChange} style={{ display: "none" }} />
                                                 </label>
                                             </div>
                                         </div>
@@ -191,13 +223,13 @@ export default function AliveOrganFormSecondStep({prevStep, nextStep, afterDeath
                                                     type="text"
                                                     name="mother_Id"
                                                     readOnly
-                                                    value={ fileName }
+                                                    value={ motherFileName }
                                                     placeholder="No file chosen"
                                                     className="file-name-display"
                                                 />
                                                 <label className="file-upload-btn">
                                                     Browse File
-                                                    <input type="file" name="mother" onChange={handleFileChange} style={{ display: "none" }} />
+                                                    <input type="file" name="mother" onChange={handleMotherFileChange} style={{ display: "none" }} />
                                                 </label>
                                             </div>
                                         </div>

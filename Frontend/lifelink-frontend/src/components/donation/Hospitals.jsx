@@ -1,12 +1,12 @@
 import { FaHospital } from "react-icons/fa";
 import { FaLocationDot } from "react-icons/fa6";
 import { FaCar } from "react-icons/fa";
-import { FaStar } from "react-icons/fa";
+import { FaTint } from "react-icons/fa";
 import { SpinnerDotted } from 'spinners-react';
 
 import "../../styles/BloodDonation.css"
 
-export default function Hospitals({ onSelect, showHospitals, searchQuery }) {
+export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [] }) {
     const isSearching = searchQuery && searchQuery.trim() !== "";
     const hasResults = Array.isArray(showHospitals) && showHospitals.length > 0;
 
@@ -19,13 +19,18 @@ return (
       {isSearching && hasResults && (
         <div className="urgent-needs">
           <h1>Search Results:</h1>
-          {showHospitals.map((h) => (
+          {showHospitals.map((h) => {
+            // Determine appointment type: if hospital has urgent flag or appears in urgent list, use urgent, otherwise regular
+            const isUrgent = h.has_urgent || urgentHospitals.some(uh => uh.id === h.id);
+            const appointmentType = isUrgent ? 'urgent' : 'regular';
+            
+            return (
             <button
               key={h.id}
               id="registered-hospital"
               className="hospital-info"
               type="button"
-              onClick={() => onSelect(h)}
+              onClick={() => onSelect({ ...h, appointment_type: appointmentType })}
             >
               <div className="hospital-icon">
                 <FaHospital />
@@ -35,12 +40,13 @@ return (
                 <div className="details">
                   <div className="location">
                     <FaLocationDot />
-                    <small>{h.address}</small>
+                    <small className="hosp-address" title={h.address}>{h.address}</small>
                   </div>
                 </div>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -49,71 +55,104 @@ return (
         <>
         {hasResults ? ( 
           <>
-            <div className="urgent-needs">
-            <h1>Urgent Need:</h1>
+            {/* Urgent Need Section - Dynamic */}
+            {urgentHospitals && urgentHospitals.length > 0 && (
+              <div className="urgent-needs">
+                <h1>Urgent Need:</h1>
+                {urgentHospitals.map((h) => {
+                  // Format due date and time for display
+                  const formatDueDate = (dateStr) => {
+                    if (!dateStr) return '';
+                    try {
+                      const date = new Date(dateStr);
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric'});
+                    } catch {
+                      return dateStr;
+                    }
+                  };
 
-            <button
-              className="hospital-info"
-              type="button"
-              onClick={() =>
-                onSelect({
-                  id: 1,
-                  name: "AL Rasool Al Aazam Hospital",
-                  bloodType: "B+",
-                  address: "Airport Street, Beirut",
-                  slots: 12,
-                })
-              }
-            >
-              <div className="hospital-icon">
-                <FaHospital />
+                  const formatDueTime = (timeStr) => {
+                    if (!timeStr) return '';
+                    try {
+                      const [hours, minutes] = timeStr.split(':');
+                      const hour12 = parseInt(hours) % 12 || 12;
+                      const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+                      return `${hour12}:${minutes} ${ampm}`;
+                    } catch {
+                      return timeStr;
+                    }
+                  };
+
+                  const dueDateStr = h.urgent_due_date ? formatDueDate(h.urgent_due_date) : '';
+                  const dueTimeStr = h.urgent_due_time ? formatDueTime(h.urgent_due_time) : '';
+                  const dueDisplay = dueDateStr && dueTimeStr ? `${dueDateStr} at ${dueTimeStr}` : (dueDateStr || dueTimeStr || 'Urgent');
+
+                  return (
+                    <button
+                      key={h.id}
+                      className="hospital-info"
+                      type="button"
+                      onClick={() => onSelect({ ...h, appointment_type: 'urgent' })}
+                    >
+                      <div className="hospital-icon">
+                        <FaHospital />
+                      </div>
+
+                      <div className="info">
+                        <h2>
+                          {h.name}{" "}
+                          <span className="urgent-blood-types animate-pulse bg-red-600">
+                            Urgent: Due {dueDisplay}
+                          </span>
+                        </h2>
+                        <div className="details">
+                          <div className="location">
+                            <FaLocationDot />
+                            <small className="hosp-address" title={h.address}>{h.address || 'No address'}</small>
+                          </div>
+
+                          <div className="distance">
+                            <FaCar />
+                            <small>2.3km</small>
+                          </div>
+
+                          <div className="rating">
+                            <FaTint className="text-red-500" />
+                            <small>{h.blood_type_needed ? `Needed: ${h.blood_type_needed}` : 'All Types'}</small>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="slots">
+                        <h2>{h.urgent_slots !== undefined ? h.urgent_slots : (h.available_slots || 0)}</h2>
+                        <small>Available Slots</small>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+            )}
 
-              <div className="info">
-                <h2>
-                  AL Rasool Al Aazam Hospital{" "}
-                  <span className="urgent-blood-types animate-pulse bg-red-600">
-                    Urgent: B+
-                  </span>
-                </h2>
-                <div className="details">
-                  <div className="location">
-                    <FaLocationDot />
-                    <small>Airport Street, Beirut</small>
-                  </div>
-
-                  <div className="distance">
-                    <FaCar />
-                    <small>2.3km</small>
-                  </div>
-
-                  <div className="rating">
-                    <FaStar className="text-yellow-400" />
-                    <FaStar className="text-yellow-400" />
-                    <FaStar className="text-yellow-400" />
-                    <FaStar className="text-yellow-400" />
-                    <small>(4)</small>
-                  </div>
-                </div>
-              </div>
-
-              <div className="slots">
-                <h2>12</h2>
-                <small>Available Slots</small>
-              </div>
-            </button>
-            </div>
-
+            {/* Regular Hospitals Section - Shows hospitals with regular appointments */}
             <div className="urgent-needs">
             <h1 className="register-hospital">Registered Hospitals:</h1>
             
-              {showHospitals.map((h) => (
+              {(() => {
+                // Use regularHospitals from backend, or fallback to filtering showHospitals
+                const hospitalsToShow = regularHospitals.length > 0 
+                  ? regularHospitals 
+                  : showHospitals.filter(h => {
+                      // If backend didn't provide regularHospitals, filter hospitals that don't have urgent
+                      return !urgentHospitals.some(uh => uh.id === h.id) || h.has_regular;
+                    });
+                
+                return hospitalsToShow.map((h) => (
                 <button
                   key={h.id}
                   id="registered-hospital"
                   className="hospital-info"
                   type="button"
-                  onClick={() => onSelect(h)}
+                  onClick={() => onSelect({ ...h, appointment_type: 'regular' })}
                 >
                   <div className="hospital-icon">
                     <FaHospital />
@@ -123,23 +162,29 @@ return (
                     <div className="details">
                       <div className="location">
                         <FaLocationDot />
-                        <small>{h.address}</small>
+                        <small className="hosp-address" title={h.address}>{h.address}</small>
                       </div>
 
                         <div className="distance">
                             <FaCar />
                             <small>2.3km</small>
                         </div>
+
+                        <div className="rating">
+                            <FaTint className="text-red-500" />
+                            <small>All Types</small>
+                        </div>
                     </div>
                     
 
                     <div className="slots">
-                        <h2>12</h2>
+                        <h2>{h.regular_slots !== undefined ? h.regular_slots : (h.available_slots || 0)}</h2>
                         <small>Available Slots</small>
                     </div>
                   </div>
                 </button>
-              ))}
+                ));
+              })()}
               
           </div>
           </>

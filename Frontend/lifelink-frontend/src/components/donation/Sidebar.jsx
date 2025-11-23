@@ -11,7 +11,7 @@ import { BiHomeSmile } from "react-icons/bi";
 
 export default function Sidebar() {
   return (
-    <div className="sidebar">
+    <div className="sidebar padding">
       <div className="top">
         <img src={lifelinklogo} alt="life link logo" />
         <h1>Donation Center</h1>
