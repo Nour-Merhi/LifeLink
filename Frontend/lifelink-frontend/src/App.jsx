@@ -8,6 +8,7 @@ import OrganDead from "./pages/OrganDead";
 import OrganAlive from "./pages/OrganAlive";
 import FinancialSupport from "./pages/FinancialSupport";
 import ScrollToTop from "./components/ScrollToTop";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import AfterDeathStepTwo from "./components/donation/afterLifeOrganForm/AfterDeathStepTwo.jsx";
 import AfterDeathStepThree from "./components/donation/afterLifeOrganForm/AfterDeathStepThree.jsx";
@@ -15,6 +16,13 @@ import AliveOrganForm from "./components/donation/AliveOrganForm";
 
 import { useEffect } from "react";
 import axios from "axios";
+import Hospitals from "./components/adminDashboard/Hospitals.jsx";
+import Donors from "./components/adminDashboard/Donors.jsx";
+import HomeVisit from "./components/adminDashboard/HomeVisit.jsx";
+import Phlebotomist from "./components/adminDashboard/Phlebotomist.jsx";
+import Financial from "./components/adminDashboard/Financial.jsx";
+import Notification from "./components/adminDashboard/Notification.jsx";
+import OrganPledges from "./components/adminDashboard/OrganPledges.jsx";
 
 function App() {
   useEffect(() => {
@@ -50,6 +58,21 @@ function App() {
           <Route path="/donation/home-blood-from" element={<HomeBookForm />} />
         </Route>
         
+        {/* Admin Dashboard layout */}
+        <Route path="/admin" element={<AdminDashboard />}>
+          <Route path="donors" element={<Donors />} />
+          <Route path="hospitals" element={<Hospitals/>} />
+          <Route path="home-visits" element={<HomeVisit />} />
+          <Route path="phlebotomists" element={<Phlebotomist />} />
+          <Route path="organ-pledges" element={<OrganPledges />} />
+          <Route path="financials" element={<Financial />} />
+          <Route path="notifications" element={<Notification />} />
+          <Route path="settings" element={<div><h1>Settings</h1></div>} />
+          <Route path="dashboard" element={<div><h1>Dashboard</h1></div>} />
+        </Route>
+        
+        {/* Default redirect */}
+        <Route path="/" element={<div>Welcome to LifeLink</div>} />
       </Routes>
     </Router>
 

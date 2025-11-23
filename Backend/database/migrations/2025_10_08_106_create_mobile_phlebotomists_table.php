@@ -13,9 +13,14 @@ return new class extends Migration
     {
         Schema::create('mobile_phlebotomists', function (Blueprint $table) {
             $table->id();
+            $table->string('code')->unique();
             $table->string('license_number');
+            $table->time('start_time');
+            $table->time('end_time');
+            $table->json('working_dates');
+            $table->integer('max_appointments');
             $table->enum('availability', ['unavailable', 'available', 'onDuty'])->default('available');
-            $table->foreignId('user_id')->referneces('id')->on('users')->onDelete('cascade');
+            $table->foreignId('user_id')->refereneces('id')->on('users')->onDelete('cascade');
             $table->foreignId('hospital_id')->references('id')->on('hospitals')->onDelete('cascade');
             $table->foreignId('manager_id')->references('id')->on('health_center_managers')->onDelete('cascade');
             $table->timestamps();

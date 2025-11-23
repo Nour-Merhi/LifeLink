@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
+
 
 use App\Models\Hospital;
 use App\Models\Donor;
@@ -18,7 +20,7 @@ class HospitalAppointment extends Model
         'appointment_date',
         'appointment_time',
         'state',
-        'note'
+        'note',
     ];
 
     public function hospital(){

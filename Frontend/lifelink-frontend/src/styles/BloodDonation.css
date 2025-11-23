@@ -12,9 +12,9 @@
 /*Search*/
 .search{
     background-color: #ffffff;
-    border-radius: 20px;
+    border-radius: 10px;
     padding: 30px;
-    box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+    box-shadow: 0 0 4px rgba(0,0,0,0.25);
     margin-bottom: 20px;
 }
 
@@ -138,6 +138,13 @@
    color: var(--red-color);
    margin-right: 60px;
 }
+.hosp-address{
+    max-width: 200px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .details > .distance{
   color: rgb(18, 120, 252);
 }
@@ -174,15 +181,15 @@
   flex-direction: row;
   justify-content: space-between;
   width: 100%;
-  height: 480px;
+  height: 530px;
   gap: 20px;
   padding: 10px 0px;
 }
 .calendar-step{
   flex: 0 0 65%;
   background-color: white;
-  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
-  border-radius: 20px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.25);
+  border-radius: 10px;
   padding: 15px;
   height: 100%;
   
@@ -192,8 +199,8 @@
 .timeslot-panel {
   flex: 0 0 33%;
   background-color: white;
-  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
-  border-radius: 20px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.25);
+  border-radius: 10px;
   height: 100%;
   padding: 20px 13px 20px 20px;
   text-align: center;
@@ -224,6 +231,20 @@
   transition: 0.3s ease;
 }
 
+/* Muted dates without appointments */
+#dates.muted-date {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
+  color: #B3B3B3;
+  background-color: #F5F5F5 !important;
+}
+
+#dates.muted-date:hover {
+  background-color: #F5F5F5 !important;
+  transform: none;
+}
+
 .time-slot-btn{
   width: 100%;
 }
@@ -236,6 +257,24 @@
   margin: 5px 0;
   border-radius: 10px;
   font-weight: 400;
+  transition: all 0.3s ease;
+}
+
+/* Booked slot styling */
+.times.booked-slot {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.time-slot-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.time-slot-btn:disabled .times {
+  background-color: #e5e7eb !important;
+  color: #9ca3af !important;
 }
 
 #go-back-btn{
@@ -467,39 +506,28 @@ label > input:checked{
 }
 
 .whats-next ul {
-  list-style: disc;            /* show dots */
+  list-style: disc;            
   list-style-position: outside;
-  padding-left: 1.25rem;      /* or 20px / 40px depending on design */
+  padding-left: 1.25rem;     
   margin: 0 2rem;
 }
 
-/* ensure li renders as list-item */
 .whats-next li {
   display: list-item;
   font-weight: 300;
 }
-
-
-/* Target the scrolling area */
 .dates-available {
   flex: 1 1 auto;
-  overflow-y: auto;            /* thickness */
+  overflow-y: auto;           
   padding-right: 5px;
-  /* optional: smoother scroll */
   scroll-behavior: smooth;
 }
-
-/* Scrollbar track */
 .dates-available::-webkit-scrollbar {
   width: 5px;
 }
-
-/* Track background */
 .dates-available::-webkit-scrollbar-track {
   background: transparent;
 }
-
-/* Thumb (the draggable part) */
 .dates-available::-webkit-scrollbar-thumb {
   background-color: var(--grey-color);
   border-radius: 10px;

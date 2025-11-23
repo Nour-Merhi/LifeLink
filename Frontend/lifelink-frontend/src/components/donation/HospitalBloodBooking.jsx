@@ -46,11 +46,17 @@ export default function HospitalBloodBooking({ pageType }) {
   useEffect (()=> {
     axios.get("http://localhost:8000/api/hospital")
     .then((res)=> {
-      setShowHospitals(res.data)
-      setFilteredHospitals(res.data);
+      // Handle both response formats: { hospitals: [...] } or direct array
+      const hospitalsData = res.data.hospitals || res.data || [];
+      const hospitalsArray = Array.isArray(hospitalsData) ? hospitalsData : [];
+      
+      setShowHospitals(hospitalsArray);
+      setFilteredHospitals(hospitalsArray);
     })
     .catch((error)=>{
-      console.error("Error fetching hospitals:", error)
+      console.error("Error fetching hospitals:", error);
+      setShowHospitals([]);
+      setFilteredHospitals([]);
     })
   }, [])
 

@@ -1,0 +1,44 @@
+.navbar{
+    background-color: white;
+    box-shadow: 3px 0 4px rgba(0, 0, 0, 0.25);
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+.navbar > h2{
+    font-size: 24px;
+    font-weight: 600;
+    margin: 15px 20px;
+}
+.nav-info{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+    margin-right: 50px;
+}
+.admin-info{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap:10px;
+}
+.admin-name{
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+}
+.admin-name > h3{
+    padding-top: 2px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 15px;
+}
+.admin-name> small{
+    font-size: 12px;
+}
+.admin-icon {
+    font-size: 20px;
+}

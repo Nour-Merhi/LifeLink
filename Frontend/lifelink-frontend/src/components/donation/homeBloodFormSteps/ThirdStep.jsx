@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom"
 import { useState } from "react";
 import { IoHeart } from "react-icons/io5";
+import axios from 'axios';
 
 import ScrollToTop from "../../ScrollToTop";
 import ThankModalHomeBlood from "../ThankModals/ThankModalHomeBlood";
@@ -9,17 +10,84 @@ import ThankModalHomeBlood from "../ThankModals/ThankModalHomeBlood";
 export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
      const navigate = useNavigate()
      const [thankMessHome, setThankMessHome] = useState(false);
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState("");
 
-     const handleSubmit = (e) => {
+     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        const prefix = pageType === "home" ? "home_" : "hospital_";
-        localStorage.setItem("step", "hospitals");
-        localStorage.removeItem("calendar");
-        localStorage.removeItem("date");
-        localStorage.removeItem("time");
+        setLoading(true);
+        setError("");
 
-        setThankMessHome(true);
+        try {
+            // Ensure all required fields are present
+            const formDataToSend = {
+                ...homeBloodFormData,
+                date_of_birth: homeBloodFormData.date_of_birth || '',                // Ensure appointment data is properly formatted
+                hospital_id: homeBloodFormData.hospital_id || null,
+                appointment_date: homeBloodFormData.appointment_date || '',
+                appointment_time: homeBloodFormData.appointment_time || '',
+                medical_conditions: homeBloodFormData.medical_conditions || {}
+            };
+
+            console.log('Submitting form data:', formDataToSend);
+
+            // Send all data to backend
+            const response = await axios.post(
+                'http://localhost:8000/api/blood/home_appointment',
+                formDataToSend,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            console.log('Home appointment created:', response.data);
+
+            // Clear localStorage
+            const prefix = "home_"; // Always home for this form
+            localStorage.setItem("step", "hospitals");
+            localStorage.removeItem(prefix + "hospital");
+            localStorage.removeItem("date");
+            localStorage.removeItem("appointment_time");
+
+            setThankMessHome(true);
+        } catch (err) {
+            console.error('Error submitting home appointment:', err);
+            console.error('Error response:', err.response?.data);
+            
+            // Handle validation errors
+            if (err.response?.status === 422 && err.response?.data?.errors) {
+                const validationErrors = err.response.data.errors;
+                const errorMessages = Object.keys(validationErrors)
+                    .map(key => `${key}: ${validationErrors[key].join(', ')}`)
+                    .join('\n');
+                
+                const errorMessage = `Validation Errors:\n${errorMessages}`;
+                setError(errorMessage);
+                alert(errorMessage);
+            } else {
+                // Get detailed error message from backend
+                const errorMessage = err.response?.data?.error 
+                    || err.response?.data?.message 
+                    || err.message 
+                    || "Failed to submit appointment. Please try again.";
+                
+                console.error('Full error details:', {
+                    message: errorMessage,
+                    type: err.response?.data?.type,
+                    details: err.response?.data?.details,
+                    status: err.response?.status
+                });
+                
+                setError(errorMessage);
+                alert(`Error: ${errorMessage}`);
+            }
+        } finally {
+            setLoading(false);
+        }
      }
 
      const onClose = () => {
@@ -104,7 +172,13 @@ export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
                                                 ()=> navigate("/donation/home-blood-donation")
                                             }
                                         >Cancel</button>
-                                        <button type="submit" className="next-step-btn color">Submit</button>
+                                        <button 
+                                            type="submit" 
+                                            className="next-step-btn color"
+                                            disabled={loading}
+                                        >
+                                            {loading ? "Submitting..." : "Submit"}
+                                        </button>
                                     </div>
                                 </div>
                             </form>

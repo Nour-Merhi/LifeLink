@@ -17,18 +17,23 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
             age--;
         }
 
-        setAfterDeathFormData(prev => ({...prev, dob, age}))
+        setAfterDeathFormData(prev => ({...prev, birth_date: dob, age}))
     }
 
-    const handleSubmit = (e) => {
+     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log("Form submitted!");
+        
+        // Validate required fields
+        if (!afterDeathFormData.first_name || !afterDeathFormData.last_name || 
+            !afterDeathFormData.email || !afterDeathFormData.phone || 
+            !afterDeathFormData.birth_date || !afterDeathFormData.gender || 
+            !afterDeathFormData.address || !afterDeathFormData.blood_type) {
+            alert("Please fill in all required fields.");
+            return;
+        }
+        
+        // Data is already in state via controlled components, just proceed to next step
         nextStep();
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     return(
@@ -46,62 +51,137 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
                     <div className="form-group">
                         <div>
                             <label htmlFor="first-name">First Name</label>
-                            <input type="text" id="first-name" name="first_name" placeholder="Enter your first name" required/>
+                            <input 
+                                type="text" 
+                                id="first-name" 
+                                name="first_name" 
+                                value={afterDeathFormData.first_name || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, first_name: e.target.value}))}
+                                placeholder="Enter your first name" 
+                                required
+                            />
                         </div>
                         <div>
                             <label htmlFor="middle-name">Middle Name</label>
-                            <input type="text" id="middle-name" name="middle_name" placeholder="Enter your middle name" required/>
+                            <input 
+                                type="text" 
+                                id="middle-name" 
+                                name="middle_name" 
+                                value={afterDeathFormData.middle_name || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, middle_name: e.target.value}))}
+                                placeholder="Enter your middle name" 
+                            />
                         </div>
                         <div>
-                            <label for="last-name">Last Name</label>
-                            <input type="text" id="last-name" name="last_name" placeholder="Enter your last name" required/>
+                            <label htmlFor="last-name">Last Name</label>
+                            <input 
+                                type="text" 
+                                id="last-name" 
+                                name="last_name" 
+                                value={afterDeathFormData.last_name || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, last_name: e.target.value}))}
+                                placeholder="Enter your last name" 
+                                required
+                            />
                         </div>
                     </div>
                     <div className="form-group">
                         <div>
-                            <label for="email">Email Address</label>
-                            <input type="email" id="email" name="email" placeholder="Enter your email" required/>
+                            <label htmlFor="email">Email Address</label>
+                            <input 
+                                type="email" 
+                                id="email" 
+                                name="email" 
+                                value={afterDeathFormData.email || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, email: e.target.value}))}
+                                placeholder="Enter your email" 
+                                required
+                            />
                         </div>
                         <div>
-                            <label for="phone">Phone Number</label>
-                            <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" required/>
+                            <label htmlFor="phone">Phone Number</label>
+                            <input 
+                                type="tel" 
+                                id="phone" 
+                                name="phone" 
+                                value={afterDeathFormData.phone || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, phone: e.target.value}))}
+                                placeholder="Enter your phone number" 
+                                required
+                            />
                         </div>
                     </div>
                     <div className="form-group">
                         <div>
                             <label htmlFor="birth-date">Date of Birth</label>
-                            <input 
+                                <input 
                                 type="date" 
                                 id="birth-date" 
                                 name="birth_date"
-                                value = { afterDeathFormData.dob }
+                                value = { afterDeathFormData.birth_date || "" }
                                 onChange={ getAge }
                                 required/>
                         </div>
                         <div>
-                            <label for="gender">Gender</label>
-                            <select id="gender">
-                                <option value="" disabled selected>Select a Gender</option>
+                            <label htmlFor="gender">Gender</label>
+                            <select id="gender" name="gender" value={afterDeathFormData.gender || ""} onChange={(e) => setAfterDeathFormData(prev => ({...prev, gender: e.target.value}))} required>
+                                <option value="" disabled>Select a Gender</option>
                                 <option value="male">Male</option>
                                 <option value="female">Female</option>
                             </select>
                         </div>
-            
                     </div>
                     <div className="form-group">
                         <div>
-                            <label for="address">Address</label>
-                            <textarea id="address" placeholder="Enter your address in detials.."required />
+                            <label htmlFor="blood-type">Blood Type</label>
+                            <select id="blood-type" name="blood-type" value={afterDeathFormData.blood_type || ""} onChange={(e) => setAfterDeathFormData(prev => ({...prev, blood_type: e.target.value}))} required>
+                                <option value="" disabled>Select Blood Type</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                            </select>
                         </div>
                     </div>
                     <div className="form-group">
                         <div>
-                            <label for="emergency-contact">Emergency Contact (optional)</label>
-                            <input type="text" id="emergency-contact" placeholder="Enter emergency contact name"/>
+                            <label htmlFor="address">Address</label>
+                            <textarea 
+                                id="address" 
+                                name="address"
+                                value={afterDeathFormData.address || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, address: e.target.value}))}
+                                placeholder="Enter your address in detials.."
+                                required 
+                            />
+                        </div>
+                    </div>
+                    <div className="form-group">
+                        <div>
+                            <label htmlFor="emergency-contact">Emergency Contact (optional)</label>
+                            <input 
+                                type="text" 
+                                id="emergency-contact" 
+                                name="emergency-contact"
+                                value={afterDeathFormData.emergency_contact || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, emergency_contact: e.target.value}))}
+                                placeholder="Enter emergency contact name"
+                            />
                         </div>
                         <div>
-                            <label for="emergency-contact-number">Emergency Contact Number (optional)</label>
-                            <input type="tel" id="emergency-contact-number" placeholder="Enter emergency contact number"/>
+                            <label htmlFor="emergency-contact-number">Emergency Contact Number (optional)</label>
+                            <input 
+                                type="tel" 
+                                id="emergency-contact-number" 
+                                name="emergency-contact-number"
+                                value={afterDeathFormData.emergency_contact_number || ""}
+                                onChange={(e) => setAfterDeathFormData(prev => ({...prev, emergency_contact_number: e.target.value}))}
+                                placeholder="Enter emergency contact number"
+                            />
                         </div>
                     </div>
 

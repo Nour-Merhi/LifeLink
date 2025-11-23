@@ -1,33 +1,225 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 import { IoMdHeart } from "react-icons/io";
 
-export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
+export default function AliveOrganFormStepThree({ setThankMess, prevStep, afterDeathFormData, setAfterDeathFormData, onReset }){
     const location = useLocation();
     const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    
+    // List of all organ IDs (excluding all-organs)
+    const allOrganIds = [
+        'heart', 'corneas', 'liver', 'skin', 'kidneys', 'bones', 
+        'lungs', 'valves', 'pancrease', 'tendons', 'intestines', 'blood-vesseles'
+    ];
+    
+    // State to track selected organs
+    const [selectedOrgans, setSelectedOrgans] = useState({
+        heart: false,
+        corneas: false,
+        liver: false,
+        skin: false,
+        kidneys: false,
+        bones: false,
+        lungs: false,
+        valves: false,
+        pancrease: false,
+        tendons: false,
+        intestines: false,
+        'blood-vesseles': false,
+        'all-organs': false
+    });
 
+    // State to hold form data for submission
+    const [formDataState, setFormDataState] = useState(null);
 
-    const [maritalState, setMartialState] = useState("")
-    const [profState, setProfState] = useState ("")
-    const [fileName, setFileName] = useState("");
-
-    const handleFileChange = (e) => {
-        if (e.target.files.length > 0) {
-        setFileName(e.target.files[0].name);
+    // Handle individual organ checkbox change
+    const handleOrganChange = (organId, checked) => {
+        if (organId === 'all-organs') {
+            // If "all-organs" is checked, check all others
+            if (checked) {
+                const newState = {};
+                allOrganIds.forEach(id => {
+                    newState[id] = true;
+                });
+                newState['all-organs'] = true;
+                setSelectedOrgans(newState);
+            } else {
+                // If "all-organs" is unchecked, uncheck all
+                const newState = {};
+                allOrganIds.forEach(id => {
+                    newState[id] = false;
+                });
+                newState['all-organs'] = false;
+                setSelectedOrgans(newState);
+            }
+        } else {
+            // Handle individual organ checkbox
+            const newState = { ...selectedOrgans, [organId]: checked };
+            
+            // Check if all individual organs are selected
+            const allIndividualSelected = allOrganIds.every(id => {
+                if (id === organId) return checked; // Use the new checked value
+                return newState[id];
+            });
+            
+            newState['all-organs'] = allIndividualSelected;
+            setSelectedOrgans(newState);
         }
     };
 
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-
-        if (!e.target.checkValidity()) {
-            e.target.reportValidity();
-            return;
+    // Function to build FormData from state
+    const buildFormData = () => {
+        // Collect organ selections from state
+        const organsToSubmit = [];
+        if (selectedOrgans['all-organs']) {
+            // If "all-organs" is selected, include it
+            organsToSubmit.push('all-organs');
+        } else {
+            // Otherwise, include only individually selected organs
+            allOrganIds.forEach(organId => {
+                if (selectedOrgans[organId]) {
+                    organsToSubmit.push(organId);
+                }
+            });
         }
 
-        setThankMess(true);
+        // Prepare FormData for file uploads
+        const formData = new FormData();
+        
+        // Step 1 data
+        formData.append('first_name', afterDeathFormData.first_name);
+        if (afterDeathFormData.middle_name) {
+            formData.append('middle_name', afterDeathFormData.middle_name);
+        }
+        formData.append('last_name', afterDeathFormData.last_name);
+        formData.append('email', afterDeathFormData.email);
+        formData.append('phone', afterDeathFormData.phone);
+        formData.append('birth_date', afterDeathFormData.birth_date);
+        formData.append('gender', afterDeathFormData.gender);
+        formData.append('address', afterDeathFormData.address);
+        if (afterDeathFormData.emergency_contact) {
+            formData.append('emergency_contact', afterDeathFormData.emergency_contact);
+        }
+        if (afterDeathFormData.emergency_contact_number) {
+            formData.append('emergency_contact_number', afterDeathFormData.emergency_contact_number);
+        }
+        
+        // Step 2 data
+        formData.append('marital_status', afterDeathFormData.marital_status);
+        formData.append('education_level', afterDeathFormData.education_level);
+        formData.append('professional_status', afterDeathFormData.professional_status);
+        if (afterDeathFormData.work_type) {
+            formData.append('work_type', afterDeathFormData.work_type);
+        }
+        if (afterDeathFormData.mother_name) {
+            formData.append('mother_name', afterDeathFormData.mother_name);
+        }
+        if (afterDeathFormData.spouse_name) {
+            formData.append('spouse_name', afterDeathFormData.spouse_name);
+        }
+        
+        // Files - id_photo is required
+        formData.append('id_photo', afterDeathFormData.id_photo);
+        if (afterDeathFormData.father_id_photo) {
+            formData.append('father_id_photo', afterDeathFormData.father_id_photo);
+        }
+        if (afterDeathFormData.mother_id_photo) {
+            formData.append('mother_id_photo', afterDeathFormData.mother_id_photo);
+        }
+        
+        // Step 3 data - organs
+        organsToSubmit.forEach(organ => {
+            formData.append('pledged_organs[]', organ);
+        });
+        
+        // Blood type (required)
+        formData.append('blood_type', afterDeathFormData.blood_type);
+
+        return formData;
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError("");
+
+        try {
+            // Validate required fields before submission
+            if (!afterDeathFormData.first_name || !afterDeathFormData.last_name || !afterDeathFormData.email || 
+                !afterDeathFormData.phone || !afterDeathFormData.birth_date || !afterDeathFormData.gender || 
+                !afterDeathFormData.address || !afterDeathFormData.blood_type) {
+                setError("Please complete all required fields in Step 1.");
+                setLoading(false);
+                return;
+            }
+
+            if (!afterDeathFormData.marital_status || !afterDeathFormData.education_level || 
+                !afterDeathFormData.professional_status || !afterDeathFormData.id_photo) {
+                setError("Please complete all required fields in Step 2, including uploading your ID photo.");
+                setLoading(false);
+                return;
+            }
+
+            // Check if at least one organ is selected
+            const hasSelectedOrgans = selectedOrgans['all-organs'] || 
+                allOrganIds.some(organId => selectedOrgans[organId]);
+            
+            if (!hasSelectedOrgans) {
+                setError("Please select at least one organ to donate.");
+                setLoading(false);
+                return;
+            }
+
+            // Build FormData from state
+            const formData = buildFormData();
+            
+            // Update formDataState
+            setFormDataState(formData);
+
+            const response = await axios.post(
+                "http://localhost:8000/api/organ/after-death-pledge",
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                        "Accept": "application/json",
+                    },
+                }
+            );
+
+            // Reset selected organs state
+            setSelectedOrgans({
+                heart: false,
+                corneas: false,
+                liver: false,
+                skin: false,
+                kidneys: false,
+                bones: false,
+                lungs: false,
+                valves: false,
+                pancrease: false,
+                tendons: false,
+                intestines: false,
+                'blood-vesseles': false,
+                'all-organs': false
+            });
+            setThankMess(true);
+        } catch (err) {
+            console.error("Error submitting form:", err);
+            if (err.response?.data?.errors) {
+                // Format validation errors
+                const errorMessages = Object.values(err.response.data.errors).flat().join(', ');
+                setError(errorMessages || "Validation failed. Please check all required fields.");
+            } else {
+                setError(err.response?.data?.message || "An error occurred while submitting the pledge. Please try again.");
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     return(
@@ -75,7 +267,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                  <div>
                                     <div className="organ-donate">
                                         <label htmlFor="heart" >
-                                            <input type="checkbox" id="heart" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="heart" 
+                                                name="heart"
+                                                checked={selectedOrgans.heart}
+                                                onChange={(e) => handleOrganChange('heart', e.target.checked)}
+                                            />
                                             Heart
                                         </label>
                                     </div>
@@ -83,7 +281,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate">
                                         <label htmlFor="corneas" >
-                                            <input type="checkbox" id="corneas" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="corneas" 
+                                                name="heart"
+                                                checked={selectedOrgans.corneas}
+                                                onChange={(e) => handleOrganChange('corneas', e.target.checked)}
+                                            />
                                             Corneas
                                         </label>
                                     </div>
@@ -93,7 +297,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                  <div>
                                     <div className="organ-donate">
                                         <label htmlFor="liver" >
-                                            <input type="checkbox" id="liver" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="liver" 
+                                                name="heart"
+                                                checked={selectedOrgans.liver}
+                                                onChange={(e) => handleOrganChange('liver', e.target.checked)}
+                                            />
                                             Liver
                                         </label>
                                     </div>
@@ -101,7 +311,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate">
                                         <label htmlFor="skin" >
-                                            <input type="checkbox" id="skin" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="skin" 
+                                                name="heart"
+                                                checked={selectedOrgans.skin}
+                                                onChange={(e) => handleOrganChange('skin', e.target.checked)}
+                                            />
                                             Skin
                                         </label>
                                     </div>
@@ -111,7 +327,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                  <div>
                                     <div className="organ-donate">
                                         <label htmlFor="kidneys" >
-                                            <input type="checkbox" id="kidneys" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="kidneys" 
+                                                name="heart"
+                                                checked={selectedOrgans.kidneys}
+                                                onChange={(e) => handleOrganChange('kidneys', e.target.checked)}
+                                            />
                                             Kidneys
                                         </label>
                                     </div>
@@ -119,7 +341,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate">
                                         <label htmlFor="bones" >
-                                            <input type="checkbox" id="bones" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="bones" 
+                                                name="heart"
+                                                checked={selectedOrgans.bones}
+                                                onChange={(e) => handleOrganChange('bones', e.target.checked)}
+                                            />
                                             Bones
                                         </label>
                                     </div>
@@ -129,7 +357,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                  <div>
                                     <div className="organ-donate">
                                         <label htmlFor="lungs" >
-                                            <input type="checkbox" id="lungs" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="lungs" 
+                                                name="heart"
+                                                checked={selectedOrgans.lungs}
+                                                onChange={(e) => handleOrganChange('lungs', e.target.checked)}
+                                            />
                                             Lungs
                                         </label>
                                     </div>
@@ -137,7 +371,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate">
                                         <label htmlFor="valves" >
-                                            <input type="checkbox" id="valves" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="valves" 
+                                                name="heart"
+                                                checked={selectedOrgans.valves}
+                                                onChange={(e) => handleOrganChange('valves', e.target.checked)}
+                                            />
                                             Valves
                                         </label>
                                     </div>
@@ -147,7 +387,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                  <div>
                                     <div className="organ-donate">
                                         <label htmlFor="pancrease" >
-                                            <input type="checkbox" id="pancrease" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="pancrease" 
+                                                name="heart"
+                                                checked={selectedOrgans.pancrease}
+                                                onChange={(e) => handleOrganChange('pancrease', e.target.checked)}
+                                            />
                                             Pancrease
                                         </label>
                                     </div>
@@ -155,7 +401,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate">
                                         <label htmlFor="tendons" >
-                                            <input type="checkbox" id="tendons" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="tendons" 
+                                                name="heart"
+                                                checked={selectedOrgans.tendons}
+                                                onChange={(e) => handleOrganChange('tendons', e.target.checked)}
+                                            />
                                             Tendons
                                         </label>
                                     </div>
@@ -165,7 +417,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                  <div>
                                     <div className="organ-donate">
                                         <label htmlFor="intestines" >
-                                            <input type="checkbox" id="intestines" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="intestines" 
+                                                name="heart"
+                                                checked={selectedOrgans.intestines}
+                                                onChange={(e) => handleOrganChange('intestines', e.target.checked)}
+                                            />
                                             Intestines
                                         </label>
                                     </div>
@@ -173,7 +431,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate">
                                         <label htmlFor="blood-vessels" >
-                                            <input type="checkbox" id="blood-vesseles" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="blood-vesseles" 
+                                                name="heart"
+                                                checked={selectedOrgans['blood-vesseles']}
+                                                onChange={(e) => handleOrganChange('blood-vesseles', e.target.checked)}
+                                            />
                                             Blood Vessels
                                         </label>
                                     </div>
@@ -183,7 +447,13 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                 <div>
                                     <div className="organ-donate last-child">
                                         <label htmlFor="all-organs" >
-                                            <input type="checkbox" id="all-organs" name="heart"/>
+                                            <input 
+                                                type="checkbox" 
+                                                id="all-organs" 
+                                                name="heart"
+                                                checked={selectedOrgans['all-organs']}
+                                                onChange={(e) => handleOrganChange('all-organs', e.target.checked)}
+                                            />
                                             Donate all organs and tissues
                                         </label>
                                     </div>
@@ -206,11 +476,24 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
 
                             </div>
 
+                            {error && (
+                                <div style={{ 
+                                    padding: '15px', 
+                                    backgroundColor: '#fee', 
+                                    color: '#c33', 
+                                    borderRadius: '5px', 
+                                    marginBottom: '20px' 
+                                }}>
+                                    {error}
+                                </div>
+                            )}
+
                             <div className="line"></div>
 
                             <div className="buttons-align">
                                 <button type="button" className="cancel-btn prev-btn"
                                         onClick={ prevStep }
+                                        disabled={loading}
                                     >Previous</button>
                                 
                                 <div>
@@ -218,8 +501,15 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep }){
                                         onClick={
                                             ()=> navigate("/donation/after-death-donation")
                                         }
+                                        disabled={loading}
                                     >Cancel</button>
-                                    <button type="submit" className="next-step-btn linear-blue" >Complete Registration</button>
+                                    <button 
+                                        type="submit" 
+                                        className="next-step-btn linear-blue"
+                                        disabled={loading}
+                                    >
+                                        {loading ? "Submitting..." : "Complete Registration"}
+                                    </button>
                                 </div>
                             </div>
                         </form>

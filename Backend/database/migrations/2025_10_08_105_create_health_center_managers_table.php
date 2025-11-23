@@ -13,11 +13,14 @@ return new class extends Migration
     {
         Schema::create('health_center_managers', function (Blueprint $table) {
             $table->id();
+            $table->string('code')->unique();
             $table->string('position');
-            $table->string('office_location');
-            $table->string('office_hours')->nullable();
+            $table->string('office_location')->nullable();
+            $table->json('working_dates')->nullable();
+            $table->string('start_time')->nullable();
+            $table->string('end_time')->nullable();
             $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('hospital_Id')->references('id')->on('hospitals')->onDelete('cascade');
+            $table->foreignId('hospital_id')->references('id')->on('hospitals')->onDelete('cascade');
             $table->timestamps();
         });
     }
