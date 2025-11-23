@@ -1,0 +1,90 @@
+:root{
+  --light-grey: #B3B3B3;
+  --grey-color : #D9D9D9;
+  --red-color: #F12C31;
+}
+
+/*SideBar*/
+.sidebar{
+  width: 21%;
+  height: 100vh;
+  box-shadow: 0 4px 4px  rgba(0,0,0, 0.25);
+  padding: 0 15px;
+  overflow-y: auto;
+  flex-shrink: 0; 
+  position: relative;       
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.sidebar > hr {
+  position: absolute;
+  left: 0;
+  right: 0;
+  color: #eaeaea;
+  margin-top: 8px;
+}
+
+.sidebar > div > h1{
+  font-size: 18px ;
+}
+.sidebar > div > p{
+  font-size: 12px ;
+}
+
+.sidebar > div > h2{
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--light-grey);
+  margin-bottom: 5px;
+}
+
+.option > div > h3{
+  font-size: 14px;
+  font-weight: 500;
+}
+.option > div > p{
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 15px;
+}
+
+.option{
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  margin-bottom: 3px;
+}
+
+.icon {
+  margin-right: 10px;
+  padding: 7px;
+  border-radius: 5px;
+}
+
+.donation{
+  margin-top: 20px;
+}
+.top > h1, .top > p{
+  margin-left: 5px;
+}
+.top > img {
+  width: 6rem;
+  margin-left: -10px ;
+  margin-bottom: 5px;
+  margin: 5px 0 5px -10px; 
+
+}
+#home{
+  position: absolute;
+  bottom: 0;
+  margin-bottom: 10px;
+}
+#bottom-hr {
+  position: absolute;
+  bottom: 0;
+  margin-bottom: 60px;
+}
+
+

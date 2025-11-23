@@ -1,0 +1,90 @@
+:root{
+  --light-grey: #B3B3B3;
+  --grey-color : #D9D9D9;
+  --red-color: #F12C31;
+  --frame-color: #F5F5F5;
+}
+html {
+  scroll-behavior: smooth;
+}
+button{
+  cursor: pointer;
+}
+h1{
+  font-size: 69px;
+  font-weight: 700;
+}
+p{
+  font-size: 20px;
+  font-weight: lighter;
+}
+.loader{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  height: 60vh;
+}
+
+/* Hero section */
+.first-illustration{
+  display: flex;
+  justify-content: flex-end;
+  margin-right: 50px;
+  margin-top: 20px;
+}
+
+.first-illustration > img{
+  position: absolute;
+  display: block;
+  z-index: 10;             /* in front of wave */
+  width: 45%;
+  height: auto; 
+}
+
+.wave{
+  width: auto; 
+  height: 90%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 0; 
+}
+
+#text-img{
+ display: flex;              
+  justify-content: space-between;
+  position: relative;          
+}
+.hero-info{
+  margin-top: 5%;
+  flex: 1;
+  max-width: 550px;
+  color: #252E32;
+}
+.hero-info > h1 {
+  max-width: 500px;
+  max-height: 424px;
+  margin: 0;
+}
+.hero-info > p {
+  max-width: 450px;
+  max-height: 424px;
+  line-height: 30px;
+  margin: 0;
+}
+
+/*Donations*/
+/* layout.css */
+.donation-layout {
+  display: flex;
+  min-height: 100vh; /* full height page */
+}
+
+.donation-content {
+  flex: 1;               
+  padding: 2rem;
+  background: var(--frame-color);   
+}
+

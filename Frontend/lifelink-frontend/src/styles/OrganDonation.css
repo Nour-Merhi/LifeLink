@@ -1,0 +1,827 @@
+:root{
+  --light-grey: #B3B3B3;
+  --grey-color : #D9D9D9;
+  --frame-color: #F5F5F5;
+  --shadow-color: #D8D8D8;
+  --red-color: #F12C31;
+  --light-red: #FFE2E2;
+  --icon-square: #FFF2F2;
+  --cancel-step-grey: #e6e6e6;
+  --blue-color: #285BFF;
+  --green-color: #2ECC71;
+  --pruple-color: #6132BE;
+}
+.organ h2{
+    font-size: 28px;
+    font-weight: 600;
+}
+.organ p{
+    font-size: 16px;
+    font-weight: 300;
+    line-height: 20px;
+}
+
+.color{
+    background-color: var(--red-color);
+}
+.bg-blue-color{
+    background-color: var(--blue-color);
+}
+.bg-purple-color{
+    background-color: var(--pruple-color);
+}
+.bg-green-color{
+    background-color: var(--green-color);
+}
+.green-color{
+    color: var(--green-color);
+    font-size: 23px;
+}
+.blue-color{
+    color: var(--blue-color)
+}
+.white-color{
+    color: white;
+}
+.linear-green{
+    background: linear-gradient(to right, var(--green-color), #129754);
+}
+.linear-blue{
+    background: linear-gradient(to right, #285BFF, #183799);
+}
+
+.organ-section{
+ margin: 20px 10px;
+}
+
+.header{
+    text-align: center;
+}
+.header >  h1{
+    font-size: 42px;
+    line-height: 50px;
+    margin: 0 100px ;
+}
+.header >  p{
+    margin: 10px 160px;
+}
+
+.pledge-btn{
+    background: linear-gradient(to right, var(--red-color), #A6191C) ;
+    border-radius: 10px;
+    color: white;
+    padding: 10px 20px;
+    font-size: 18px;
+    margin: 15px 15px 0 15px;
+}
+
+.box-container,
+.faq-section,
+.support-patient{
+    background-color: white;
+    box-shadow: 0 0 4px rgba(0,0,0, 0.25);
+    border-radius: 20px;
+    margin: 35px 0 10px 0;
+    padding: 20px 10px;
+}
+.box-container >  h2{
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.why-reason{
+    background-color: var(--frame-color);
+    border-radius: 20px;
+    margin: 0 40px;
+    padding: 20px 100px;
+    line-height: 30px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: center;
+}
+.why-register{
+    display: flex;
+    flex-direction: column;
+}
+.why-reason > div > p{
+    font-size: 14px;
+}
+
+.organs, 
+.process-steps{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin: 10px;
+}
+
+.organ-card, 
+.step{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin: 10px;
+}
+
+.organ-icon{
+    padding: 25px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    margin-top: 5px;
+    color: white;
+    font-size: 30px;
+}
+
+.organ-card > h3, 
+.step > h3{
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+.organ-card > p, 
+.step > p{
+    font-size: 14px;
+    padding: 0 20px;
+    max-width: 230px;
+}
+
+.step-number,
+.last-step-number{
+    font-size: 32px;
+    color: white;
+    font-weight: 600;
+    padding: 10px 25px;
+    border-radius: 50%;
+    margin: 10px 0 20px 0;
+}
+
+.step-number{
+    background-color: var(--blue-color);
+}
+
+.last-step-number{
+    background-color: var(--green-color);
+}
+
+.form-box-container{
+    background-color: white;
+    box-shadow: 0 0 4px rgba(0,0,0,0.25);
+    border-radius: 0 0 20px 20px ;
+}
+.title{
+    border-radius: 20px 20px 0 0;
+    padding: 10px 18px;
+    margin-top: 30px;
+    color: white;
+    font-weight: 600;
+    font-size: 24px;
+}
+.form{
+    padding: 30px 30px 23px 30px;
+}
+.organ-btn{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+.form-action{
+  display: flex;
+  justify-content: center;
+}
+
+
+/*Question Section*/
+.faq-item{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.faq-question{
+    flex: 0 0 48%;
+    background-color: var(--frame-color);
+    padding: 15px 25px;
+    border-radius: 20px;
+}
+.faq-question > h3{
+    font-weight: 600;
+    font-size: 17px;
+    margin-bottom: 5px;
+}
+.faq-question > p{
+    font-size: 14px;
+}
+
+.data-privacy{
+    margin: 20px 80px;
+    text-align: center;
+}
+.data-privacy > p{
+    font-size: 12px;
+}
+
+/*live donor imp mess*/
+.imp-mess{
+    background-color: rgba(255, 249, 89, 0.32);
+    border-radius: 20px;
+    padding: 20px 15px 20px 50px;
+    text-align: left;
+    margin-top: 20px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+}
+.imp-mess > p{
+    font-size: 14px;
+    color: rgba(232, 136, 3, 0.84) ;
+}
+.imp-mess > div {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    color: rgb(237, 162, 1);
+    margin-bottom: 5px;
+}
+
+/*form design Organ Alive */
+.organ-container{
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+.form-step{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.personal-info{
+    background-color: var(--frame-color);
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 15px;
+}
+.info-title{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    margin-left: 10px;
+}
+.organ-form-group{
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 16px;
+    gap: 20px
+}
+.organ-form-group > div{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.organ-form-group > div > input, 
+.organ-form-group > div > select,
+.organ-form-group > div > textarea{
+  width: 100%;
+  height: 50px;
+  border-radius: 10px;
+  padding: 0 20px;;
+  background-color: white;
+  box-shadow: inset 0 0 3px rgba(0,0,0, 0.25);
+}
+
+.organ-checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); 
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.organ-checkbox-group > div{
+    background: white;
+    padding: 15px 10px 10px 10px;
+    border-radius: 8px;
+    box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.25);
+}
+
+.organ-checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+.organ-checkbox-group > div > label > input[type="checkbox"],
+.agreement > label > input {
+  width: 18px;    
+  height: 18px;       
+  cursor: pointer;
+}
+
+.donation-type label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 30px;
+  background-color: white;
+  box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.donation-type input[type="radio"] {
+  width: 18px;
+  height: 18px;
+}
+.donation-type label p:last-child{
+    font-weight: 300;
+    font-size: 14px;
+}
+.donation-type label p:first-child{
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.agreement {
+    background-color: var(--frame-color);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 10px;
+}
+.agreement > label{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--red-color);
+}
+
+
+/*Donation Welcome Page*/
+.auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    max-width: 50%;
+    height: calc(100vh - 65px);
+    margin: 0 auto;
+}
+.auth-container > h2{
+    font-size: 45px;
+     background: linear-gradient(to right, var(--red-color), #A6191C);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: -5px;
+}
+
+.auth-container > p{
+    color: #858585;
+    margin-bottom: 20px;
+}
+
+.auth-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: #eee;
+  padding: 4px;
+  border-radius: 15px;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.btn {
+  position: relative;
+  z-index: 1;
+  padding: 10px 30px 10px 20px;
+  font-size: 16px;
+  border: none;
+  background: transparent;
+  color: #444;
+  border-radius: 30px;
+  transition: color 0.3s;
+}
+
+.btn.active {
+  color: white;
+}
+
+.highlight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(to right, var(--red-color), #A6191C);
+    border-radius: 15px 50px 0 15px;
+    z-index: 0;
+    transition: all 0.35s ease;
+}
+
+.highlight.login {
+  left: 50%;
+  border-radius: 50px 15px 15px 0;  
+}
+
+/*Financial Support Page*/
+.donate-support{
+    position: relative;
+    border-radius: 20px;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    overflow: hidden;
+    padding-left: 50px;
+    color: white;
+}
+
+.donate-support img{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0; 
+    box-shadow: inset 392px 0 250px rgba(0,0,0, 0.64);
+}
+.donate-support > div{
+    position: absolute;
+    z-index: 10;
+    max-width: 560px;
+}
+
+.donate-support h1{
+    line-height: 71px;
+}
+.donate-support p{
+    margin: 15px 0;
+}
+.donate-support button{
+    margin-left: -3px;
+}
+.top-info{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: 0 20px;
+}
+.top-info > h2{
+    font-size: 25px;
+}
+.pat-card{
+    padding: 10px 30px;
+}
+.patient {
+    display: flex;
+    flex-direction: column;
+    width: 225px;  
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+    padding-bottom:  20px; 
+    box-sizing: border-box;
+    margin: 5px 5px; 
+}
+.patient:hover{
+    border: 1px solid #0dca65;
+    box-shadow: 0 0 3px #5ff879;
+}
+.patient > img{
+    border-radius: 16px 16px  0 0;
+    height: 150px;
+}
+.support-patient-btn{
+    border-radius: 10px;
+    padding: 8px 20px;
+    color: white;
+    font-weight: 600;
+    font-size: 15px;
+    margin: 0 18px;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+.support-patient-btn:hover{
+    transform: scale(1.05);
+    opacity: 92%;
+}
+
+.view-more-btn{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap:5px;
+}
+.patient-dis{
+    text-align: justify;
+}
+.texts{
+    padding: 10px 25px 0;
+}
+
+.text-title{
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+
+/*Financial Support Form*/
+.type{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+.payment-method{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+.dn-type,
+.pay-type,
+.rec-type{
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+    padding: 20px;
+}
+
+.dn-type,
+.pay-type {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.rec-chose{
+    display: flex;
+    flex-direction: column;
+    gap:10px;
+}
+.rec-type,
+.cust-amount{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+}
+.rec-type >  div{
+    text-align: left;
+}
+
+.fin-icon{
+    font-size: 35px;
+    margin: 20px ;
+}
+
+.mn-type{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+.cust-amount{
+    margin-top: 15px;
+}
+.cust-amount > input{
+    background-color: var(--grey-color);
+    border-radius: 5px;
+    padding: 5px 10px;
+    max-width: 100px;
+    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.dn-type:hover,
+.rec-type:hover,
+.pay-type:hover{
+    border: 1px solid var(--green-color);
+    box-shadow: 0 0 8px rgba(1, 208, 87, 0.25);
+}
+
+.checked:checked{
+   accent-color : var(--green-color);
+}
+
+.selected-dn-btn{
+    background: linear-gradient(to right, var(--green-color), #129754) ;
+    color:white;
+}
+
+/*thank modal*/
+.modal-overlay {
+  position: fixed;
+  inset: 0;                   
+  background: rgba(0, 0, 0, 0.5); 
+  backdrop-filter: blur(4px); 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;             
+}
+
+.modal-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  max-width: 390px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 45px;
+}
+
+.modal-box button {
+    margin-top: 13px;
+    width: 100%;
+    padding: 0.5rem 1.5rem;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.complete{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.tick{
+    background-color: #D7FFDD;
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    color: #04AA68;
+    font-size: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+.complete > h3{
+    font-weight: 600;
+    font-size: 20px;
+}
+.conf-mess{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.conf-mess > small{
+    font-weight: 500;
+    line-height: 18px;
+}
+.modal-btn{
+    background-color: var(--red-color);
+}
+.thank-mess{
+    color: var(--red-color);
+    line-height: 28px;
+    margin-bottom: 15px;
+}
+.thank-mess > h2{
+    font-family: "Yellowtail", cursive;
+    font-weight: 500;
+    font-size: 30px;
+    font-style: normal;
+}
+.app-info{
+    background-color: var(--frame-color);
+    border-radius: 10px;
+    padding: 25px 20px;
+    width: 100%;
+}
+.app-info small{
+    font-size: 15px;
+    font-weight: 400;
+}
+.app-info div {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+/*AfterDeathForm step two*/
+.file-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.file-upload-container > div{
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.file-upload-container > p{
+    margin-left: 8px;
+    font-size: 15px;
+}
+
+.file-upload-btn {
+  background-color: var(--blue-color);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.file-name-display {
+  width: 400px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  background-color: var(--frame-color);
+}
+
+/*after death organ form step three*/
+.organ-donate{
+    border: 1px solid #B8C9FF;
+    border-radius: 5px;
+    padding: 10px;
+}
+.last-child{
+    background-color: #E7F1FD;
+}
+
+.organ-donate label,
+.form-group > .declare{
+    font-size: 18px;
+}
+.organ-donate input {
+    margin-right: 8px ;
+    transform: scale(1.2);
+    cursor: pointer;
+}
+.what-next{
+    background-color: #E6ECFF;
+    border: 1px solid #285BFF;
+    border-radius: 5px;
+    padding: 15px 15px 20px;
+}
+.what-next > div{
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    align-items: center;
+}
+.list{
+    padding-left: 40px;    
+    margin: 0.5rem 0;
+    font-weight: 300;
+}
+.what-next ul li::before {
+  content: "• ";
+  color: black;
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+}
+
+/*Progress Bar*/
+.progress-wrapper {
+  width: 100%;
+  max-width: 500px;
+  margin: 2rem auto 1rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.progress-header > span{
+    font-size: 13px;
+}
+
+.progress-bar {
+  background: #eee;
+  height: 13px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #47f771, #20c27f);
+  transition: width 0.4s ease;
+}
+
+.progress-text {
+  text-align: center;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+
