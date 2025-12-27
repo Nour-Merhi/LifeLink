@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react"
-import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp } from "react-icons/io5";
+import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { BsCalendar3, BsClock, BsHospital, BsChevronDown, BsChevronUp, BsListUl } from "react-icons/bs";
 import { MdLocationOn } from "react-icons/md";
 import { SpinnerDotted } from 'spinners-react';
+import axios from 'axios';
 import HospitalCalendarView from "./HospitalCalendarView";
+import EditAppointmentModal from "./EditAppointmentModal";
 
-export default function HomeAppTable({ appointments = [], loading = false, error = "" }){
+export default function HomeAppTable({ appointments = [], loading = false, error = "", onAppointmentsUpdate }){
     const [visitState, setVisitState] = useState("all-states"); 
     const [bloodType, setBloodType] = useState("all-blood");
     const [currentPage, setCurrentPage] = useState(1);
@@ -16,6 +17,11 @@ export default function HomeAppTable({ appointments = [], loading = false, error
     const [expandedDates, setExpandedDates] = useState({}); // Track which dates are expanded
     const [viewMode, setViewMode] = useState("list"); // 'list' or 'calendar'
     const [selectedHospitalId, setSelectedHospitalId] = useState(""); // Selected hospital for calendar view
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState(null); // { hospitalId, date, appointmentIds, type: 'hospital' | 'date' }
+    const [deleteError, setDeleteError] = useState("");
+    const [editModal, setEditModal] = useState(null); // { hospitalId, hospitalName, availableSlots }
+    const [editAppointmentModal, setEditAppointmentModal] = useState(null); // { appointmentIds, hospitalId, date }
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -66,7 +72,7 @@ export default function HomeAppTable({ appointments = [], loading = false, error
 
     if (error && !loading) {
         return (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#F12C31' }}>
+            <div className="error-container">
                 <p>Error: {error}</p>
             </div>
         );
@@ -76,6 +82,105 @@ export default function HomeAppTable({ appointments = [], loading = false, error
     const handleDateSelect = (date, timeslots) => {
         console.log('Selected date:', date, 'with timeslots:', timeslots);
         // You can add additional logic here if needed
+    };
+
+    // Handle delete for entire hospital
+    const handleDeleteHospitalClick = (e, hospital) => {
+        e.stopPropagation();
+        // Collect all appointment IDs from all dates for this hospital
+        const allAppointmentIds = [];
+        if (hospital.availableSlots && hospital.availableSlots.length > 0) {
+            hospital.availableSlots.forEach(slot => {
+                if (slot.appointment_ids && slot.appointment_ids.length > 0) {
+                    allAppointmentIds.push(...slot.appointment_ids);
+                }
+            });
+        }
+        setDeleteConfirm({ 
+            hospitalId: hospital.id, 
+            hospitalName: hospital.name,
+            appointmentIds: allAppointmentIds,
+            type: 'hospital'
+        });
+        setDeleteError("");
+    };
+
+    // Handle delete for specific date
+    const handleDeleteDateClick = (e, hospitalId, date, appointmentIds) => {
+        e.stopPropagation();
+        setDeleteConfirm({ hospitalId, date, appointmentIds, type: 'date' });
+        setDeleteError("");
+    };
+
+    // Handle edit click - open edit modal
+    const handleEditClick = (e, hospital) => {
+        e.stopPropagation();
+        setEditModal({
+            hospitalId: hospital.id,
+            hospitalName: hospital.name,
+            availableSlots: hospital.availableSlots || []
+        });
+    };
+
+    // Handle edit modal close
+    const handleEditModalClose = () => {
+        setEditModal(null);
+    };
+
+    // Handle delete cancellation
+    const handleDeleteCancel = () => {
+        setDeleteConfirm(null);
+        setDeleteError("");
+    };
+
+    // Handle delete confirmation and API call
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirm || !deleteConfirm.appointmentIds || deleteConfirm.appointmentIds.length === 0) {
+            setDeleteError("No appointments to delete");
+            return;
+        }
+
+        setDeleteLoading(true);
+        setDeleteError("");
+
+        try {
+            // Delete all appointments
+            const deletePromises = deleteConfirm.appointmentIds.map(appointmentId => 
+                axios.delete(`http://localhost:8000/api/admin/dashboard/appointments/${appointmentId}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                })
+            );
+
+            const results = await Promise.allSettled(deletePromises);
+            
+            // Check for any failures
+            const failures = results.filter(r => r.status === 'rejected');
+            if (failures.length > 0) {
+                const errorMessages = failures.map(f => f.reason?.response?.data?.message || f.reason?.message || 'Unknown error');
+                setDeleteError(errorMessages.join(', '));
+                
+                // If all failed, show error and don't close modal
+                if (failures.length === results.length) {
+                    setDeleteLoading(false);
+                    return;
+                }
+            }
+
+            // Success - close modal and refresh data
+            setDeleteConfirm(null);
+            setEditModal(null); // Close edit modal if open
+            if (onAppointmentsUpdate) {
+                onAppointmentsUpdate();
+            }
+        } catch (error) {
+            console.error('Error deleting appointments:', error);
+            setDeleteError(error.response?.data?.message || error.message || "Failed to delete appointments");
+        } finally {
+            setDeleteLoading(false);
+        }
     };
 
     return(
@@ -161,8 +266,20 @@ export default function HomeAppTable({ appointments = [], loading = false, error
                                     </div>
                                 </div>
                                 <div className="hospital-actions">
-                                    <button className="icon-btn" title="View Details"><FiEye /></button>
-                                    <button className="icon-btn" title="Edit"><FiEdit /></button>
+                                    <button 
+                                        className="icon-btn" 
+                                        title="Edit Appointments"
+                                        onClick={(e) => handleEditClick(e, hospital)}
+                                    >
+                                        <FiEdit />
+                                    </button>
+                                    <button 
+                                        className="icon-btn icon-btn-delete" 
+                                        title="Delete All Appointments for Hospital"
+                                        onClick={(e) => handleDeleteHospitalClick(e, hospital)}
+                                    >
+                                        <RiDeleteBin6Line />
+                                    </button>
                                 </div>
                             </div>
 
@@ -187,7 +304,7 @@ export default function HomeAppTable({ appointments = [], loading = false, error
                                                             <BsCalendar3 className="date-icon" />
                                                             <span className="date-value">{slot.date}</span>
                                                         </div>
-                                                        <div className="date-header-right">
+                                                        <div className="date-header-right date-header-right-flex">
                                                             <span className="available-count">
                                                                 {availableCount} available
                                                             </span>
@@ -279,6 +396,194 @@ export default function HomeAppTable({ appointments = [], loading = false, error
                 </div>
             )}
                 </>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="modal-overlay modal-overlay-delete">
+                    <div className="modal-container modal-container-delete">
+                        <div className="modal-title">
+                            <h2>Delete Appointments</h2>
+                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
+                                <IoClose />
+                            </button>
+                        </div>
+                        <div className="modal-form">
+                            {deleteConfirm.type === 'hospital' ? (
+                                <>
+                                    <p>Are you sure you want to delete <strong>ALL</strong> appointments for <strong>{deleteConfirm.hospitalName}</strong>?</p>
+                                    <p className="modal-text-secondary">
+                                        This will delete {deleteConfirm.appointmentIds?.length || 0} appointment record(s) across all dates. 
+                                        {deleteConfirm.appointmentIds?.length > 0 && (
+                                            <span className="modal-warning-text">
+                                                {' '}Note: This action cannot be undone if there are no active bookings.
+                                            </span>
+                                        )}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p>Are you sure you want to delete all appointments for <strong>{deleteConfirm.date}</strong>?</p>
+                                    <p className="modal-text-secondary">
+                                        This will delete {deleteConfirm.appointmentIds?.length || 0} appointment record(s). 
+                                        {deleteConfirm.appointmentIds?.length > 0 && (
+                                            <span className="modal-warning-text">
+                                                {' '}Note: This action cannot be undone if there are no active bookings.
+                                            </span>
+                                        )}
+                                    </p>
+                                </>
+                            )}
+                            
+                            {deleteError && (
+                                <div className="error-message modal-error-container">
+                                    {deleteError}
+                                </div>
+                            )}
+
+                            <div className="form-actions form-actions-modal">
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteCancel}
+                                    disabled={deleteLoading}
+                                    className="btn-cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteConfirm}
+                                    disabled={deleteLoading}
+                                    className="submit-btn btn-delete-submit"
+                                >
+                                    {deleteLoading ? (
+                                        <>
+                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Delete'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Appointment Modal */}
+            {editAppointmentModal && (
+                <EditAppointmentModal
+                    onClose={() => setEditAppointmentModal(null)}
+                    onAppointmentUpdated={() => {
+                        setEditAppointmentModal(null);
+                        setEditModal(null);
+                        if (onAppointmentsUpdate) {
+                            onAppointmentsUpdate();
+                        }
+                    }}
+                    appointmentIds={editAppointmentModal.appointmentIds}
+                    hospitalId={editAppointmentModal.hospitalId}
+                    date={editAppointmentModal.date}
+                    hospitals={[]}
+                />
+            )}
+
+            {/* Edit Modal */}
+            {editModal && !deleteConfirm && !editAppointmentModal && (
+                <div className="modal-overlay modal-overlay-edit">
+                    <div className="modal-container modal-container-edit">
+                        <div className="modal-title">
+                            <h2>Edit Appointments - {editModal.hospitalName}</h2>
+                            <button onClick={handleEditModalClose} disabled={deleteLoading}>
+                                <IoClose />
+                            </button>
+                        </div>
+                        <div className="modal-form">
+                            <div className="edit-modal-description">
+                                <p className="edit-modal-description-text">
+                                    Manage appointments for this hospital. You can delete specific dates or edit appointment details.
+                                </p>
+                            </div>
+
+                            {editModal.availableSlots && editModal.availableSlots.length > 0 ? (
+                                <div className="dates-container edit-dates-container">
+                                    {editModal.availableSlots.map((slot, idx) => {
+                                        const availableCount = slot.times?.filter(t => t.available).length || 0;
+                                        const totalCount = slot.times?.length || 0;
+                                        
+                                        return (
+                                            <div key={idx} className="date-slot edit-date-slot">
+                                                <div className="edit-date-header">
+                                                    <div className="edit-date-header-left">
+                                                        <BsCalendar3 className="edit-date-calendar-icon" />
+                                                        <span className="edit-date-value">{slot.date}</span>
+                                                        <span className="edit-date-count">
+                                                            ({availableCount} available of {totalCount})
+                                                        </span>
+                                                    </div>
+                                                    <div className="edit-date-actions">
+                                                        <button
+                                                            className="icon-btn icon-btn-delete-red"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteDateClick(e, editModal.hospitalId, slot.date, slot.appointment_ids || []);
+                                                            }}
+                                                            title="Delete this date"
+                                                        >
+                                                            <RiDeleteBin6Line />
+                                                        </button>
+                                                        <button
+                                                            className="icon-btn icon-btn-edit-blue"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditAppointmentModal({
+                                                                    appointmentIds: slot.appointment_ids || [],
+                                                                    hospitalId: editModal.hospitalId,
+                                                                    date: slot.date
+                                                                });
+                                                            }}
+                                                            title="Edit this date"
+                                                        >
+                                                            <FiEdit />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {slot.times && slot.times.length > 0 && (
+                                                    <div className="edit-times-container">
+                                                        <div className="edit-times-grid">
+                                                            {slot.times.slice(0, 10).map((time, timeIdx) => (
+                                                                <div 
+                                                                    key={timeIdx}
+                                                                    className={time.available ? 'edit-time-slot-available' : 'edit-time-slot-booked'}
+                                                                >
+                                                                    <BsClock className="edit-time-clock-icon" />
+                                                                    {time.time}
+                                                                    {!time.available && (
+                                                                        <span className="edit-time-booked-label">(Booked)</span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            {slot.times.length > 10 && (
+                                                                <span className="edit-time-more">
+                                                                    +{slot.times.length - 10} more
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="edit-no-appointments">
+                                    <p>No appointments found for this hospital</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
             
         </section>

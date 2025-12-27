@@ -56,7 +56,8 @@ export default function Donors(){
             <DonorTable 
                 donors={donors} 
                 loading={loading} 
-                error={error} 
+                error={error}
+                onDonorsUpdate={fetchDonors}
             />
             
             {openModal && 

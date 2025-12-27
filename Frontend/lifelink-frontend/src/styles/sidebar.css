@@ -79,10 +79,8 @@
   margin-left: 5px;
 }
 .top > img {
-  width: 6rem;
-  margin-left: -10px ;
-  margin-bottom: 5px;
-  margin: 5px 0 5px -10px; 
+  width: 9rem;
+  margin: -20px;
 
 }
 #home{
@@ -107,11 +105,15 @@
   background: linear-gradient(to bottom, var(--red-color), #8C1A1C);
 }
 
+.linear-hospital{
+  background: linear-gradient(to bottom, #96AFFF, #2349C2);
+}
+
 .links{
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   display: flex;
-  flex-direction: column; 
+  flex-direction: column;
 }
 .link-item{
   display: flex;
@@ -130,7 +132,7 @@
 }
 
 .icon-size{
-  font-size: 23px;
+  font-size: 21px;
 }
 
 .logout{

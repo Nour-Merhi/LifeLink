@@ -25,6 +25,8 @@ class HomeAppointment extends Model
         'phlebotomist_id',
         'weight(kg)',
         'address',
+        'latitude',
+        'longitude',
         'medical_conditions',
         'emerg_contact',
         'emerg_phone',

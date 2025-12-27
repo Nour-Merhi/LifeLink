@@ -1,17 +1,25 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom";
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp } from "react-icons/io5";
+import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
+import axios from 'axios';
 import AssignPhlebotomistModal from "../homeVisitComponents/AssignPhlebotomistModal";
+import EditPhlebotomistForm from "./EditPhlebotomistForm";
 
-export default function PhlebotomistTable({ phlebotomists = [], loading = false, error = "" }){
+export default function PhlebotomistTable({ phlebotomists = [], loading = false, error = "", onPhlebotomistsUpdate }){
+    const navigate = useNavigate();
     const [phlebotomistState, setPhlebotomistState] = useState("all-states");
     const [availableState, setAvailableState] = useState("all-states");
     const [assignPhlebotomistModalOpen, setAssignPhlebotomistModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
+    const [editModal, setEditModal] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -44,9 +52,14 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
         // Determine status based on availability (can be enhanced with actual status field)
         const status = phleb.availability === 'unavailable' ? 'inactive' : 'active';
         
-        // Calculate performance and success rate (placeholder - can be enhanced with actual data)
-        const performance = "80%"; // TODO: Calculate from actual appointments
-        const success_rate = "91.23% success"; // TODO: Calculate from actual success rate
+        // Get performance data from backend (calculated in controller)
+        const totalAppointments = phleb.total_appointments || 0;
+        const completedAppointments = phleb.completed_appointments || 0;
+        const successRate = phleb.success_rate || 0;
+        
+        // Format performance: show total appointments completed
+        const performance = totalAppointments > 0 ? `${completedAppointments}/${totalAppointments}` : "0/0";
+        const success_rate = successRate > 0 ? `${successRate}% success` : "No data";
         
         return {
             id: phleb.code || `PHL-${String(phleb.id).padStart(4, '0')}`,
@@ -224,9 +237,38 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
                             
                                 <td className="col-actions">
                                     <div className="row-actions">
-                                        <button className="icon-btn text-blue-800"><FiEye /></button>
-                                        <button className="icon-btn text-green-600"><FiEdit /></button>
-                                        <button className="icon-btn text-red-500"><RiDeleteBin6Line /></button>
+                                        <button 
+                                            className="icon-btn text-blue-800" 
+                                            title="View Details"
+                                            onClick={() => navigate(`/admin/phlebotomists/${p.id}`)}
+                                        >
+                                            <FiEye />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-green-600" 
+                                            title="Edit"
+                                            onClick={() => {
+                                                setEditModal({
+                                                    phlebotomistCode: p.id,
+                                                    phlebotomistData: p.raw
+                                                });
+                                            }}
+                                        >
+                                            <FiEdit />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-red-500" 
+                                            title="Delete"
+                                            onClick={() => {
+                                                setDeleteConfirm({
+                                                    phlebotomistCode: p.id,
+                                                    phlebotomistName: p.name
+                                                });
+                                                setDeleteError("");
+                                            }}
+                                        >
+                                            <RiDeleteBin6Line />
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -274,6 +316,97 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
 
             {assignPhlebotomistModalOpen && (
                 <AssignPhlebotomistModal onClose={() => setAssignPhlebotomistModalOpen(false)} />
+            )}
+
+            {editModal && (
+                <EditPhlebotomistForm
+                    onClose={() => setEditModal(null)}
+                    onPhlebotomistUpdated={() => {
+                        if (onPhlebotomistsUpdate) {
+                            onPhlebotomistsUpdate();
+                        }
+                    }}
+                    phlebotomistCode={editModal.phlebotomistCode}
+                    phlebotomistData={editModal.phlebotomistData}
+                />
+            )}
+
+            {deleteConfirm && (
+                <div className="modal-overlay modal-overlay-delete">
+                    <div className="modal-container modal-container-delete">
+                        <div className="modal-title">
+                            <h2>Confirm Deletion</h2>
+                            <button onClick={() => {
+                                setDeleteConfirm(null);
+                                setDeleteError("");
+                            }} disabled={deleteLoading}>
+                                <IoClose />
+                            </button>
+                        </div>
+                        <div className="modal-form">
+                            <p>Are you sure you want to delete <strong>{deleteConfirm.phlebotomistName}</strong>?</p>
+                            <p className="modal-text-secondary">
+                                This action cannot be undone. The phlebotomist will be permanently removed from the system.
+                            </p>
+                            {deleteError && (
+                                <div className="error-message modal-error-container">
+                                    {deleteError}
+                                </div>
+                            )}
+                            <div className="form-actions form-actions-modal">
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setDeleteConfirm(null);
+                                        setDeleteError("");
+                                    }}
+                                    disabled={deleteLoading}
+                                    className="btn-cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={async () => {
+                                        setDeleteLoading(true);
+                                        setDeleteError("");
+                                        try {
+                                            await axios.delete(
+                                                `http://localhost:8000/api/admin/dashboard/phlebotomists/${deleteConfirm.phlebotomistCode}`,
+                                                {
+                                                    headers: {
+                                                        'Accept': 'application/json',
+                                                        'Content-Type': 'application/json'
+                                                    }
+                                                }
+                                            );
+                                            setDeleteConfirm(null);
+                                            if (onPhlebotomistsUpdate) {
+                                                onPhlebotomistsUpdate();
+                                            }
+                                        } catch (error) {
+                                            console.error('Error deleting phlebotomist:', error);
+                                            setDeleteError(error.response?.data?.message || error.message || "Failed to delete phlebotomist");
+                                        } finally {
+                                            setDeleteLoading(false);
+                                        }
+                                    }}
+                                    disabled={deleteLoading}
+                                    className="submit-btn btn-delete-submit"
+                                >
+                                    {deleteLoading ? (
+                                        <>
+                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Delete'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </section>
     )

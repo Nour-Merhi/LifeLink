@@ -5,16 +5,17 @@ import { useState, useEffect } from "react";
 
 export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setHomeBloodFormData }){
     const navigate = useNavigate();
-    const [bloodType, setBloodType] = useState("");
-    const [lastDonation, setLastDonation] = useState("");
+    const [bloodType, setBloodType] = useState(homeBloodFormData.blood_type || "");
+    const [lastDonation, setLastDonation] = useState(homeBloodFormData.last_donation || "");
     const [isAffected, setIsAffected] = useState(false);
-    const [medicalConditions, setMedicalConditions] = useState({
+    const [lastDonationError, setLastDonationError] = useState("");
+    const [medicalConditions, setMedicalConditions] = useState(homeBloodFormData.medical_conditions || {
         not_healthy: false,
         has_surgery: false,
         has_travel: false,
         take_medicine: false,
         has_disease: false,
-    })
+    });
 
    const handleChange = (e) => {
         const { name, value } = e.target;
@@ -33,6 +34,54 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
             updatedConditions.has_disease;
 
         setIsAffected(hasDisqualifyingCondition);
+        
+        // Save to localStorage immediately
+        const updatedData = {
+            ...homeBloodFormData,
+            medical_conditions: updatedConditions,
+            blood_type: bloodType,
+            last_donation: lastDonation,
+        };
+        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+    };
+
+    // Validate last donation date (must be at least 56 days ago)
+    const validateLastDonation = (donationDate) => {
+        if (!donationDate) {
+            setLastDonationError("");
+            return true; // Let HTML5 required validation handle empty
+        }
+
+        const lastDonationDate = new Date(donationDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+        lastDonationDate.setHours(0, 0, 0, 0);
+
+        const daysSinceDonation = Math.floor((today - lastDonationDate) / (1000 * 60 * 60 * 24));
+
+        if (daysSinceDonation < 56) {
+            const daysRemaining = 56 - daysSinceDonation;
+            setLastDonationError(`Thank you for your previous donation! For your safety and health, please wait ${daysRemaining} more day${daysRemaining !== 1 ? 's' : ''} before donating again. We appreciate your generosity and look forward to seeing you soon!`);
+            return false;
+        }
+
+        setLastDonationError("");
+        return true;
+    };
+
+    const handleLastDonationChange = (e) => {
+        const value = e.target.value;
+        setLastDonation(value);
+        validateLastDonation(value);
+        
+        // Save to localStorage immediately
+        const updatedData = {
+            ...homeBloodFormData,
+            medical_conditions: { ...medicalConditions },
+            blood_type: bloodType,
+            last_donation: value,
+        };
+        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
     };
 
     const handleSubmit = (e) => {
@@ -43,23 +92,46 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
             return;
         }
 
-        setHomeBloodFormData((prev) => ({
-            ...prev,
+        // Validate last donation date
+        if (!validateLastDonation(lastDonation)) {
+            return; // Don't proceed if validation fails
+        }
+
+        // Save to form data
+        const updatedData = {
+            ...homeBloodFormData,
             medical_conditions: { ...medicalConditions },
             blood_type: bloodType,
             last_donation: lastDonation,
-        }));
+        };
+        
+        setHomeBloodFormData(updatedData);
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+        
         nextStep();
     };
 
+    // Initialize from localStorage or homeBloodFormData on mount
     useEffect(() => {
-        setHomeBloodFormData((prev) => ({
-            ...prev,
-            medical_conditions: { ...medicalConditions },
-            blood_type: bloodType,
-            last_donation: lastDonation
-        }));
-    }, [medicalConditions, bloodType, lastDonation]);
+        const savedData = localStorage.getItem('home_blood_form_data');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                if (parsed.blood_type) setBloodType(parsed.blood_type);
+                if (parsed.last_donation) {
+                    setLastDonation(parsed.last_donation);
+                    // Validate on load
+                    validateLastDonation(parsed.last_donation);
+                }
+                if (parsed.medical_conditions) setMedicalConditions(parsed.medical_conditions);
+            } catch (e) {
+                console.warn('Error parsing saved form data:', e);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount
 
     
     return(
@@ -106,8 +178,18 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                     <label htmlFor="blood-type">Blood Type</label>
                                     <select 
                                         id="blood-type" 
-                                        value={ bloodType} 
-                                        onChange={(e)=> (setBloodType(e.target.value))} 
+                                        value={bloodType} 
+                                        onChange={(e) => {
+                                            setBloodType(e.target.value);
+                                            // Save immediately to localStorage
+                                            const updatedData = {
+                                                ...homeBloodFormData,
+                                                blood_type: e.target.value,
+                                                medical_conditions: { ...medicalConditions },
+                                                last_donation: lastDonation,
+                                            };
+                                            localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+                                        }}
                                     required>
                                         <option value="" disabled>Select Blood Type</option>
                                         <option value="AB+">AB+</option>
@@ -123,11 +205,27 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                 <div>
                                     <label htmlFor="last-donation">Last Donation</label>
                                     <input
-                                        onChange={ (e)=> (setLastDonation(e.target.value)) } 
+                                        onChange={handleLastDonationChange}
                                         type="date" 
                                         id="last-donation"
-                                        value={ homeBloodFormData.last_donation || lastDonation} 
-                                    required/>
+                                        value={lastDonation} 
+                                        max={new Date().toISOString().split('T')[0]} // Cannot be in the future
+                                        required
+                                    />
+                                    {lastDonationError && (
+                                        <p style={{ 
+                                            color: "#dc2626", 
+                                            marginTop: "8px", 
+                                            fontSize: "14px",
+                                            lineHeight: "1.5",
+                                            padding: "10px",
+                                            backgroundColor: "#fef2f2",
+                                            borderRadius: "4px",
+                                            border: "1px solid #fecaca"
+                                        }}>
+                                            {lastDonationError}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -278,7 +376,18 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
 
                             <div className="buttons-align">
                                 <button type="button" className="cancel-btn prev-btn"
-                                        onClick = { prevStep }
+                                        onClick={() => {
+                                            // Save current form data to localStorage before going back
+                                            const updatedData = {
+                                                ...homeBloodFormData,
+                                                medical_conditions: { ...medicalConditions },
+                                                blood_type: bloodType,
+                                                last_donation: lastDonation,
+                                            };
+                                            setHomeBloodFormData(updatedData);
+                                            localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+                                            prevStep();
+                                        }}
                                     >Previous</button>
                                 
                                 <div>
@@ -290,7 +399,7 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                     <button 
                                         type="submit" 
                                         className="next-step-btn color" 
-                                        disabled = { isAffected } 
+                                        disabled={isAffected || !!lastDonationError}
                                     >
                                         Next Step
                                     </button>

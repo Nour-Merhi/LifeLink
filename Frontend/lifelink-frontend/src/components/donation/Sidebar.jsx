@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import lifelinklogo from "../../assets/imgs/lifelink_logo.svg";
+import lifelinklogo from "../../assets/imgs/Logo.png";
 import "../../styles/sidebar.css";
 
 import { FaHouseChimney } from "react-icons/fa6";

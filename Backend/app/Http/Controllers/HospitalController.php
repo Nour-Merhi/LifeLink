@@ -18,7 +18,9 @@ class HospitalController extends Controller
      */
     public function index()
     {
-        $hospitals = Hospital::with(['healthCenterManager.user'])->get();
+        $hospitals = Hospital::with(['healthCenterManager.user'])
+            ->orderBy('created_at', 'desc')
+            ->get();
         
         return response()->json([
             'hospitals' => $hospitals,
@@ -33,6 +35,35 @@ class HospitalController extends Controller
         }
         return response()->json($hospital, 200);
     }
+
+    /**
+     * Get a single hospital by code
+     */
+    public function show($code)
+    {
+        try {
+            $hospital = Hospital::where('code', $code)
+                ->with(['healthCenterManager.user'])
+                ->firstOrFail();
+            
+            return response()->json([
+                'hospital' => $hospital
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Hospital not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital:', [
+                'code' => $code,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to fetch hospital: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Show the form for creating a new resource.
      */
@@ -49,6 +80,8 @@ class HospitalController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'phone_nb' => 'required|string',
             'email' => 'required|email',
         
@@ -56,7 +89,7 @@ class HospitalController extends Controller
             'manager.first_name' => 'required|string|max:255',
             'manager.middle_name' => 'nullable|string|max:255',
             'manager.last_name' => 'nullable|string|max:255',
-            'manager.phone_nb' => 'required|string',
+            'manager.phone_nb' => 'required|string|unique:users,phone_nb',
             'manager.email' => 'required|email|unique:users,email',
             'manager.password' => [
                 'required',
@@ -72,70 +105,130 @@ class HospitalController extends Controller
             'manager.working_dates' => 'array',
         ]);
         
+        try {
+            DB::transaction(function () use ($validated) {
+                // Create hospital
+                $hospital = Hospital::create([
+                    'name' => $validated['name'],
+                    'address' => $validated['address'],
+                    'latitude' => $validated['latitude'] ?? null,
+                    'longitude' => $validated['longitude'] ?? null,
+                    'phone_nb' => $validated['phone_nb'],
+                    'email' => $validated['email'],
+                ]);
+        
+                //Create User 
+                $user = User::create([
+                    'first_name'=>$validated['manager']['first_name'],
+                    'middle_name'=>$validated['manager']['middle_name'] ?? null,
+                    'last_name'=>$validated['manager']['last_name'] ?? '',
+                    'email'=>$validated['manager']['email'],
+                    'phone_nb'=>$validated['manager']['phone_nb'],
+                    'role'=>'Manager',
+                    'password'=>Hash::make($validated['manager']['password'])
+                ]);
 
-        DB::transaction(function () use ($validated) {
-            // Create hospital
-            $hospital = Hospital::create([
-                'name' => $validated['name'],
-                'address' => $validated['address'],
-                'phone_nb' => $validated['phone_nb'],
-                'email' => $validated['email'],
+                // Create manager
+                HealthCenterManager::create([
+                    'user_id'=> $user->id,
+                    'hospital_id' => $hospital->id,
+                    'position'=>'organ transfer manager',
+                    'start_time' => $validated['manager']['start_time'],
+                    'end_time' => $validated['manager']['end_time'],
+                    'working_dates' => json_encode($validated['manager']['working_dates'] ?? []),
+                ]);            
+            });
+        
+            return response()->json(['message' => 'Hospital added successfully'], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error adding hospital:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-    
-            //Create User 
-            $user = User::create([
-                'first_name'=>$validated['manager']['first_name'],
-                'middle_name'=>$validated['manager']['middle_name'] ?? null,
-                'last_name'=>$validated['manager']['last_name'] ?? '',
-                'email'=>$validated['manager']['email'],
-                'phone_nb'=>$validated['manager']['phone_nb'],
-                'role'=>'Manager',
-                'password'=>Hash::make($validated['manager']['password'])
-            ]);
-
-            // Create manager
-            HealthCenterManager::create([
-                'user_id'=> $user->id,
-                'hospital_id' => $hospital->id,
-                'position'=>'organ transfer manager',
-                'start_time' => $validated['manager']['start_time'],
-                'end_time' => $validated['manager']['end_time'],
-                'working_dates' => json_encode($validated['manager']['working_dates'] ?? []),
-            ]);            
-        });
-    
-        return response()->json(['message' => 'Hospital added successfully'], 201);
+            return response()->json([
+                'message' => 'Failed to add hospital: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Hospitals $hospitals)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Hospitals $hospitals)
-    {
-        //
-    }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Hospitals $hospitals)
+    public function update(Request $request, $code)
     {
-        //
+        try {
+            $hospital = Hospital::where('code', $code)->firstOrFail();
+            
+            $validated = $request->validate([
+                'name' => 'sometimes|string|max:255',
+                'address' => 'sometimes|string',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
+                'phone_nb' => 'sometimes|string|max:30',
+                'email' => 'sometimes|email',
+                'status' => 'sometimes|in:verified,unverified',
+            ]);
+
+            $hospital->update($validated);
+            $hospital->refresh();
+            $hospital->load(['healthCenterManager.user']);
+
+            return response()->json([
+                'message' => 'Hospital updated successfully',
+                'hospital' => $hospital
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Hospital not found'
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating hospital:', [
+                'code' => $code,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to update hospital: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Hospitals $hospitals)
+    public function destroy($code)
     {
-        //
+        try {
+            $hospital = Hospital::where('code', $code)->firstOrFail();
+            
+            // Delete the hospital - related records will be handled by database cascade deletes
+            $hospital->delete();
+
+            return response()->json([
+                'message' => 'Hospital deleted successfully'
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Hospital not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting hospital:', [
+                'code' => $code,
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'message' => 'Failed to delete hospital: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

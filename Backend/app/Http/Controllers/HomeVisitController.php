@@ -193,6 +193,10 @@ class HomeVisitController extends Controller
 
                 $availableSlots = $sortedDates->map(function ($date) use ($dateGroups) {
                     $dateAppointments = $dateGroups->get($date);
+                    
+                    // Collect appointment IDs for this date (for delete functionality)
+                    $appointmentIds = $dateAppointments->pluck('id')->toArray();
+                    
                     // Collect all time slots from all appointments on this date
                     $allTimeSlots = [];
                     
@@ -267,7 +271,8 @@ class HomeVisitController extends Controller
 
                     return [
                         'date' => $date,
-                        'times' => $uniqueSlots
+                        'times' => $uniqueSlots,
+                        'appointment_ids' => $appointmentIds // Include appointment IDs for delete functionality
                     ];
                 })
                 ->values(); // Maintain the order from sortKeysDesc()
@@ -387,6 +392,248 @@ class HomeVisitController extends Controller
         return 0;
     }
 
-    
+    /**
+     * Get a single home visit order by code
+     */
+    public function showHomeVisitOrder($code)
+    {
+        try {
+            $order = HomeAppointment::where('code', $code)
+                ->with([
+                    'donor.user',
+                    'donor.bloodType',
+                    'mobilePhlebotomist.user',
+                    'hospital',
+                    'appointment'
+                ])
+                ->firstOrFail();
+
+            // Calculate age
+            $age = null;
+            if ($order->donor && $order->donor->date_of_birth) {
+                $birthDate = Carbon::parse($order->donor->date_of_birth);
+                $age = $birthDate->age;
+            }
+
+            // Get blood type string
+            $bloodType = 'N/A';
+            if ($order->donor && $order->donor->bloodType) {
+                $bloodType = $order->donor->bloodType->type . $order->donor->bloodType->rh_factor;
+            }
+
+            // Get donor name
+            $donorName = 'N/A';
+            if ($order->donor && $order->donor->user) {
+                $nameParts = array_filter([
+                    $order->donor->user->first_name,
+                    $order->donor->user->middle_name,
+                    $order->donor->user->last_name
+                ]);
+                $donorName = implode(' ', $nameParts);
+            }
+
+            // Get phlebotomist name
+            $phlebotomistName = 'Unassigned';
+            if ($order->phlebotomist_id && $order->mobilePhlebotomist && $order->mobilePhlebotomist->user) {
+                $nameParts = array_filter([
+                    $order->mobilePhlebotomist->user->first_name,
+                    $order->mobilePhlebotomist->user->middle_name,
+                    $order->mobilePhlebotomist->user->last_name
+                ]);
+                $phlebotomistName = implode(' ', $nameParts);
+            }
+
+            // Get appointment date and time
+            $appointmentDate = 'N/A';
+            $appointmentTime = 'N/A';
+            if ($order->appointment) {
+                $appointmentDate = $order->appointment->appointment_date;
+                if ($order->appointment_time) {
+                    $appointmentTime = $order->appointment_time;
+                    // Format time to 12-hour format
+                    if (preg_match('/^(\d{2}):(\d{2})$/', $appointmentTime, $matches)) {
+                        $hour = (int)$matches[1];
+                        $minute = $matches[2];
+                        $ampm = $hour >= 12 ? 'PM' : 'AM';
+                        $hour12 = $hour % 12;
+                        if ($hour12 === 0) $hour12 = 12;
+                        $appointmentTime = sprintf('%d:%s %s', $hour12, $minute, $ampm);
+                    }
+                }
+            }
+
+            // Get donor email and phone
+            $email = $order->donor && $order->donor->user ? $order->donor->user->email : 'N/A';
+            $phone = $order->donor && $order->donor->user ? $order->donor->user->phone_nb : 'N/A';
+
+            // Get donor gender
+            $gender = $order->donor && $order->donor->gender ? ucfirst($order->donor->gender) : 'N/A';
+
+            // Get date of birth
+            $dateOfBirth = $order->donor && $order->donor->date_of_birth 
+                ? Carbon::parse($order->donor->date_of_birth)->format('Y-m-d') 
+                : 'N/A';
+
+            // Get last donation
+            $lastDonation = $order->donor && $order->donor->last_donation 
+                ? Carbon::parse($order->donor->last_donation)->format('Y-m-d') 
+                : null;
+
+            return response()->json([
+                'order' => [
+                    'id' => $order->code,
+                    'name' => $donorName,
+                    'first_name' => $order->donor && $order->donor->user ? $order->donor->user->first_name : 'N/A',
+                    'last_name' => $order->donor && $order->donor->user ? $order->donor->user->last_name : 'N/A',
+                    'middle_name' => $order->donor && $order->donor->user ? $order->donor->user->middle_name : null,
+                    'blood_type' => $bloodType,
+                    'age' => $age,
+                    'gender' => $gender,
+                    'date_of_birth' => $dateOfBirth,
+                    'weight' => $order->{'weight(kg)'} ?? 'N/A',
+                    'email' => $email,
+                    'phone' => $phone,
+                    'address' => $order->address ?? 'N/A',
+                    'status' => $order->state === 'canceled' ? 'cancelled' : ($order->state ?? 'pending'),
+                    'state' => $order->state ?? 'pending',
+                    'created_at' => $order->created_at ? Carbon::parse($order->created_at)->format('Y-m-d H:i:s') : 'N/A',
+                    'phlebotomist' => $phlebotomistName,
+                    'phlebotomist_id' => $order->phlebotomist_id,
+                    'date' => $appointmentDate,
+                    'time' => $appointmentTime,
+                    'appointment_time' => $order->appointment_time,
+                    'hospital_id' => $order->hospital ? $order->hospital->id : null,
+                    'hospital_name' => $order->hospital ? $order->hospital->name : 'Unknown Hospital',
+                    'hospital_address' => $order->hospital ? $order->hospital->address : 'N/A',
+                    'emerg_contact' => $order->emerg_contact ?? null,
+                    'emerg_phone' => $order->emerg_phone ?? null,
+                    'medical_conditions' => $order->medical_conditions ?? [],
+                    'note' => $order->note ?? null,
+                    'last_donation' => $lastDonation,
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Home visit order not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching home visit order:', [
+                'code' => $code,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch home visit order: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a home visit order
+     */
+    public function updateHomeVisitOrder(Request $request, $code)
+    {
+        try {
+            $order = HomeAppointment::where('code', $code)->firstOrFail();
+
+            $validated = $request->validate([
+                'state' => 'sometimes|in:pending,completed,canceled',
+                'note' => 'nullable|string|max:1000',
+                'address' => 'sometimes|string|max:500',
+                'weight(kg)' => 'sometimes|string|max:10',
+                'emerg_contact' => 'nullable|string|max:255',
+                'emerg_phone' => 'nullable|string|max:30',
+                'medical_conditions' => 'nullable|array',
+            ]);
+
+            // Update only provided fields
+            if (isset($validated['state'])) {
+                $order->state = $validated['state'];
+            }
+            if (isset($validated['note'])) {
+                $order->note = $validated['note'];
+            }
+            if (isset($validated['address'])) {
+                $order->address = $validated['address'];
+            }
+            if (isset($validated['weight(kg)'])) {
+                $order->{'weight(kg)'} = $validated['weight(kg)'];
+            }
+            if (isset($validated['emerg_contact'])) {
+                $order->emerg_contact = $validated['emerg_contact'];
+            }
+            if (isset($validated['emerg_phone'])) {
+                $order->emerg_phone = $validated['emerg_phone'];
+            }
+            if (isset($validated['medical_conditions'])) {
+                $order->medical_conditions = $validated['medical_conditions'];
+            }
+
+            $order->save();
+
+            return response()->json([
+                'message' => 'Home visit order updated successfully',
+                'order' => $order
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Home visit order not found'
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating home visit order:', [
+                'code' => $code,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update home visit order: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a home visit order
+     */
+    public function destroyHomeVisitOrder($code)
+    {
+        try {
+            $order = HomeAppointment::where('code', $code)->firstOrFail();
+
+            // Prevent deletion if order is already completed (optional business rule)
+            // Uncomment if needed:
+            // if ($order->state === 'completed') {
+            //     return response()->json([
+            //         'message' => 'Cannot delete a completed order'
+            //     ], 422);
+            // }
+
+            $order->delete();
+
+            return response()->json([
+                'message' => 'Home visit order deleted successfully'
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Home visit order not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting home visit order:', [
+                'code' => $code,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete home visit order: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

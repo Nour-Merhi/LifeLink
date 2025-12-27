@@ -17,7 +17,9 @@ export default function NotificationTable({ notifications }) {
 
     // Filtering notifications based on type and status
     const filteredNotifications = notifications ? notifications.filter((notification) => {
-        const matchesSearch = notification.id.toLowerCase().includes(searchTerm.toLowerCase());
+        const idString = String(notification.id || '');
+        const matchesSearch = idString.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (notification.title && notification.title.toLowerCase().includes(searchTerm.toLowerCase()));
         const matchesType = notificationType === "all-types" || notification.type === notificationType;
         const matchesStatus = notificationState === "all-states" || notification.status === notificationState;
 

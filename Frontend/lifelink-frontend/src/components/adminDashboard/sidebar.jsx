@@ -36,6 +36,10 @@ export default function Sidebar(){
                     <NavLink to="/admin/home-visits">Home Visits</NavLink>
                 </div>
                 <div className="link-item">
+                    <FaHospital className="icon-size text-white"/>
+                    <NavLink to="/admin/hospital-appointments">Hospital Appointments</NavLink>
+                </div>
+                <div className="link-item">
                     <img src={nurse} alt="nurse" width="23px" height="23px"/>
                     <NavLink to="/admin/phlebotomists">Phlebotomists</NavLink>
                 </div>
