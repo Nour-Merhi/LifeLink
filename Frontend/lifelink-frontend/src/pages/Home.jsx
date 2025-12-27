@@ -30,6 +30,7 @@ const navigate = useNavigate();
         <Navbar />
         <section id="hero">
             <div id="text-img">
+              <h1>hello</h1>
                 <div className="hero-info pl-10">
                     <h1> BE THE </h1>
                     <h1> LINK THAT SAVES A LIFE</h1>
