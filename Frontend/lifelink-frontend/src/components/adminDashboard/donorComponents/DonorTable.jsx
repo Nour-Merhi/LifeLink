@@ -1,15 +1,23 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom";
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp } from "react-icons/io5";
+import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
+import axios from 'axios';
+import EditDonorForm from "./EditDonorForm";
 
-export default function DonorTable({ donors = [], loading = false, error = "" }){
+export default function DonorTable({ donors = [], loading = false, error = "", onDonorsUpdate }){
+    const navigate = useNavigate();
     const [donorState, setDonorState] = useState("all-states"); 
     const [bloodType, setBloodType] = useState("all-blood");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
+    const [editModal, setEditModal] = useState(null); // { donorCode, donorData }
+    const [deleteConfirm, setDeleteConfirm] = useState(null); // { donorCode, donorName }
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -74,7 +82,9 @@ export default function DonorTable({ donors = [], loading = false, error = "" })
             created_at: formatDate(donor.created_at),
             gender: donor.gender || 'N/A',
             medical_conditions: medicalConditionsList,
-            medical_conditions_raw: medicalConditions
+            medical_conditions_raw: medicalConditions,
+            // Store original donor data for edit functionality
+            _originalDonor: donor
         };
     }): [];
 
@@ -101,6 +111,83 @@ export default function DonorTable({ donors = [], loading = false, error = "" })
     //Displaying text
     const startDisplay = startIndex + 1;
     const endDisplay = Math.min(endIndex, totalDonors);
+
+    // Handle edit click
+    const handleEditClick = (donor) => {
+        // Find the original donor data from the donors array
+        const originalDonor = donors.find(d => {
+            const code = d.code || `D${String(d.id).padStart(4, '0')}`;
+            return code === donor.id;
+        });
+        
+        if (originalDonor) {
+            setEditModal({
+                donorCode: donor.id,
+                donorData: originalDonor
+            });
+        } else {
+            console.error('Donor not found in original data');
+            alert('Error: Could not load donor data. Please refresh the page and try again.');
+        }
+    };
+
+    // Handle delete click
+    const handleDeleteClick = (donor) => {
+        setDeleteConfirm({
+            donorCode: donor.id,
+            donorName: donor.name
+        });
+        setDeleteError("");
+    };
+
+    // Handle delete confirmation
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirm) return;
+
+        setDeleteLoading(true);
+        setDeleteError("");
+
+        try {
+            await axios.delete(
+                `http://localhost:8000/api/admin/dashboard/donors/${deleteConfirm.donorCode}`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            setDeleteConfirm(null);
+            if (onDonorsUpdate) {
+                onDonorsUpdate();
+            }
+        } catch (error) {
+            console.error('Error deleting donor:', error);
+            setDeleteError(error.response?.data?.message || error.message || "Failed to delete donor");
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    // Handle delete cancel
+    const handleDeleteCancel = () => {
+        setDeleteConfirm(null);
+        setDeleteError("");
+    };
+
+    // Handle edit modal close
+    const handleEditClose = () => {
+        setEditModal(null);
+    };
+
+    // Handle donor updated
+    const handleDonorUpdated = () => {
+        setEditModal(null);
+        if (onDonorsUpdate) {
+            onDonorsUpdate();
+        }
+    };
 
     return(
         <section className="hospital-table-section">
@@ -174,9 +261,9 @@ export default function DonorTable({ donors = [], loading = false, error = "" })
                             <th className="col-address">Address</th>
                             <th className="col-last-donation">Last Donation</th>
                             <th className="col-status">Status</th>
-                            <th className="col-medical">Medical Conditions</th>
                             <th className="col-total">Total Donations</th>
-                            <th className="col-contact">Contact</th>
+                            <th className="col-phone">Phone Number</th>
+                            <th className="col-contact">Email</th>
                             <th className="col-date">Date Added</th>
                             <th className="col-actions">Actions</th>
                         </tr>
@@ -218,55 +305,45 @@ export default function DonorTable({ donors = [], loading = false, error = "" })
                                          "Blocked"}
                                     </span>
                                 </td>
-                                <td className="col-medical">
-                                    {d.medical_conditions && d.medical_conditions.length > 0 ? (
-                                        <div style={{ 
-                                            display: 'flex', 
-                                            flexWrap: 'wrap', 
-                                            gap: '5px',
-                                            maxWidth: '200px'
-                                        }}>
-                                            {d.medical_conditions.map((condition, idx) => (
-                                                <span
-                                                    key={idx}
-                                                    style={{
-                                                        background: '#FFF4E5',
-                                                        color: '#F97316',
-                                                        padding: '2px 8px',
-                                                        borderRadius: '12px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 500
-                                                    }}
-                                                >
-                                                    {condition}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <span className="muted">None</span>
-                                    )}
-                                </td>
                                 <td className="col-total">
                                     <span>{d.total_donations}</span>
                                 </td>
+                                <td className="col-phone">
+                                    <span>+961 {d.phone_nb}</span>
+                                </td>
                                 <td className="col-contact">
-                                    <div className="contact">
-                                        <span>{ d.email }</span>
-                                        <small className="muted">{ d.phone_nb }</small>
-                                    </div>
+                                    <span>{d.email}</span>
                                 </td>
                                 <td className="col-date">{ d.created_at }</td>
                                 <td className="col-actions">
                                     <div className="row-actions">
-                                        <button className="icon-btn text-blue-800"><FiEye /></button>
-                                        <button className="icon-btn text-green-600"><FiEdit /></button>
-                                        <button className="icon-btn text-red-500"><RiDeleteBin6Line /></button>
+                                        <button 
+                                            className="icon-btn text-blue-800"
+                                            onClick={() => navigate(`/admin/donors/${d.id}`)}
+                                            title="View Details"
+                                        >
+                                            <FiEye />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-green-600"
+                                            onClick={() => handleEditClick(d)}
+                                            title="Edit Donor"
+                                        >
+                                            <FiEdit />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-red-500"
+                                            onClick={() => handleDeleteClick(d)}
+                                            title="Delete Donor"
+                                        >
+                                            <RiDeleteBin6Line />
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan="11" style={{ textAlign: 'center', padding: '40px' }}>
+                                <td colSpan="10" style={{ textAlign: 'center', padding: '40px' }}>
                                     <p>No donors found</p>
                                 </td>
                             </tr>
@@ -309,6 +386,68 @@ export default function DonorTable({ donors = [], loading = false, error = "" })
                     </div>
                 </div>
             </div>
+            )}
+
+            {/* Edit Donor Modal */}
+            {editModal && (
+                <EditDonorForm
+                    onClose={handleEditClose}
+                    onDonorUpdated={handleDonorUpdated}
+                    donorCode={editModal.donorCode}
+                    donorData={editModal.donorData}
+                />
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="modal-overlay modal-overlay-delete">
+                    <div className="modal-container modal-container-delete">
+                        <div className="modal-title">
+                            <h2>Delete Donor</h2>
+                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
+                                <IoClose />
+                            </button>
+                        </div>
+                        <div className="modal-form">
+                            <p>Are you sure you want to delete <strong>{deleteConfirm.donorName}</strong>?</p>
+                            <p className="modal-text-secondary">
+                                This action cannot be undone. If the donor has active appointments, deletion will be prevented.
+                            </p>
+                            
+                            {deleteError && (
+                                <div className="error-message modal-error-container">
+                                    {deleteError}
+                                </div>
+                            )}
+
+                            <div className="form-actions form-actions-modal">
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteCancel}
+                                    disabled={deleteLoading}
+                                    className="btn-cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteConfirm}
+                                    disabled={deleteLoading}
+                                    className="submit-btn btn-delete-submit"
+                                >
+                                    {deleteLoading ? (
+                                        <>
+                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Delete'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </section>
     )

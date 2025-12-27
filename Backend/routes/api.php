@@ -33,6 +33,8 @@ Route::prefix('/blood')->group(function(){
     Route::get('/home_donation', [HomeAppointmentController::class, 'index']);
     Route::get('/home_donation/{id}', [HomeAppointmentController::class, 'show']);
     Route::post('/home_appointment', [HomeAppointmentController::class, 'store']);
+    Route::get('/hospital_donation', [HospitalAppointmentController::class, 'index']);
+    Route::get('/hospital_donation/{id}', [HospitalAppointmentController::class, 'show']);
 });
 
 Route::get('/test', function () {
@@ -57,24 +59,47 @@ Route::prefix('/admin/dashboard')->group(function(){
     //Hospital Routes
     Route::post('/add-hospital', [HospitalController::class, 'store']);
     Route::get('/get-hospitals', [HospitalController::class, 'index']);
+    Route::get('/hospitals/{code}', [HospitalController::class, 'show']);
+    Route::put('/hospitals/{code}', [HospitalController::class, 'update']);
+    Route::delete('/hospitals/{code}', [HospitalController::class, 'destroy']);
     //Donor Routes
     Route::post('/add-donor', [DonorController::class, 'store']);
     Route::get('/get-donors', [DonorController::class, 'index']);
+    Route::get('/donors/{code}', [DonorController::class, 'show']);
+    Route::put('/donors/{code}', [DonorController::class, 'update']);
+    Route::delete('/donors/{code}', [DonorController::class, 'destroy']);
     
     //Blood Types Route
     Route::get('/get-blood-types', [DonorController::class, 'getBloodTypes']);
 
     //Appointments Routes
     Route::post('/generate-appointments', [AppointmentsController::class, 'createHomeAppointments']);
+    Route::post('/generate-hospital-appointments', [AppointmentsController::class, 'createHospitalAppointments']);
+    Route::get('/appointments/{appointment}', [AppointmentsController::class, 'show']);
+    Route::put('/appointments/{appointment}', [AppointmentsController::class, 'update']);
+    Route::delete('/appointments/{appointment}', [AppointmentsController::class, 'destroy']);
 
     //Phlebotomist Routes
     Route::get('/get-phlebotomists', [MobilePhlebotomistsController::class, 'index']);
+    Route::get('/phlebotomists/{code}', [MobilePhlebotomistsController::class, 'show']);
+    Route::put('/phlebotomists/{code}', [MobilePhlebotomistsController::class, 'update']);
+    Route::delete('/phlebotomists/{code}', [MobilePhlebotomistsController::class, 'destroy']);
     Route::post('/add-phlebotomist', [MobilePhlebotomistsController::class, 'store']);
 
     //Home Visit Routes
     Route::get('/home-visit-orders', [HomeVisitController::class, 'getHomeVisitOrders']);
+    Route::get('/home-visit-orders/{code}', [HomeVisitController::class, 'showHomeVisitOrder']);
+    Route::put('/home-visit-orders/{code}', [HomeVisitController::class, 'updateHomeVisitOrder']);
+    Route::delete('/home-visit-orders/{code}', [HomeVisitController::class, 'destroyHomeVisitOrder']);
     Route::get('/home-visit-appointments', [HomeVisitController::class, 'getHomeVisitAppointments']);
     Route::post('/home-visit-orders/{orderCode}/assign-phlebotomist', [MobilePhlebotomistsController::class, 'assignPhlebotomist']);
+
+    //Hospital Appointment Routes
+    Route::get('/hospital-appointments', [HospitalAppointmentController::class, 'getHospitalAppointments']);
+    Route::get('/hospital-appointments/{code}', [HospitalAppointmentController::class, 'showHospitalAppointment']);
+    Route::put('/hospital-appointments/{code}', [HospitalAppointmentController::class, 'update']);
+    Route::delete('/hospital-appointments/{code}', [HospitalAppointmentController::class, 'destroy']);
+    Route::get('/hospital-visit-appointments', [HospitalAppointmentController::class, 'getHospitalVisitAppointments']);
 
     //Living Donor Routes
     Route::get('/living-donors', [LivingDonorController::class, 'index']);

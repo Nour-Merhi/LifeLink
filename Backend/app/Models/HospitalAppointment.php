@@ -17,20 +17,29 @@ class HospitalAppointment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'appointment_date',
-        'appointment_time',
         'state',
         'note',
+        'code',
     ];
 
+    protected static function booted()
+    {
+        static::creating(function ($hospitalAppointment) {
+            // Only generate if not already set
+            if (!$hospitalAppointment->code) {
+                $hospitalAppointment->code = 'HOSP-' . strtoupper(Str::random(8)); // HOSP-ABCDEFGH
+            }
+        });
+    }
+
     public function hospital(){
-        return $this->belongsTo(Hospital::class , 'id');
+        return $this->belongsTo(Hospital::class, 'hospital_Id'); // Note: migration uses hospital_Id
     }
     public function donor(){
-        return $this->belongsTo(Donor::class, 'id');
+        return $this->belongsTo(Donor::class, 'donor_id');
     }
     public function appointments(){
-        return $this->belongsTo(Appointment::class, 'id');
+        return $this->belongsTo(Appointment::class, 'appointment_id');
     }
     
 

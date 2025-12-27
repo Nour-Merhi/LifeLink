@@ -2,13 +2,16 @@ import { useState, useEffect } from "react"
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp } from "react-icons/io5";
+import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { BsCalendar3 } from "react-icons/bs";
 import { BsListUl } from "react-icons/bs";
 import { FiUserPlus } from "react-icons/fi";
 import { SpinnerDotted } from 'spinners-react';
+import axios from 'axios';
 import CalendarView from "./CalendarView";
 import AssignPhlebotomistModal from "./AssignPhlebotomistModal";
+import ViewHomeOrderModal from "./ViewHomeOrderModal";
+import EditHomeOrderModal from "./EditHomeOrderModal";
 
 export default function HomeOrderTable({ orders = [], loading = false, error = "", onOrdersUpdate }){
     const [visitState, setVisitState] = useState("all-states"); 
@@ -19,6 +22,13 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [selectedOrders, setSelectedOrders] = useState([]); // Array of selected order IDs
     const [selectAll, setSelectAll] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null); // For assign phlebotomist modal
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
+    const [selectedOrderCode, setSelectedOrderCode] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -290,6 +300,10 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
                                         <button 
                                             className="icon-btn text-blue-800" 
                                             title="View Details"
+                                            onClick={() => {
+                                                setSelectedOrderCode(o.id);
+                                                setViewModalOpen(true);
+                                            }}
                                         >
                                             <FiEye />
                                         </button>
@@ -306,12 +320,25 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
                                         <button 
                                             className="icon-btn text-green-600" 
                                             title="Edit"
+                                            onClick={() => {
+                                                setSelectedOrderCode(o.id);
+                                                setEditModalOpen(true);
+                                            }}
                                         >
                                             <FiEdit />
                                         </button>
                                         <button 
                                             className="icon-btn text-red-500" 
                                             title="Delete"
+                                            onClick={() => {
+                                                setDeleteConfirm({
+                                                    orderCode: o.id,
+                                                    donorName: o.name,
+                                                    hospitalName: o.hospital_name,
+                                                    date: o.date
+                                                });
+                                                setDeleteError("");
+                                            }}
                                         >
                                             <RiDeleteBin6Line />
                                         </button>
@@ -370,16 +397,119 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
                 <AssignPhlebotomistModal
                     onClose={() => {
                         setAssignModalOpen(false);
+                        setSelectedOrder(null);
                     }}
-                    orders={getSelectedOrdersData()}
+                    orders={selectedOrder ? [selectedOrder] : getSelectedOrdersData()}
                     onAssignSuccess={() => {
                         setSelectedOrders([]);
                         setSelectAll(false);
+                        setSelectedOrder(null);
                         if (onOrdersUpdate) {
                             onOrdersUpdate();
                         }
                     }}
                 />
+            )}
+
+            {viewModalOpen && selectedOrderCode && (
+                <ViewHomeOrderModal
+                    onClose={() => {
+                        setViewModalOpen(false);
+                        setSelectedOrderCode(null);
+                    }}
+                    orderCode={selectedOrderCode}
+                />
+            )}
+
+            {editModalOpen && selectedOrderCode && (
+                <EditHomeOrderModal
+                    onClose={() => {
+                        setEditModalOpen(false);
+                        setSelectedOrderCode(null);
+                    }}
+                    onOrderUpdated={() => {
+                        if (onOrdersUpdate) {
+                            onOrdersUpdate();
+                        }
+                    }}
+                    orderCode={selectedOrderCode}
+                />
+            )}
+
+            {deleteConfirm && (
+                <div className="modal-overlay modal-overlay-delete">
+                    <div className="modal-container modal-container-delete">
+                        <div className="modal-title">
+                            <h2>Confirm Deletion</h2>
+                            <button onClick={() => {
+                                setDeleteConfirm(null);
+                                setDeleteError("");
+                            }} disabled={deleteLoading}>
+                                <IoClose />
+                            </button>
+                        </div>
+                        <div className="modal-form">
+                            <p>Are you sure you want to delete the order for <strong>{deleteConfirm.donorName}</strong> at <strong>{deleteConfirm.hospitalName}</strong> on <strong>{deleteConfirm.date}</strong>?</p>
+                            <p className="modal-text-secondary">This action cannot be undone.</p>
+                            {deleteError && (
+                                <div className="error-message modal-error-container">
+                                    {deleteError}
+                                </div>
+                            )}
+                            <div className="form-actions form-actions-modal">
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setDeleteConfirm(null);
+                                        setDeleteError("");
+                                    }}
+                                    disabled={deleteLoading}
+                                    className="btn-cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={async () => {
+                                        setDeleteLoading(true);
+                                        setDeleteError("");
+                                        try {
+                                            await axios.delete(
+                                                `http://localhost:8000/api/admin/dashboard/home-visit-orders/${deleteConfirm.orderCode}`,
+                                                {
+                                                    headers: {
+                                                        'Accept': 'application/json',
+                                                        'Content-Type': 'application/json'
+                                                    }
+                                                }
+                                            );
+                                            setDeleteConfirm(null);
+                                            if (onOrdersUpdate) {
+                                                onOrdersUpdate();
+                                            }
+                                        } catch (error) {
+                                            console.error('Error deleting home order:', error);
+                                            setDeleteError(error.response?.data?.message || error.message || "Failed to delete order");
+                                        } finally {
+                                            setDeleteLoading(false);
+                                        }
+                                    }}
+                                    disabled={deleteLoading}
+                                    className="submit-btn btn-delete-submit"
+                                >
+                                    {deleteLoading ? (
+                                        <>
+                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Delete'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </section>
     )

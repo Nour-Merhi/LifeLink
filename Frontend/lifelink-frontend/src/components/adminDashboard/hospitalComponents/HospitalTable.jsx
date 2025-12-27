@@ -1,20 +1,99 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom";
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp } from "react-icons/io5";
+import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
+import axios from 'axios';
+import EditHospitalForm from "./EditHospitalForm";
 
-export default function hospitalTable({ hospitals = [], loading = false, error = "" }){
+export default function hospitalTable({ hospitals = [], loading = false, error = "", onHospitalsUpdate }){
+    const navigate = useNavigate();
     const [hospitalState, setHospitalState] = useState("all-states"); 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [editModal, setEditModal] = useState(null); // { hospitalCode, hospitalData }
+    const [deleteConfirm, setDeleteConfirm] = useState(null); // { hospitalCode, hospitalName }
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     useEffect(()=>{
         setCurrentPage(1);
     }, [searchTerm, hospitalState])
+
+    // Handle view click - navigate to hospital detail page
+    const handleViewClick = (hospitalCode) => {
+        navigate(`/admin/hospitals/${hospitalCode}`);
+    };
+
+    // Handle edit click
+    const handleEditClick = (hospital) => {
+        setEditModal({ 
+            hospitalCode: hospital.id, 
+            hospitalData: hospital._originalHospital 
+        });
+    };
+
+    // Handle delete click
+    const handleDeleteClick = (hospitalCode, hospitalName) => {
+        setDeleteConfirm({ hospitalCode, hospitalName });
+        setDeleteError("");
+    };
+
+    // Handle delete cancellation
+    const handleDeleteCancel = () => {
+        setDeleteConfirm(null);
+        setDeleteError("");
+    };
+
+    // Handle delete confirmation
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirm || !deleteConfirm.hospitalCode) {
+            setDeleteError("No hospital selected");
+            return;
+        }
+
+        setDeleteLoading(true);
+        setDeleteError("");
+
+        try {
+            await axios.delete(
+                `http://localhost:8000/api/admin/dashboard/hospitals/${deleteConfirm.hospitalCode}`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            // Success - close modal and refresh data
+            setDeleteConfirm(null);
+            if (onHospitalsUpdate) {
+                onHospitalsUpdate();
+            }
+        } catch (error) {
+            console.error('Error deleting hospital:', error);
+            setDeleteError(error.response?.data?.message || error.message || "Failed to delete hospital");
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    // Handle modal close
+    const handleEditModalClose = () => {
+        setEditModal(null);
+    };
+
+    const handleHospitalUpdated = () => {
+        setEditModal(null);
+        if (onHospitalsUpdate) {
+            onHospitalsUpdate();
+        }
+    };
 
     // Format date to readable format (YYYY-MM-DD HH:MM)
     const formatDate = (dateString) => {
@@ -38,18 +117,21 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
         const contactName = manager 
             ? `${manager.first_name || ''} ${manager.middle_name || ''} ${manager.last_name || ''}`.trim()
             : 'N/A';
+        const managerPhone = manager?.phone_nb || 'N/A';
         
         return {
             id: hospital.code || `HSP-${String(hospital.id).padStart(4, '0')}`,
+            db_id: hospital.id, // Store database ID
             name: hospital.name || 'N/A',
             address: hospital.address || 'No address provided',
             status: hospital.status || 'unverified',
             contact_name: contactName,
-            phone_nb: hospital.phone_nb || 'N/A',
+            phone_nb: managerPhone,
             email: hospital.email || 'N/A',
             blood_stock: hospital.blood_stock || {}, // If it's an object from backend
             requests: hospital.requests || 0,
             created_at: formatDate(hospital.created_at),
+            _originalHospital: hospital // Store full original hospital object for editing
         }
     }) : [];
     
@@ -128,7 +210,7 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
                             <th className="text-left col-hospital">Hospital</th>
                             <th className="col-address">Address</th>
                             <th className="col-status">Status</th>
-                            <th className="col-contact">Contact</th>
+                            <th className="col-contact">Manager Info</th>
                             <th className="col-stock">Blood Stock</th>
                             <th className="col-requests">Requests</th>
                             <th className="col-date">Date Added</th>
@@ -163,7 +245,7 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
                                 <td className="col-contact">
                                     <div className="contact">
                                         <span>{ h.contact_name }</span>
-                                        <small className="muted">{ h.phone_nb }</small>
+                                        <small className="muted">+961 { h.phone_nb }</small>
                                     </div>
                                 </td>
                                 <td className="col-stock">
@@ -181,9 +263,27 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
                                 <td className="col-date">{ h.created_at }</td>
                                 <td className="col-actions">
                                     <div className="row-actions">
-                                        <button className="icon-btn text-blue-800"><FiEye /></button>
-                                        <button className="icon-btn text-green-600"><FiEdit /></button>
-                                        <button className="icon-btn text-red-500"><RiDeleteBin6Line /></button>
+                                        <button 
+                                            className="icon-btn text-blue-800" 
+                                            title="View Details"
+                                            onClick={() => handleViewClick(h.id)}
+                                        >
+                                            <FiEye />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-green-600" 
+                                            title="Edit"
+                                            onClick={() => handleEditClick(h)}
+                                        >
+                                            <FiEdit />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-red-500" 
+                                            title="Delete"
+                                            onClick={() => handleDeleteClick(h.id, h.name)}
+                                        >
+                                            <RiDeleteBin6Line />
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -227,6 +327,68 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
                             >
                                 Next
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Modal */}
+            {editModal && (
+                <EditHospitalForm
+                    onClose={handleEditModalClose}
+                    onHospitalUpdated={handleHospitalUpdated}
+                    hospitalCode={editModal.hospitalCode}
+                    hospitalData={editModal.hospitalData}
+                />
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <div className="modal-overlay modal-overlay-delete">
+                    <div className="modal-container modal-container-delete">
+                        <div className="modal-title">
+                            <h2>Delete Hospital</h2>
+                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
+                                <IoClose />
+                            </button>
+                        </div>
+                        <div className="modal-form">
+                            <p>Are you sure you want to delete <strong>{deleteConfirm.hospitalName}</strong>?</p>
+                            <p className="modal-text-secondary">
+                                This action cannot be undone. The hospital will be permanently removed from the system.
+                            </p>
+                            
+                            {deleteError && (
+                                <div className="error-message modal-error-container">
+                                    {deleteError}
+                                </div>
+                            )}
+
+                            <div className="form-actions form-actions-modal">
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteCancel}
+                                    disabled={deleteLoading}
+                                    className="btn-cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteConfirm}
+                                    disabled={deleteLoading}
+                                    className="submit-btn btn-delete-submit"
+                                >
+                                    {deleteLoading ? (
+                                        <>
+                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        'Delete'
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

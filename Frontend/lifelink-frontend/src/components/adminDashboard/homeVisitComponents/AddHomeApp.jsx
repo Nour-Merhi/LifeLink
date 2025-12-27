@@ -64,15 +64,15 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
         // If switching appointment type, clear relevant fields
         if (name === 'appointment_type') {
             if (value === 'urgent') {
-                // Switching to urgent: clear start_time, end_time, set due_date to today
                 const today = getTodayDate();
                 setAppointmentData((prev) => ({
                     ...prev,
-                    [name]: value,
+                    appointment_type: value,
                     appointment_date: today,
+                    due_date: today,
+                    due_time: '',
                     start_time: '',
                     end_time: '',
-                    due_date: prev.due_date,
                 }));
             } else {
                 // Switching to regular: clear due date/time and blood type fields
@@ -96,18 +96,33 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
         if (!dueDate || !dueTime) return false;
     
         const now = new Date();
-        const due = new Date(`${dueDate}T${dueTime}`);
     
-        const diffMs = due - now;
+        // Build due date in LOCAL time (no UTC parsing)
+        const [year, month, day] = dueDate.split('-').map(Number);
+        const [hours, minutes] = dueTime.split(':').map(Number);
+    
+        const due = new Date(
+            year,
+            month - 1,
+            day,
+            hours,
+            minutes,
+            0,
+            0
+        );
+    
+        const diffMs = due.getTime() - now.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
     
-        return diffHours > 0 && diffHours <= 24;
+        return diffHours > 0 && diffHours <= 24.01; // small grace
     };
+    
     
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setErrors({});
 
         try{
             // Prepare data for submission
@@ -300,7 +315,9 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
                                                 onChange={handleChange}
                                                 required
                                                 step="60"
+                                                min={appointmentData.due_date === getTodayDate() ? getCurrentTime() : undefined}
                                             />
+
                                             {errors.due_time && (<small className="error-text">{errors.due_time}</small>)}
                                             <small className="info-text" style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                                                 {appointmentData.due_date === getTodayDate() 

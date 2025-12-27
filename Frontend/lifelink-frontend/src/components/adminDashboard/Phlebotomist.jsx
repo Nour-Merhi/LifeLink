@@ -125,6 +125,7 @@ export default function Phlebotomist(){
                 phlebotomists={phlebotomists}
                 loading={loading}
                 error={error}
+                onPhlebotomistsUpdate={fetchPhlebotomists}
             />
             
             {openModal && 

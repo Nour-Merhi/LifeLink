@@ -23,20 +23,32 @@ class HomeAppointmentController extends Controller
     public function index()
     {
         try {
+            $today = now()->toDateString();
+            
+            // Log for debugging
+            \Log::info('Fetching hospitals for home donation', [
+                'today' => $today,
+                'total_appointments' => Appointment::where('donation_type', 'Home Blood Donation')->count(),
+                'pending_appointments' => Appointment::where('donation_type', 'Home Blood Donation')->where('state', 'pending')->count(),
+                'future_appointments' => Appointment::where('donation_type', 'Home Blood Donation')
+                    ->where('state', 'pending')
+                    ->whereDate('appointment_date', '>=', $today)
+                    ->count()
+            ]);
+            
             // Get hospitals that have appointments with donation_type = 'Home Blood Donation'
             $hospitals = Hospital::query()
             ->select(['id','name','address','phone_nb','email','code','created_at'])
-            ->whereHas('appointments', function($query) {
+            ->whereHas('appointments', function($query) use ($today) {
                 $query->where('donation_type', 'Home Blood Donation')
                       ->where('state', 'pending')
-                      ->where('appointment_date', '>=', now()->toDateString());
+                      ->whereDate('appointment_date', '>=', $today);
             })
-            ->with(['appointments' => function($query) {
+            ->with(['appointments' => function($query) use ($today) {
                 $query->where('donation_type', 'Home Blood Donation')
                       ->where('state', 'pending')
-                      ->where('appointment_date', '>=', now()->toDateString())
-                      ->orderBy('appointment_date', 'asc')
-                      ->select(['id','hospital_id','appointment_date','time_slots','appointment_type','due_date','due_time','blood_type']);
+                      ->whereDate('appointment_date', '>=', $today)
+                      ->orderBy('appointment_date', 'asc');
             }])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -50,7 +62,7 @@ class HomeAppointmentController extends Controller
                 'urgent_hospitals' => [],
                 'regular_hospitals' => [],
                 'total' => 0,
-                'error' => 'Failed to fetch hospitals'
+                'error' => 'Failed to fetch hospitals: ' . $e->getMessage()
             ], 500);
         }
 
@@ -71,23 +83,28 @@ class HomeAppointmentController extends Controller
                         $totalSlots += $slotCount;
                         
                         // Check appointment type and count slots separately
-                        if ($appointment->appointment_type === 'urgent' && $appointment->due_date) {
+                        if ($appointment->appointment_type === 'urgent' && !empty($appointment->due_date)) {
                             $hasUrgent = true;
                             $urgentSlots += $slotCount;
                             
                             // Get the earliest urgent due date/time using Carbon for proper comparison
-                            $appointmentDueDate = Carbon::parse($appointment->due_date);
-                            if (!$urgentDueDate) {
-                                $urgentDueDate = $appointment->due_date;
-                                $urgentDueTime = $appointment->due_time;
-                                $urgentBloodType = $appointment->blood_type;
-                            } else {
-                                $currentUrgentDueDate = Carbon::parse($urgentDueDate);
-                                if ($appointmentDueDate->lessThan($currentUrgentDueDate)) {
+                            try {
+                                $appointmentDueDate = Carbon::parse($appointment->due_date);
+                                if (!$urgentDueDate) {
                                     $urgentDueDate = $appointment->due_date;
-                                    $urgentDueTime = $appointment->due_time;
-                                    $urgentBloodType = $appointment->blood_type;
+                                    $urgentDueTime = $appointment->due_time ?? null;
+                                    $urgentBloodType = $appointment->blood_type ?? null;
+                                } else {
+                                    $currentUrgentDueDate = Carbon::parse($urgentDueDate);
+                                    if ($appointmentDueDate->lessThan($currentUrgentDueDate)) {
+                                        $urgentDueDate = $appointment->due_date;
+                                        $urgentDueTime = $appointment->due_time ?? null;
+                                        $urgentBloodType = $appointment->blood_type ?? null;
+                                    }
                                 }
+                            } catch (\Exception $e) {
+                                // Skip invalid date format
+                                \Log::warning('Invalid due_date format for appointment: ' . $appointment->id);
                             }
                         }
                         
@@ -165,6 +182,8 @@ class HomeAppointmentController extends Controller
                 'appointment_time' => 'required|string',
                 // Home appointment specific
                 'address' => 'required|string',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
                 'weight' => 'required|string',
                 'emerg_contact' => 'nullable|string|max:255',
                 'emerg_phone' => 'nullable|string|max:30',
@@ -263,16 +282,42 @@ class HomeAppointmentController extends Controller
                 ->where('state', 'pending')
                 ->get();
 
+            // Extract start time from appointment_time (handle "09:00 - 10:00" or "09:00" formats)
+            $requestedTime = $validated['appointment_time'];
+            $requestedStartTime = $requestedTime;
+            if (strpos($requestedTime, ' - ') !== false) {
+                $requestedStartTime = trim(explode(' - ', $requestedTime)[0]);
+            }
+            
             // Find appointment that has the selected time in its time_slots
             $appointment = null;
             foreach ($appointments as $apt) {
                 $timeSlots = $apt->time_slots ?? [];
-                if (in_array($validated['appointment_time'], $timeSlots)) {
-                    // Check if this time slot is already booked
-                    // Note: For now, we allow multiple bookings per time slot
-                    // Later you can add logic to limit bookings per time slot
-                    $appointment = $apt;
-                    break;
+                
+                // Check if the selected time matches any slot (handle both object and string formats)
+                foreach ($timeSlots as $slot) {
+                    $slotStart = '';
+                    $slotTimeDisplay = '';
+                    
+                    if (is_array($slot) || is_object($slot)) {
+                        // Handle object format: {start: "09:00", end: "10:00"}
+                        $slotArray = (array) $slot;
+                        $slotStart = $slotArray['start'] ?? '';
+                        $slotEnd = $slotArray['end'] ?? '';
+                        $slotTimeDisplay = $slotStart . ($slotEnd ? ' - ' . $slotEnd : '');
+                    } else {
+                        // Handle string format (fallback)
+                        $slotTimeDisplay = (string) $slot;
+                        $slotStart = $slotTimeDisplay;
+                    }
+                    
+                    // Match if the requested time matches the slot display or start time
+                    if ($requestedTime === $slotTimeDisplay || 
+                        $requestedTime === $slotStart ||
+                        $requestedStartTime === $slotStart) {
+                        $appointment = $apt;
+                        break 2; // Break out of both loops
+                    }
                 }
             }
 
@@ -283,14 +328,17 @@ class HomeAppointmentController extends Controller
                 ], 404);
             }
 
+            // Use the extracted start time for storing
             // Create Home Appointment
             $homeAppointmentData = [
                 'donor_id' => $donor->id,
                 'hospital_id' => $validated['hospital_id'],
                 'appointment_id' => $appointment->id,
-                'appointment_time' => $validated['appointment_time'],
+                'appointment_time' => $requestedStartTime,
                 'weight(kg)' => $validated['weight'],
                 'address' => $validated['address'],
+                'latitude' => $validated['latitude'] ?? null,
+                'longitude' => $validated['longitude'] ?? null,
                 'emerg_contact' => $validated['emerg_contact'] ?? null,
                 'emerg_phone' => $validated['emerg_phone'] ?? null,
                 'medical_conditions' => $validated['medical_conditions'] ?? null,
@@ -365,11 +413,13 @@ class HomeAppointmentController extends Controller
         // Get appointment_type from query parameter (urgent or regular)
         $appointmentType = $request->query('appointment_type'); // 'urgent' or 'regular' or null
         
+        $today = now()->toDateString();
+        
         // Build query for appointments
         $query = Appointment::where('hospital_id', $hospitalId)
             ->where('donation_type', 'Home Blood Donation')
             ->where('state', 'pending')
-            ->where('appointment_date', '>=', now()->toDateString());
+            ->whereDate('appointment_date', '>=', $today);
         
         // Filter by appointment_type if provided
         if ($appointmentType && in_array($appointmentType, ['urgent', 'regular'])) {
@@ -405,9 +455,36 @@ class HomeAppointmentController extends Controller
             
             $slots = $appointment->time_slots ?? [];
             
-            foreach ($slots as $time) {
+            foreach ($slots as $slotIndex => $slot) {
+                // Handle time slot format: could be object with start/end or string
+                $timeDisplay = '';
+                $timeKey = ''; // For checking bookings
+                
+                if (is_array($slot) || is_object($slot)) {
+                    // Handle object format: {start: "09:00", end: "10:00", is_available: true}
+                    $slotArray = (array) $slot;
+                    $startTime = $slotArray['start'] ?? '';
+                    $endTime = $slotArray['end'] ?? '';
+                    
+                    if ($startTime && $endTime) {
+                        $timeDisplay = $startTime . ' - ' . $endTime;
+                        $timeKey = $startTime; // Use start time as key for booking lookup
+                    } elseif ($startTime) {
+                        $timeDisplay = $startTime;
+                        $timeKey = $startTime;
+                    }
+                } else {
+                    // Handle string format (fallback for backward compatibility)
+                    $timeDisplay = (string) $slot;
+                    $timeKey = $timeDisplay;
+                }
+                
+                if (!$timeDisplay || !$timeKey) {
+                    continue; // Skip invalid slots
+                }
+                
                 // Check if this specific time slot is booked
-                $currentBookings = $bookedAppointments[$appointment->id][$time] ?? 0;
+                $currentBookings = $bookedAppointments[$appointment->id][$timeKey] ?? 0;
                 
                 // Check against max_capacity if it exists
                 $maxCapacity = $appointment->max_capacity ?? null;
@@ -429,13 +506,16 @@ class HomeAppointmentController extends Controller
                 }
                 
                 $timeSlots[] = [
-                    'id' => $appointment->id . '_' . $time,
+                    'id' => $appointment->id . '_' . $slotIndex . '_' . $timeKey,
                     'date' => $date,
-                    'time' => $time,
+                    'time' => $timeDisplay,
+                    'time_key' => $timeKey, // Store the key for booking reference
                     'status' => $status,
                     'appointment_id' => $appointment->id,
                     'bookings_count' => $currentBookings,
-                    'max_capacity' => $maxCapacity
+                    'max_capacity' => $maxCapacity,
+                    'start' => is_array($slot) || is_object($slot) ? ((array)$slot)['start'] ?? $timeKey : $timeKey,
+                    'end' => is_array($slot) || is_object($slot) ? ((array)$slot)['end'] ?? null : null
                 ];
             }
         }

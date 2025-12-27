@@ -13,17 +13,37 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
     const [selectedPhlebotomist, setSelectedPhlebotomist] = useState(null);
     const [error, setError] = useState("");
 
+    // Extract hospital IDs from orders
+    const getOrderHospitalIds = () => {
+        if (!orders || orders.length === 0) return [];
+        // Extract unique hospital IDs from orders
+        const hospitalIds = orders
+            .map(order => order.hospital_id)
+            .filter(id => id !== null && id !== undefined);
+        return [...new Set(hospitalIds)]; // Remove duplicates
+    };
+
     // Fetch phlebotomists on mount
     useEffect(() => {
         fetchPhlebotomists();
     }, []);
 
-    // Filter phlebotomists based on search
+    // Filter phlebotomists based on hospital and search
     useEffect(() => {
-        if (searchTerm.trim() === "") {
-            setFilteredPhlebotomists(phlebotomists);
-        } else {
-            const filtered = phlebotomists.filter((phleb) => {
+        let filtered = phlebotomists;
+        const orderHospitalIds = getOrderHospitalIds();
+        
+        // Filter by hospital ID (only show phlebotomists from the same hospital as the orders)
+        if (orderHospitalIds.length > 0) {
+            filtered = filtered.filter((phleb) => {
+                const phlebHospitalId = phleb.hospital_id || phleb.hospital?.id;
+                return orderHospitalIds.includes(phlebHospitalId);
+            });
+        }
+        
+        // Apply search filter if search term exists
+        if (searchTerm.trim() !== "") {
+            filtered = filtered.filter((phleb) => {
                 const fullName = `${phleb.user?.first_name || ''} ${phleb.user?.middle_name || ''} ${phleb.user?.last_name || ''}`.trim();
                 const license = phleb.license_number || '';
                 const hospital = phleb.hospital?.name || '';
@@ -32,9 +52,12 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                        license.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        hospital.toLowerCase().includes(searchTerm.toLowerCase());
             });
-            setFilteredPhlebotomists(filtered);
         }
-    }, [searchTerm, phlebotomists]);
+        
+        // Note: We keep all phlebotomists in the list but disable unavailable ones
+        // This way admins can see who is unavailable but cannot select them
+        setFilteredPhlebotomists(filtered);
+    }, [searchTerm, phlebotomists, orders]);
 
     const fetchPhlebotomists = async () => {
         setLoading(true);
@@ -56,6 +79,12 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
         // Validate phlebotomist selection - check if id exists
         if (!selectedPhlebotomist || !selectedPhlebotomist.id) {
             setError("Please select a phlebotomist");
+            return;
+        }
+
+        // Validate that selected phlebotomist is not unavailable
+        if (selectedPhlebotomist.availability === 'unavailable') {
+            setError("Cannot assign an unavailable phlebotomist. Please select an available or on-duty phlebotomist.");
             return;
         }
 
@@ -125,14 +154,24 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                 <div className="modal-form">
                     {orders && orders.length > 0 && (
                         <div className="order-info" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
-                            <h4>Selected Orders ({orders.length}):</h4>
+                            <h4>Selected Orders:</h4>
                             <div style={{ maxHeight: '120px', overflowY: 'auto', marginTop: '10px' }}>
                                 {orders.map((order, idx) => (
                                     <div key={order.id || idx} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                                        <strong>{order.name}</strong> - {order.id} ({order.date} at {order.time})
+                                        <strong>{order.name}</strong> - {order.id} : {order.date} at {order.time}
+                                        {order.hospital_name && (
+                                            <span style={{ color: '#666', marginLeft: '8px' }}>
+                                                (Hospital: {order.hospital_name})
+                                            </span>
+                                        )}
                                     </div>
                                 ))}
                             </div>
+                            {getOrderHospitalIds().length > 0 && (
+                                <div style={{ marginTop: '10px', fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                                    Only phlebotomists from the selected hospital(s) are shown
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -160,50 +199,77 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                     ) : (
                         <div className="phlebotomist-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                             {filteredPhlebotomists.length > 0 ? (
-                                filteredPhlebotomists.map((phleb) => (
-                                    <div
-                                        key={phleb.id}
-                                        className={`phlebotomist-item ${selectedPhlebotomist?.id === phleb.id ? 'selected' : ''}`}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            // Use a callback to ensure state is set properly
-                                            setSelectedPhlebotomist(phleb);
-                                            setError(""); // Clear error when phlebotomist is selected
-                                        }}
-                                        style={{
-                                            padding: '15px',
-                                            marginBottom: '10px',
-                                            border: selectedPhlebotomist?.id === phleb.id ? '2px solid #f01010' : '1px solid #ddd',
-                                            borderRadius: '8px',
-                                            cursor: 'pointer',
-                                            backgroundColor: selectedPhlebotomist?.id === phleb.id ? '#fff5f5' : '#fff',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div>
-                                                <h4 style={{ margin: '0 0 5px 0' }}>{getPhlebotomistName(phleb)}</h4>
-                                                <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
-                                                    License: {phleb.license_number || 'N/A'}
-                                                </p>
-                                                <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
-                                                    Hospital: {phleb.hospital?.name || 'N/A'}
-                                                </p>
-                                                {phleb.user?.phone_nb && (
+                                filteredPhlebotomists.map((phleb) => {
+                                    // Check if phlebotomist is available (not unavailable)
+                                    const isAvailable = phleb.availability && phleb.availability !== 'unavailable';
+                                    const isDisabled = !isAvailable;
+                                    
+                                    return (
+                                        <div
+                                            key={phleb.id}
+                                            className={`phlebotomist-item ${selectedPhlebotomist?.id === phleb.id ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                // Block selection if unavailable
+                                                if (isDisabled) {
+                                                    setError("This phlebotomist is unavailable and cannot be assigned");
+                                                    return;
+                                                }
+                                                // Use a callback to ensure state is set properly
+                                                setSelectedPhlebotomist(phleb);
+                                                setError(""); // Clear error when phlebotomist is selected
+                                            }}
+                                            style={{
+                                                padding: '15px',
+                                                marginBottom: '10px',
+                                                border: selectedPhlebotomist?.id === phleb.id ? '2px solid #f01010' : '1px solid #ddd',
+                                                borderRadius: '8px',
+                                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                                backgroundColor: isDisabled ? '#f5f5f5' : (selectedPhlebotomist?.id === phleb.id ? '#fff5f5' : '#fff'),
+                                                opacity: isDisabled ? 0.6 : 1,
+                                                transition: 'all 0.2s ease',
+                                                position: 'relative'
+                                            }}
+                                        >
+                                            {isDisabled && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: '10px',
+                                                    right: '10px',
+                                                    fontSize: '12px',
+                                                    color: '#999',
+                                                    fontStyle: 'italic'
+                                                }}>
+                                                    Unavailable
+                                                </div>
+                                            )}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <h4 style={{ margin: '0 0 5px 0', color: isDisabled ? '#999' : '#000' }}>
+                                                        {getPhlebotomistName(phleb)}
+                                                    </h4>
                                                     <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
-                                                        Phone: {phleb.user.phone_nb}
+                                                        License: {phleb.license_number || 'N/A'}
                                                     </p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <span className={`badge ${getAvailabilityBadge(phleb.availability)}`}>
-                                                    {phleb.availability || 'available'}
-                                                </span>
+                                                    <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                                                        Hospital: {phleb.hospital?.name || 'N/A'}
+                                                    </p>
+                                                    {phleb.user?.phone_nb && (
+                                                        <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                                                            Phone: {phleb.user.phone_nb}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <span className={`badge ${getAvailabilityBadge(phleb.availability)}`}>
+                                                        {phleb.availability || 'available'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             ) : (
                                 <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
                                     <p>No phlebotomists found</p>
@@ -216,7 +282,7 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                 <div className="modal-footer form-submit-btn">
                     <button
                         type="button"
-                        className="btn-secondary"
+                        className="btn-cancel"
                         onClick={onClose}
                         disabled={assigning}
                         style={{ marginRight: '10px' }}

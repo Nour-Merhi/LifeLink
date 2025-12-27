@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
+import MapIntegration from "../../MapIntegration";
 
 import axios from "axios"
 
@@ -22,6 +23,8 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
     const [addHospitalData, setAddHospitalData] = useState({
         name: "",
         address: "",
+        latitude: null,
+        longitude: null,
         phone_nb: "",
         email: "",
         manager: {
@@ -37,6 +40,7 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
             working_dates: [],
         },
     });
+
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -123,6 +127,14 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
         }));
     }, [workingDates]);
 
+    const handleLocationSelect = (lat, lng) => {
+        setAddHospitalData(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -150,6 +162,8 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
                 setAddHospitalData({
                     name: "",
                     address: "",
+                    latitude: null,
+                    longitude: null,
                     phone_nb: "",
                     email: "",
                     manager: {
@@ -253,13 +267,31 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
                             <div className="form-group">
                                 <div>
                                     <label htmlFor="address">Hospital Address</label>
-                                    <textarea className="textarea"
+                                    <input
                                         id="address"
                                         name="address"
+                                        type="text"
+                                        className="input"
                                         value={addHospitalData.address}
-                                        placeholder="Enter hospital address..."
+                                        placeholder="Enter hospital address"
                                         onChange={handleChange}
                                     />
+                                </div>
+                            </div>  
+                            <div className="form-group">
+                                <div>
+                                    <label>Hospital Location</label>
+                                    <MapIntegration
+                                        latitude={addHospitalData.latitude}
+                                        longitude={addHospitalData.longitude}
+                                        onLocationSelect={handleLocationSelect}
+                                    />
+
+                                    {addHospitalData.latitude && addHospitalData.longitude && (
+                                        <small className="muted" style={{ fontSize: '12px', display: 'block', marginTop: '4px', color: '#16a34a' }}>
+                                        ✓ Selected Location: {addHospitalData.latitude.toFixed(6)}, {addHospitalData.longitude.toFixed(6)}
+                                        </small>
+                                    )}
                                 </div>
                             </div>
 

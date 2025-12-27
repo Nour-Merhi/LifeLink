@@ -125,7 +125,12 @@ export default function HomeVisit(){
                 />
             }
             {app &&
-                <HomeAppTable appointments={appointmentData} loading={loading} error={error} />
+                <HomeAppTable 
+                    appointments={appointmentData} 
+                    loading={loading} 
+                    error={error}
+                    onAppointmentsUpdate={fetchData}
+                />
             }
             
             {openModal && 

@@ -62,6 +62,7 @@ export default function Hospitals(){
                 hospitals = { hospitals }
                 loading = { loading }
                 error = { error }
+                onHospitalsUpdate = { fetchHospitals }
             />
             
             {openModal && 

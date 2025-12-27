@@ -30,7 +30,7 @@ export default function CalendarStep({
 
   // Get all dates that have appointments for this hospital
   const getAvailableDates = () => {
-    if (pageType !== "home" || !appointments || appointments.length === 0) {
+    if ((pageType !== "home" && pageType !== "hospital") || !appointments || appointments.length === 0) {
       return new Set();
     }
     
@@ -49,10 +49,22 @@ export default function CalendarStep({
         }
         
         if (dateStr) {
-          // Also check if this date has any time slots
+          // Also check if this date has any time slots with valid data
           const slots = apt.time_slots || [];
           if (slots && slots.length > 0) {
-            dateSet.add(dateStr);
+            // Check if there's at least one valid slot (either string or object with start)
+            const hasValidSlot = slots.some(slot => {
+              if (!slot) return false;
+              if (typeof slot === 'string') return slot.length > 0;
+              if (typeof slot === 'object') {
+                const slotObj = slot;
+                return slotObj.start || slotObj.time || Object.keys(slotObj).length > 0;
+              }
+              return false;
+            });
+            if (hasValidSlot) {
+              dateSet.add(dateStr);
+            }
           }
         }
       }
@@ -73,7 +85,7 @@ export default function CalendarStep({
 
   // Reset selection when appointments change (hospital changes)
   useEffect(() => {
-    if (pageType === "home") {
+    if (pageType === "home" || pageType === "hospital") {
       setSelected(null);
       setSelectedDate(null);
     }
@@ -160,9 +172,9 @@ return (
                     <>
                         <p>Available Time Slots</p>
                         <Timeslots 
-                            timeslots={pageType === "home" && timeSlots.length > 0 
+                            timeslots={(pageType === "home" || pageType === "hospital") && timeSlots.length > 0 
                                 ? timeSlots 
-                                : (pageType === "home" && appointments.length > 0 
+                                : ((pageType === "home" || pageType === "hospital") && appointments.length > 0 
                                     ? appointments.flatMap(apt => {
                                         const slots = apt.time_slots || [];
                                         // Format date to YYYY-MM-DD to match selectedDate format
@@ -180,13 +192,42 @@ return (
                                         
                                         if (!dateStr || slots.length === 0) return [];
                                         
-                                        return slots.map(time => ({
-                                            id: apt.id + '_' + time,
-                                            date: dateStr,
-                                            time: time,
-                                            status: 'available',
-                                            appointment_id: apt.id
-                                        }));
+                                        return slots.map((slot, slotIndex) => {
+                                            // Handle time slot format: could be object with start/end or string
+                                            let timeDisplay = '';
+                                            let timeKey = '';
+                                            
+                                            if (slot && typeof slot === 'object') {
+                                                // Handle object format: {start: "09:00", end: "10:00", is_available: true}
+                                                const startTime = slot.start || '';
+                                                const endTime = slot.end || '';
+                                                
+                                                if (startTime && endTime) {
+                                                    timeDisplay = `${startTime} - ${endTime}`;
+                                                    timeKey = startTime;
+                                                } else if (startTime) {
+                                                    timeDisplay = startTime;
+                                                    timeKey = startTime;
+                                                }
+                                            } else if (slot) {
+                                                // Handle string format (fallback)
+                                                timeDisplay = String(slot);
+                                                timeKey = timeDisplay;
+                                            }
+                                            
+                                            if (!timeDisplay) return null;
+                                            
+                                            return {
+                                                id: `${apt.id}_${slotIndex}_${timeKey}`,
+                                                date: dateStr,
+                                                time: timeDisplay,
+                                                time_key: timeKey,
+                                                status: slot.is_available === false ? 'booked' : 'available',
+                                                appointment_id: apt.id,
+                                                start: typeof slot === 'object' ? (slot.start || timeKey) : timeKey,
+                                                end: typeof slot === 'object' ? (slot.end || null) : null
+                                            };
+                                        }).filter(slot => slot !== null);
                                     }).filter(slot => slot && slot.date)
                                     : timeslots)} 
                             selectedDate = {selectedDate}

@@ -28,7 +28,10 @@ class Hospital extends Model
         'phone_nb',
         'email',
         'address',
+        'latitude',
+        'longitude',
         'code',
+        'status',
     ];
     protected static function booted()
     {
