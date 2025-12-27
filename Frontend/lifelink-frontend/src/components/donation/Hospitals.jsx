@@ -6,11 +6,11 @@ import { SpinnerDotted } from 'spinners-react';
 
 import "../../styles/BloodDonation.css"
 
+
 export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [] }) {
     const isSearching = searchQuery && searchQuery.trim() !== "";
-    const hasResults = Array.isArray(showHospitals) && showHospitals.length > 0;
 
-return (
+    return (
     <div className="search-hospital">
       {/* Case 1: Searching but no results */}
       {isSearching && !hasResults && <p>No hospitals found.</p>}
@@ -32,9 +32,6 @@ return (
               type="button"
               onClick={() => onSelect({ ...h, appointment_type: appointmentType })}
             >
-              <div className="hospital-icon">
-                <FaHospital />
-              </div>
               <div className="info">
                 <h2>{h.name}</h2>
                 <div className="details">

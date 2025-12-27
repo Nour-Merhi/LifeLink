@@ -19,7 +19,7 @@ use App\Http\Controllers\HospitalSettingController;
 use App\Http\Controllers\HomeVisitController;
 use App\Http\Controllers\LivingDonorController;
 use App\Http\Controllers\AfterDeathPledgeController;
-
+use App\Http\Controllers\HospitalsController;
 
 
 Route::post('/login', [AuthenticatedSessionController::class, 'login']);
@@ -35,6 +35,13 @@ Route::prefix('/blood')->group(function(){
     Route::post('/home_appointment', [HomeAppointmentController::class, 'store']);
     Route::get('/hospital_donation', [HospitalAppointmentController::class, 'index']);
     Route::get('/hospital_donation/{id}', [HospitalAppointmentController::class, 'show']);
+Route::post('/appointments', [AppointmentsContoller::class, 'createAppointment']);
+Route::get('/appointmnets', [AppointmentsContoller::class, 'showAppointments']);
+});
+//Blood donation Module
+Route::middleware('auth:sanctum')->prefix('/blood')->group(function(){
+    Route::get('/home_donation', [HomeAppointmentController::class, 'index']);
+    Route::get('/home_donation/{id}', [HomeAppointmentController::class, 'show']);
 });
 
 Route::get('/test', function () {
@@ -109,3 +116,8 @@ Route::prefix('/admin/dashboard')->group(function(){
 });
 
 //Appointments Routes
+Route::get('/hospital', [HospitalsController::class, 'index']);
+Route::get('/hospital/{id}', [HospitalsController::class, 'getHospital']);
+
+//Hospital Appointment Route 
+Route::post('/hospital/appointments', [HospitalAppointmentController::class, 'store']);
