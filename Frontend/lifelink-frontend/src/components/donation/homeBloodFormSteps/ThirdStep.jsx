@@ -46,12 +46,13 @@ export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
 
             console.log('Home appointment created:', response.data);
 
-            // Clear localStorage
+            // Clear localStorage only on successful submission
             const prefix = "home_"; // Always home for this form
             localStorage.setItem("step", "hospitals");
             localStorage.removeItem(prefix + "hospital");
             localStorage.removeItem("date");
             localStorage.removeItem("appointment_time");
+            localStorage.removeItem("home_blood_form_data"); // Clear form data
 
             setThankMessHome(true);
         } catch (err) {

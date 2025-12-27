@@ -1,8 +1,26 @@
 import { useNavigate } from "react-router-dom";
 import ScrollToTop from "../../ScrollToTop";
+import { useEffect } from "react";
+import MapIntegration from "../../MapIntegration";
 
 export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFormData }){
      const navigate = useNavigate()
+
+     // Load from localStorage on mount
+     useEffect(() => {
+        const savedData = localStorage.getItem('home_blood_form_data');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                setHomeBloodFormData((prev) => ({
+                    ...prev,
+                    ...parsed
+                }));
+            } catch (e) {
+                console.warn('Error parsing saved form data:', e);
+            }
+        }
+     }, []);
 
      const handleSubmit = (e) => {
          e.preventDefault();
@@ -11,12 +29,19 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
             return;
         }
         
+        // Save current form data to localStorage before proceeding
+        const updatedData = { ...homeBloodFormData };
+        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+        
         nextStep();
      }
 
      const handleChange = (e) => {
         const {name, value} = e.target;
-        setHomeBloodFormData ((prev) => ({...prev, [name]: value}));
+        const updatedData = {...homeBloodFormData, [name]: value};
+        setHomeBloodFormData(updatedData);
+        // Save to localStorage on each change
+        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
      }
 
     return (
@@ -116,7 +141,12 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 </div>
                                 <div>
                                     <label htmlFor="gender">Gender</label>
-                                    <select id="gender" name="gender" onChange={ handleChange }>
+                                    <select 
+                                        id="gender" 
+                                        name="gender" 
+                                        value={homeBloodFormData.gender || ""}
+                                        onChange={handleChange}
+                                    >
                                         <option value="" disabled>Select a Gender</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
@@ -145,6 +175,30 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                         value = { homeBloodFormData.address || "" }
                                         placeholder="Enter your address in detials.."
                                     required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <div style={{ width: '100%' }}>
+                                    <label>Select Your Location on Map</label>
+                                    <div style={{ marginTop: '10px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+                                        <MapIntegration
+                                            latitude={homeBloodFormData.latitude || null}
+                                            longitude={homeBloodFormData.longitude || null}
+                                            onLocationSelect={(lat, lng) => {
+                                                const updatedData = {
+                                                    ...homeBloodFormData,
+                                                    latitude: lat,
+                                                    longitude: lng
+                                                };
+                                                setHomeBloodFormData(updatedData);
+                                                localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+                                            }}
+                                            height="300px"
+                                        />
+                                    </div>
+                                    <small style={{ display: 'block', marginTop: '5px', color: '#666' }}>
+                                        Click on the map to mark your location. This will help our phlebotomist find your address easily.
+                                    </small>
                                 </div>
                             </div>
                             <div className="form-group">

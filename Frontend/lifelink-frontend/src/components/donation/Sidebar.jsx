@@ -11,7 +11,8 @@ import { BiHomeSmile } from "react-icons/bi";
 
 export default function Sidebar() {
   return (
-    <div className="sidebar padding">
+
+    <div className="sidebar">
       <div className="top">
         <img src={lifelinklogo} alt="life link logo" />
         <h1>Donation Center</h1>
@@ -48,7 +49,7 @@ export default function Sidebar() {
         className={({ isActive }) =>
             `option rounded-[15px] hover:bg-gray-300 
             ${isActive ? 
-              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
               ""}`
             } >
           {({ isActive }) => (
@@ -72,7 +73,7 @@ export default function Sidebar() {
          className={({ isActive }) =>
             `option rounded-[15px] hover:bg-gray-300 
             ${isActive ? 
-              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
               ""}`
             } >
           {({ isActive }) => (
@@ -92,7 +93,7 @@ export default function Sidebar() {
           className={({ isActive }) =>
             `option rounded-[15px] hover:bg-gray-300 
             ${isActive ? 
-              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
               ""}`
             } >
           {({ isActive }) => (
@@ -116,7 +117,7 @@ export default function Sidebar() {
           className={({ isActive }) =>
             `option rounded-[15px] hover:bg-gray-300 
             ${isActive ? 
-              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
               ""}`
         }>
           {({ isActive }) => (

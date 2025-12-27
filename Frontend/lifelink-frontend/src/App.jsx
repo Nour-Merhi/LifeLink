@@ -9,6 +9,7 @@ import OrganAlive from "./pages/OrganAlive";
 import FinancialSupport from "./pages/FinancialSupport";
 import ScrollToTop from "./components/ScrollToTop";
 import AdminDashboard from "./pages/AdminDashboard";
+import Home from "./pages/Home"
 
 import AfterDeathStepTwo from "./components/donation/afterLifeOrganForm/AfterDeathStepTwo.jsx";
 import AfterDeathStepThree from "./components/donation/afterLifeOrganForm/AfterDeathStepThree.jsx";
@@ -23,6 +24,10 @@ import Phlebotomist from "./components/adminDashboard/Phlebotomist.jsx";
 import Financial from "./components/adminDashboard/Financial.jsx";
 import Notification from "./components/adminDashboard/Notification.jsx";
 import OrganPledges from "./components/adminDashboard/OrganPledges.jsx";
+import Login from "./pages/Login";
+import Register from "./pages/Register"
+import { useEffect } from "react";
+import axios from "axios";
 
 function App() {
   useEffect(() => {
@@ -42,6 +47,18 @@ function App() {
     <Router>
       <ScrollToTop />
       
+      <Routes>
+        <Route path="/login" element={<Login />} />
+      </Routes>
+      <Routes>
+        <Route path="/register" element={<Register />} />
+      </Routes>
+      {/* home layout */}
+      <Routes>
+        <Route path="/home" element={<Home />}></Route>
+
+
+      </Routes>
       <Routes>
         {/* Donation layout */}
         <Route path="/donation" element={<Donation />}>

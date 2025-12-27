@@ -12,9 +12,9 @@
 /*Search*/
 .search{
     background-color: #ffffff;
-    border-radius: 10px;
+    border-radius: 20px;
     padding: 30px;
-    box-shadow: 0 0 4px rgba(0,0,0,0.25);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.25);
     margin-bottom: 20px;
 }
 
@@ -181,15 +181,15 @@
   flex-direction: row;
   justify-content: space-between;
   width: 100%;
-  height: 530px;
+  height: 480px;
   gap: 20px;
   padding: 10px 0px;
 }
 .calendar-step{
   flex: 0 0 65%;
   background-color: white;
-  box-shadow: 0 0 4px rgba(0,0,0,0.25);
-  border-radius: 10px;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  border-radius: 20px;
   padding: 15px;
   height: 100%;
   
@@ -199,8 +199,8 @@
 .timeslot-panel {
   flex: 0 0 33%;
   background-color: white;
-  box-shadow: 0 0 4px rgba(0,0,0,0.25);
-  border-radius: 10px;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  border-radius: 20px;
   height: 100%;
   padding: 20px 13px 20px 20px;
   text-align: center;
@@ -528,6 +528,28 @@ label > input:checked{
 .dates-available::-webkit-scrollbar-track {
   background: transparent;
 }
+
+
+/* Target the scrolling area */
+.dates-available {
+  flex: 1 1 auto;
+  overflow-y: auto;            /* thickness */
+  padding-right: 5px;
+  /* optional: smoother scroll */
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar track */
+.dates-available::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* Track background */
+.dates-available::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Thumb (the draggable part) */
 .dates-available::-webkit-scrollbar-thumb {
   background-color: var(--grey-color);
   border-radius: 10px;
