@@ -8,6 +8,7 @@ use App\Models\Donor;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class HospitalAppointmentController extends Controller
 {
@@ -721,6 +722,107 @@ class HospitalAppointmentController extends Controller
             ]);
             return response()->json([
                 'message' => 'Failed to delete hospital appointment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Store a newly created hospital appointment
+     */
+    public function store(Request $request)
+    {
+        try {
+            // For now, accept minimal data - hospital_name, appointment_date, appointment_time
+            // TODO: This should be updated to require donor information or get from authenticated user
+            $validated = $request->validate([
+                'hospital_name' => 'required|string',
+                'appointment_date' => 'required|date',
+                'appointment_time' => 'required|string',
+            ]);
+
+            // Find hospital by name
+            $hospital = Hospital::where('name', $validated['hospital_name'])->first();
+            
+            if (!$hospital) {
+                return response()->json([
+                    'message' => 'Hospital not found'
+                ], 404);
+            }
+
+            // Find the appointment based on hospital_id, date, donation_type, and time
+            $appointments = Appointment::where('hospital_id', $hospital->id)
+                ->where('appointment_date', $validated['appointment_date'])
+                ->where('donation_type', 'Hospital Blood Donation')
+                ->where('state', 'pending')
+                ->get();
+
+            // Extract start time from appointment_time (handle "09:00 - 10:00" or "09:00" formats)
+            $requestedTime = $validated['appointment_time'];
+            $requestedStartTime = $requestedTime;
+            if (strpos($requestedTime, ' - ') !== false) {
+                $requestedStartTime = trim(explode(' - ', $requestedTime)[0]);
+            }
+            
+            // Find appointment that has the selected time in its time_slots
+            $appointment = null;
+            foreach ($appointments as $apt) {
+                $timeSlots = $apt->time_slots ?? [];
+                
+                // Check if the selected time matches any slot (handle both object and string formats)
+                foreach ($timeSlots as $slot) {
+                    $slotStart = '';
+                    $slotTimeDisplay = '';
+                    
+                    if (is_array($slot) || is_object($slot)) {
+                        // Handle object format: {start: "09:00", end: "10:00"}
+                        $slotArray = (array) $slot;
+                        $slotStart = $slotArray['start'] ?? '';
+                        $slotEnd = $slotArray['end'] ?? '';
+                        $slotTimeDisplay = $slotStart . ($slotEnd ? ' - ' . $slotEnd : '');
+                    } else {
+                        // Handle string format (fallback)
+                        $slotTimeDisplay = (string) $slot;
+                        $slotStart = $slotTimeDisplay;
+                    }
+                    
+                    // Match if the requested time matches the slot display or start time
+                    if ($requestedTime === $slotTimeDisplay || 
+                        $requestedTime === $slotStart ||
+                        $requestedStartTime === $slotStart) {
+                        $appointment = $apt;
+                        break 2; // Break out of both loops
+                    }
+                }
+            }
+
+            if (!$appointment) {
+                return response()->json([
+                    'message' => 'Appointment slot not found or not available'
+                ], 404);
+            }
+
+            // TODO: Get donor_id from authenticated user or require it in the request
+            // For now, return an error indicating donor information is required
+            return response()->json([
+                'message' => 'Donor information is required to create a hospital appointment. Please ensure you are logged in.',
+                'error' => 'missing_donor_info'
+            ], 400);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error creating hospital appointment:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to create hospital appointment',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
             ], 500);
         }
     }

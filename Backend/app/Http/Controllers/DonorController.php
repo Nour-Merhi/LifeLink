@@ -55,6 +55,8 @@ class DonorController extends Controller
             'gender'=> 'required|in:male,female',
             'date_of_birth'=> 'required|date|before:today',
             'blood_type_id' => 'required|exists:blood_types,id',
+            'last_donation' => 'nullable|date|before_or_equal:today',
+            'city' => 'nullable|string|max:100',
         ]);
 
         $result = DB::transaction(function () use ($validated) {
@@ -64,6 +66,7 @@ class DonorController extends Controller
                 'last_name'=> $validated['last_name'] ?? '',
                 'email'=> $validated['email'],
                 'phone_nb'=> $validated['phone_nb'],
+                'city'=> $validated['city'] ?? null,
                 'role'=> 'donor',
                 'password'=> Hash::make($validated['password']),
             ]);
@@ -73,6 +76,7 @@ class DonorController extends Controller
                 'gender'=> $validated['gender'],
                 'date_of_birth'=> $validated['date_of_birth'],
                 'blood_type_id'=> $validated['blood_type_id'],
+                'last_donation'=> $validated['last_donation'] ?? null,
             ]);
 
             return [$user, $donor];

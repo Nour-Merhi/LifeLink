@@ -20,8 +20,10 @@ use App\Http\Controllers\HomeVisitController;
 use App\Http\Controllers\LivingDonorController;
 use App\Http\Controllers\AfterDeathPledgeController;
 use App\Http\Controllers\HospitalsController;
+use App\Http\Controllers\Auth\RegisterController;
 
 
+Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [AuthenticatedSessionController::class, 'login']);
 Route::middleware('auth:sanctum')->get('/user', [AuthenticatedSessionController::class, 'user']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthenticatedSessionController::class, 'logout']);
@@ -35,25 +37,21 @@ Route::prefix('/blood')->group(function(){
     Route::post('/home_appointment', [HomeAppointmentController::class, 'store']);
     Route::get('/hospital_donation', [HospitalAppointmentController::class, 'index']);
     Route::get('/hospital_donation/{id}', [HospitalAppointmentController::class, 'show']);
-Route::post('/appointments', [AppointmentsContoller::class, 'createAppointment']);
-Route::get('/appointmnets', [AppointmentsContoller::class, 'showAppointments']);
-});
-//Blood donation Module
-Route::middleware('auth:sanctum')->prefix('/blood')->group(function(){
-    Route::get('/home_donation', [HomeAppointmentController::class, 'index']);
-    Route::get('/home_donation/{id}', [HomeAppointmentController::class, 'show']);
+    Route::post('/appointments', [AppointmentsController::class, 'createAppointment']);
+    Route::get('/appointmnets', [AppointmentsController::class, 'showAppointments']);
 });
 
 Route::get('/test', function () {
     return response()->json(['message' => 'API connected successfully!']);
 });
 
+// Public route for blood types
+Route::get('/blood-types', [DonorController::class, 'getBloodTypes']);
+
 //Hospital Route
 Route::get('/hospital', [HospitalController::class, 'index']);
 Route::get('/hospital/{id}', [HospitalController::class, 'getHospital']);
 
-//Hospital Appointment Route 
-Route::post('/hospital/appointments', [HomeAppointmentController::class, 'store']);
 
 //Living Organ Donation Routes - Public
 Route::post('/organ/living-donor', [LivingDonorController::class, 'store']);
