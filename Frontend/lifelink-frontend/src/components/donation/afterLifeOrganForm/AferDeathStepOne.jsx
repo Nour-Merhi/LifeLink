@@ -101,7 +101,7 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
                         <div>
                             <label htmlFor="phone">Phone Number</label>
                             <input 
-                                type="tel" 
+                                type="text" 
                                 id="phone" 
                                 name="phone" 
                                 value={afterDeathFormData.phone || ""}
@@ -175,7 +175,7 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
                         <div>
                             <label htmlFor="emergency-contact-number">Emergency Contact Number (optional)</label>
                             <input 
-                                type="tel" 
+                                type="text" 
                                 id="emergency-contact-number" 
                                 name="emergency-contact-number"
                                 value={afterDeathFormData.emergency_contact_number || ""}

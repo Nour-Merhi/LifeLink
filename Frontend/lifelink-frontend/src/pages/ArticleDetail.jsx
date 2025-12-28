@@ -177,6 +177,7 @@ export default function ArticleDetail() {
     if (!article) {
         return (
             <>
+            <div className="article-detail-page">
                 <Navbar />
                 <div className="article-detail-error">
                     <h2>Article Not Found</h2>
@@ -185,14 +186,15 @@ export default function ArticleDetail() {
                         Back to Articles
                     </button>
                 </div>
+            </div>
             </>
         );
     }
 
     return (
         <>
-            <Navbar />
             <section className="article-detail-page">
+            <Navbar />
                 <div className="article-detail-container">
                     {/* Back Button */}
                     <button onClick={() => navigate('/articles')} className="back-button">

@@ -12,8 +12,6 @@
   width: 21%;
   height: 100vh;
   box-shadow: 0 4px 4px  rgba(0,0,0, 0.25);
-  padding: 0 15px;
-  overflow-y: auto;
   flex-shrink: 0; 
   position: relative;       
   position: sticky;
@@ -28,7 +26,6 @@
 }
 
 .sidebar > hr {
-  position: absolute;
   left: 0;
   right: 0;
   color: #eaeaea;
@@ -60,10 +57,17 @@
 }
 
 .option{
-  display: flex;
-  align-items: center;
-  padding: 6px 10px;
-  margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    margin-bottom: 3px;
+    cursor: pointer;
+}
+
+.disabled-option {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .icon {
@@ -73,7 +77,7 @@
 }
 
 .donation{
-  margin-top: 20px;
+  margin-top: 10px;
 }
 .top > h1, .top > p{
   margin-left: 5px;

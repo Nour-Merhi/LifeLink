@@ -120,7 +120,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                     <label for="phone">Phone Number</label>
                                     <input 
                                         onChange={ handleChange }
-                                        type="tel" 
+                                        type="text" 
                                         id="phone" 
                                         name="phone_nb"
                                         value = { homeBloodFormData.phone_nb || "" }
@@ -217,7 +217,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                     <label for="emergency-contact-number">Emergency Contact Number (optional)</label>
                                     <input 
                                         onChange={ handleChange }
-                                        type="tel" 
+                                        type="text" 
                                         id="emergency-contact-number" 
                                         name="emerg_phone"
                                         value = { homeBloodFormData.emerg_phone || "" }

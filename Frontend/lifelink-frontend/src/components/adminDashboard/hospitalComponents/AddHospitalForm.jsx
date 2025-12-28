@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import MapIntegration from "../../MapIntegration";
-
-import axios from "axios"
+import api from "../../../api/axios";
 
 export default function AddHospitalForm({ onClose, onHospitalAdded }) {
     const [workingDates, setWorkingDates] = useState([]);
@@ -146,15 +145,13 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
         setLoading (true);
 
         try{
-            const response = await axios.post(
-                "http://localhost:8000/api/admin/dashboard/add-hospital",
-                addHospitalData,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                }
+            // First, get the CSRF cookie from Sanctum
+            await api.get("/sanctum/csrf-cookie");
+
+            // Then, make the POST request
+            const response = await api.post(
+                "/api/admin/dashboard/add-hospital",
+                addHospitalData
             );
             setShowSuccess(true);
             setTimeout(() => {

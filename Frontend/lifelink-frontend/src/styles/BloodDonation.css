@@ -299,7 +299,6 @@
   background-color: var(--frame-color);
   min-height: 100vh;
 }
-
 .container{
   max-width: 850px;
   max-height: 1075px;
@@ -343,6 +342,11 @@
   background-color: white;
   box-shadow: 0 4px 10px var(--shadow-color) ;
   border-radius: 0 0 20px 20px;
+  padding: 20px;
+}
+
+.form-container form {
+  width: 100%;
 }
 
 .form-group {
@@ -533,9 +537,8 @@ label > input:checked{
 /* Target the scrolling area */
 .dates-available {
   flex: 1 1 auto;
-  overflow-y: auto;            /* thickness */
+  overflow-y: auto;            
   padding-right: 5px;
-  /* optional: smoother scroll */
   scroll-behavior: smooth;
 }
 

@@ -9,6 +9,11 @@ import "../../styles/BloodDonation.css"
 
 export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [] }) {
     const isSearching = searchQuery && searchQuery.trim() !== "";
+    
+    // Calculate hasResults based on current state
+    const hasResults = isSearching 
+        ? (showHospitals && showHospitals.length > 0)
+        : ((urgentHospitals && urgentHospitals.length > 0) || (regularHospitals && regularHospitals.length > 0) || (showHospitals && showHospitals.length > 0));
 
     return (
     <div className="search-hospital">

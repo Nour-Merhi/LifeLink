@@ -1,10 +1,36 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../styles/OrganDonation.css";
+import { useAuth } from "../../context/AuthContext";
 
 export default function DonationWelcome() {
   const [active, setActive] = useState("signin");
-  const navigate  = useNavigate();
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const getUserName = () => {
+    if (!user) return "";
+    const firstName = user.first_name || "";
+    const lastName = user.last_name || "";
+    return `${firstName} ${lastName}`.trim() || "Donor";
+  };
+
+  if (loading) {
+    return (
+      <div className="auth-container">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (user) {
+    return (
+      <div className="auth-container">
+        <h2>Welcome {getUserName()}!</h2>
+        <p>Kindly choose your donation type</p>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-container">
@@ -20,7 +46,7 @@ export default function DonationWelcome() {
           className={`btn signin ${active === "signin" ? "active" : ""}`}
           onMouseEnter={() => setActive("signin")}
           onClick = {
-            () => navigate ("/signin-page")
+            () => navigate ("/register")
           }
         >
           Signin
@@ -29,7 +55,7 @@ export default function DonationWelcome() {
           className={`btn login ${active === "login" ? "active" : ""}`}
           onMouseEnter={() => setActive("login")}
           onClick = {
-            () => navigate ("/login-page")
+            () => navigate ("/login")
           }
         >
           Login

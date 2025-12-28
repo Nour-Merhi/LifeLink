@@ -15,6 +15,10 @@ export default function CalendarStep({
     appointments = [],
     availableSlots = 0
 }) {
+  // Get current date info
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
 
   // days in month
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -121,7 +125,7 @@ return (
                                 : !dateHasAppointments && d >= currentDay
                                 ? "text-gray-400 cursor-not-allowed opacity-50 muted-date"
                                 : isSelected
-                                ? "bg-gradient-to-red from-red-500 to-red-800 font-bold text-white cursor-pointer"
+                                ? "bg-gradient-to-r from-red-500 to-red-800 font-bold text-white cursor-pointer"
                                 : isToday && dateHasAppointments
                                 ? "border-2 border-red-500 cursor-pointer hover:bg-red-50"
                                 : dateHasAppointments
@@ -168,10 +172,8 @@ return (
                     <>
                         <p>Available Time Slots</p>
                         <Timeslots 
-                            timeslots={(pageType === "home" || pageType === "hospital") && timeSlots.length > 0 
-                                ? timeSlots 
-                                : ((pageType === "home" || pageType === "hospital") && appointments.length > 0 
-                                    ? appointments.flatMap(apt => {
+                            timeslots={((pageType === "home" || pageType === "hospital") && appointments.length > 0 
+                                ? appointments.flatMap(apt => {
                                         const slots = apt.time_slots || [];
                                         // Format date to YYYY-MM-DD to match selectedDate format
                                         let dateStr;
@@ -186,7 +188,8 @@ return (
                                             }
                                         }
                                         
-                                        if (!dateStr || slots.length === 0) return [];
+                                        // Only include slots for the selected date
+                                        if (!dateStr || dateStr !== selectedDate || slots.length === 0) return [];
                                         
                                         return slots.map((slot, slotIndex) => {
                                             // Handle time slot format: could be object with start/end or string
@@ -225,14 +228,14 @@ return (
                                             };
                                         }).filter(slot => slot !== null);
                                     }).filter(slot => slot && slot.date)
-                                    : timeslots)} 
-                            selectedDate = {selectedDate}
-                            pageType = {pageType}
-                            setStep = {setStep}
-                            setTime = {setTime} 
-                            hospitalAppt ={hospitalAppt}
-                            thankMessHospital = {thankMessHospital}
-                            setThankMessHospital = {setThankMessHospital}
+                                    : timeslots)}
+                            selectedDate={selectedDate}
+                            pageType={pageType}
+                            setStep={setStep}
+                            setTime={setTime} 
+                            hospitalAppt={hospitalAppt}
+                            thankMessHospital={thankMessHospital}
+                            setThankMessHospital={setThankMessHospital}
                             hospital={hospital}
                         />
 

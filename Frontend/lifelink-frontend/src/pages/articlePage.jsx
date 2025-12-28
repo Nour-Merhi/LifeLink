@@ -94,8 +94,8 @@ export default function ArticlePage() {
 
     return (
         <>
-            <Navbar />
             <section className="articles-page">
+            <Navbar />
                 <div className="articles-container">
                     {/* Header Section */}
                     <div className="articles-header">

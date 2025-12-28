@@ -1,6 +1,7 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import lifelinklogo from "../../assets/imgs/Logo.png";
 import "../../styles/sidebar.css";
+import { useAuth } from "../../context/AuthContext";
 
 import { FaHouseChimney } from "react-icons/fa6";
 import { FaHospital } from "react-icons/fa";
@@ -10,9 +11,19 @@ import { RiHandHeartFill } from "react-icons/ri";
 import { BiHomeSmile } from "react-icons/bi";
 
 export default function Sidebar() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleDonationClick = (e) => {
+    if (!user) {
+      e.preventDefault();
+      navigate("/donation");
+    }
+  };
+
   return (
 
-    <div className="sidebar">
+    <div className="sidebar pl-3 pr-3">
       <div className="top">
         <img src={lifelinklogo} alt="life link logo" />
         <h1>Donation Center</h1>
@@ -25,8 +36,9 @@ export default function Sidebar() {
 
         <NavLink 
           to="home-blood-donation" 
+          onClick={handleDonationClick}
           className={({ isActive }) =>
-            `option rounded-[15px] hover:bg-gray-300 ${isActive ? "bg-gradient-to-r from-red-600 to-red-800 text-white" : "text-black"}`
+            `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} ${isActive ? "bg-gradient-to-r from-red-600 to-red-800 text-white" : "text-black"}`
           }   
         >
   
@@ -45,11 +57,12 @@ export default function Sidebar() {
 
 
 
-        <NavLink to="hospital-blood-donation"  
+        <NavLink to="hospital-blood-donation"
+        onClick={handleDonationClick}
         className={({ isActive }) =>
-            `option rounded-[15px] hover:bg-gray-300 
+            `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
-              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
               ""}`
             } >
           {({ isActive }) => (
@@ -69,11 +82,12 @@ export default function Sidebar() {
       <div className="donation">
         <h2>ORGAN DONATION</h2>
 
-        <NavLink to="/donation/alive-organ-donation" 
+        <NavLink to="/donation/alive-organ-donation"
+        onClick={handleDonationClick}
          className={({ isActive }) =>
-            `option rounded-[15px] hover:bg-gray-300 
+            `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
-              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
               ""}`
             } >
           {({ isActive }) => (
@@ -89,11 +103,12 @@ export default function Sidebar() {
           )}
         </NavLink>
 
-        <NavLink to="/donation/after-death-donation" 
+        <NavLink to="/donation/after-death-donation"
+        onClick={handleDonationClick}
           className={({ isActive }) =>
-            `option rounded-[15px] hover:bg-gray-300 
+            `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
-              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
               ""}`
             } >
           {({ isActive }) => (
@@ -113,11 +128,12 @@ export default function Sidebar() {
       <div className="donation">
         <h2>FINANCIAL SUPPORT</h2>
 
-        <NavLink to="/donation/financial-support"  
+        <NavLink to="/donation/financial-support"
+        onClick={handleDonationClick}
           className={({ isActive }) =>
-            `option rounded-[15px] hover:bg-gray-300 
+            `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
-              "bg-gradient-to-red from-red-600 to-red-800 text-white " : 
+              "bg-gradient-to-r from-red-600 to-red-800 text-white " : 
               ""}`
         }>
           {({ isActive }) => (
@@ -135,7 +151,7 @@ export default function Sidebar() {
       </div>
 
       <hr id="bottom-hr" />
-      <NavLink to="/donation" id="home" className="option">
+      <NavLink to="/home" id="home" className="option">
         <div id="home-icon" className="icon">
           <BiHomeSmile />
         </div>

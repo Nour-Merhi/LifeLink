@@ -5,25 +5,110 @@ import { PiHeartbeatFill } from "react-icons/pi";
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AliveOragnForm(){
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [isChecked, setIsChecked] = useState([]);
-    const [formData, setFormData] = useState({
-        first_name: "",
-        middle_name: "",
-        last_name: "",
-        email: "",
-        phone: "",
-        birth_date: "",
-        gender: "",
-        address: "",
-        blood_type: "",
-        living_organ: "",
-        donationType: "",
-        health: [],
-        agree_intrest: false,
-    });
+    
+    // Initialize form data with user data if available
+    const getInitialFormData = () => {
+        if (!user) {
+            return {
+                first_name: "",
+                middle_name: "",
+                last_name: "",
+                email: "",
+                phone: "",
+                birth_date: "",
+                gender: "",
+                address: "",
+                blood_type: "",
+                living_organ: "",
+                donationType: "",
+                health: [],
+                agree_intrest: false,
+            };
+        }
+        
+        const donor = user.donor || {};
+        const bloodType = donor.bloodType || donor.blood_type || null;
+        const bloodTypeString = bloodType 
+            ? `${bloodType.type || ''}${bloodType.rh_factor || ''}` 
+            : '';
+        
+        // Format date_of_birth for input field (YYYY-MM-DD)
+        let formattedDob = '';
+        if (donor.date_of_birth) {
+            const dobDate = new Date(donor.date_of_birth);
+            formattedDob = dobDate.toISOString().split('T')[0];
+        }
+        
+        // Parse name for first, middle, last
+        const firstName = user.first_name || '';
+        const middleName = user.middle_name || '';
+        const lastName = user.last_name || '';
+        
+        // Check if phone_nb is a temporary value (starts with 'temp_')
+        const phoneNumber = user.phone_nb && !user.phone_nb.startsWith('temp_') ? user.phone_nb : '';
+        
+        return {
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
+            email: user.email || "",
+            phone: phoneNumber,
+            birth_date: formattedDob,
+            gender: donor.gender || "",
+            address: user.city ? user.city : "",
+            blood_type: bloodTypeString,
+            living_organ: "",
+            donationType: "",
+            health: [],
+            agree_intrest: false,
+        };
+    };
+    
+    const [formData, setFormData] = useState(getInitialFormData());
+    
+    // Update form when user data loads
+    useEffect(() => {
+        if (user) {
+            const donor = user.donor || {};
+            const bloodType = donor.bloodType || donor.blood_type || null;
+            const bloodTypeString = bloodType 
+                ? `${bloodType.type || ''}${bloodType.rh_factor || ''}` 
+                : '';
+            
+            let formattedDob = '';
+            if (donor.date_of_birth) {
+                const dobDate = new Date(donor.date_of_birth);
+                formattedDob = dobDate.toISOString().split('T')[0];
+            }
+            
+            const firstName = user.first_name || '';
+            const middleName = user.middle_name || '';
+            const lastName = user.last_name || '';
+            
+            // Check if phone_nb is a temporary value (starts with 'temp_')
+            const phoneNumber = user.phone_nb && !user.phone_nb.startsWith('temp_') ? user.phone_nb : '';
+            
+            // Only pre-fill empty fields, don't override user's entries
+            setFormData((prev) => ({
+                ...prev,
+                first_name: prev.first_name || firstName,
+                middle_name: prev.middle_name || middleName,
+                last_name: prev.last_name || lastName,
+                email: prev.email || user.email || "",
+                phone: prev.phone || phoneNumber,
+                birth_date: prev.birth_date || formattedDob,
+                gender: prev.gender || donor.gender || "",
+                address: prev.address || (user.city || ""),
+                blood_type: prev.blood_type || bloodTypeString,
+            }));
+        }
+    }, [user]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
@@ -186,7 +271,7 @@ export default function AliveOragnForm(){
                                     <div>
                                         <label htmlFor="phone">Phone Number</label>
                                         <input 
-                                            type="tel" 
+                                            type="text" 
                                             id="phone" 
                                             name="phone"
                                             value={formData.phone}

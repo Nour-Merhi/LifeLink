@@ -36,16 +36,16 @@ button:disabled{
 .first-illustration{
   display: flex;
   justify-content: flex-end;
-  margin-right: 50px;
-  margin-top: 20px;
+  margin-right:80px;
 }
 
 .first-illustration > img{
   position: absolute;
   display: block;
   z-index: 10;             /* in front of wave */
-  width: 45%;
+  width: 41%;
   height: auto; 
+  margin-top: -20px;
 }
 
 .wave{
@@ -64,6 +64,7 @@ button:disabled{
 }
 .hero-info{
   margin-top: 5%;
+  padding-left: 80px;
   flex: 1;
   max-width: 550px;
   color: #252E32;
@@ -72,11 +73,12 @@ button:disabled{
   max-width: 500px;
   max-height: 424px;
   margin: 0;
+  line-height: 1.2;
 }
 .hero-info > p {
   max-width: 450px;
   max-height: 424px;
-  line-height: 30px;
+  line-height: 25px;
   margin: 0;
 }
 

@@ -31,9 +31,6 @@ import Notification from "./components/adminDashboard/Notification.jsx";
 import OrganPledges from "./components/adminDashboard/OrganPledges.jsx";
 import Login from "./pages/Login";
 import Register from "./pages/Register"
-import { useEffect } from "react";
-import axios from "axios";
-
 
 import ArticlePage from "./pages/articlePage.jsx";
 import ArticleDetail from "./pages/ArticleDetail.jsx";
@@ -77,17 +74,9 @@ function App() {
       
       <Routes>
         <Route path="/login" element={<Login />} />
-      </Routes>
-      <Routes>
         <Route path="/register" element={<Register />} />
-      </Routes>
-      {/* home layout */}
-      <Routes>
-        <Route path="/home" element={<Home />}></Route>
-
-
-      </Routes>
-      <Routes>
+        <Route path="/home" element={<Home />} />
+        
         {/* Donation layout */}
         <Route path="/donation" element={<Donation />}>
           <Route index element={<DonationWelcome />} />

@@ -311,7 +311,7 @@ export default function FinancialSupportForm({ setModal }){
                                 <div className="organ-form-group">
                                     <div>
                                         <label htmlFor="phone">Phone Number</label>
-                                        <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" 
+                                        <input type="text" id="phone" name="phone" placeholder="Enter your phone number" 
                                                 value={formData.phone}
                                                 onChange={ handleChange }
                                         />

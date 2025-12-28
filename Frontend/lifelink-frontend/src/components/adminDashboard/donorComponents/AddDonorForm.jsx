@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-
-import axios from "axios"
+import api from "../../../api/axios";
 
 export default function AddDonorForm({ onClose, onDonorAdded }) {
     const [passwordMes, setPasswordMes] = useState("");
@@ -94,15 +93,13 @@ export default function AddDonorForm({ onClose, onDonorAdded }) {
             };
             delete submissionData.blood_type; // Remove blood_type, keep blood_type_id
 
-            const response = await axios.post(
-                "http://localhost:8000/api/admin/dashboard/add-donor",
-                submissionData,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                }
+            // First, get the CSRF cookie from Sanctum
+            await api.get("/sanctum/csrf-cookie");
+
+            // Then, make the POST request
+            const response = await api.post(
+                "/api/admin/dashboard/add-donor",
+                submissionData
             );
             setShowSuccess(true);
             setTimeout(() => {

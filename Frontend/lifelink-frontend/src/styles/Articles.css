@@ -1,8 +1,10 @@
+.bg-gray{
+    background-color: #1a1a1a;
+}
 /* Articles Page Styles */
 .articles-page {
     min-height: 100vh;
     background-color: #1a1a1a;
-    padding: 2rem 0;
     color: #e5e5e5;
 }
 
@@ -87,7 +89,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 2rem;
-    margin-bottom: 3rem;
+    padding-bottom: 50px;
 }
 
 /* Article Card */
@@ -285,7 +287,6 @@
 .article-detail-page {
     min-height: 100vh;
     background-color: #1a1a1a;
-    padding: 2rem 0;
     color: #e5e5e5;
 }
 
@@ -297,7 +298,7 @@
 
 .article-detail-loading,
 .article-detail-error {
-    min-height: 100vh;
+    min-height: 70vh;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -629,5 +630,67 @@
     .article-body {
         font-size: 0.9375rem;
     }
+}
+
+/* Home Page Article Cards - Consistent with articlePage */
+.article-card-home {
+    background-color: #2a2a2a;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.article-card-home:hover {
+    transform: translateY(-8px);
+}
+
+.article-image-container-home {
+    position: relative;
+    overflow: hidden;
+    height: 200px;
+    background-color: #1a1a1a;
+}
+
+.article-image-container-home img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.article-card-home:hover .article-image-container-home img {
+    transform: scale(1.1);
+}
+
+.read-article-btn-home {
+    background: linear-gradient(to right, #dc2626, #b91c1c);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.read-article-btn-home:hover {
+    background: linear-gradient(to right, #b91c1c, #991b1b);
+    transform: translateX(4px);
+}
+
+.read-article-btn-home .arrow-icon {
+    transition: transform 0.3s ease;
+}
+
+.read-article-btn-home:hover .arrow-icon {
+    transform: translateX(4px);
 }
 
