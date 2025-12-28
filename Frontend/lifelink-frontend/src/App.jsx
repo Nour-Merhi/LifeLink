@@ -17,7 +17,6 @@ import AfterDeathStepThree from "./components/donation/afterLifeOrganForm/AfterD
 import AliveOrganForm from "./components/donation/AliveOrganForm";
 
 import { useEffect } from "react";
-import axios from "axios";
 import Hospitals from "./components/adminDashboard/Hospitals.jsx";
 import Donors from "./components/adminDashboard/Donors.jsx";
 import DonorDetail from "./components/adminDashboard/donorComponents/DonorDetail.jsx";
@@ -31,6 +30,8 @@ import Notification from "./components/adminDashboard/Notification.jsx";
 import OrganPledges from "./components/adminDashboard/OrganPledges.jsx";
 import Login from "./pages/Login";
 import Register from "./pages/Register"
+import axios from "axios";
+
 
 import ArticlePage from "./pages/articlePage.jsx";
 import ArticleDetail from "./pages/ArticleDetail.jsx";
