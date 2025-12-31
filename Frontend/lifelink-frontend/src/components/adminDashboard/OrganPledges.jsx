@@ -166,19 +166,19 @@ export default function OrganPledges() {
             {/* Navigation Tabs */}
             <div className="financial-tabs">
                 <button
-                    className={activeTab === "living-donors" ? "tab-active" : "tab-inactive"}
+                    className={activeTab === "living-donors" ? "tab-active-admin" : "tab-inactive"}
                     onClick={() => setActiveTab("living-donors")}
                 >
                     Living Donors
                 </button>
                 <button
-                    className={activeTab === "after-death" ? "tab-active" : "tab-inactive"}
+                    className={activeTab === "after-death" ? "tab-active-admin" : "tab-inactive"}
                     onClick={() => setActiveTab("after-death")}
                 >
                     After Death Pledges
                 </button>
                 <button
-                    className={activeTab === "matching" ? "tab-active" : "tab-inactive"}
+                    className={activeTab === "matching" ? "tab-active-admin" : "tab-inactive"}
                     onClick={() => setActiveTab("matching")}
                 >
                     Matching Interface

@@ -1,12 +1,20 @@
 import { useNavigate } from "react-router-dom";
-import { FaArrowRight, FaTint } from "react-icons/fa";
+import { FaArrowRight, FaRegistered, FaTint } from "react-icons/fa";
 
 import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 import BloodHeroes from "../components/home/BloodHeroes";
 import Articles from "../components/home/Articles";
+import RegisteredHospitals from "../components/home/RegisteredHospitals";
 import { useAuth } from "../context/AuthContext";
+import QuestionSection from "../components/home/QuestionSection";
+import GameSection from "../components/home/GameSection";
+import SuperheroesCarousel from "../components/home/SuperheroesCarousel";
+import BackgroundWave from "../assets/imgs/wave/Background_game_wave.svg";
 
 import bloodIllustration from "../assets/illustrations/blood_home.svg";
+import humanBodyIllustration from "../assets/imgs/HumanBody/HumanBody.svg";
+import "../styles/HumanBodySection.css";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -28,12 +36,12 @@ export default function Home() {
   };
 
   const heroes = [
-    { id: 1, name: "John & Evan", imgSrc: "/donationHistory.jpg", link: "/hero1" },
-    { id: 2, name: "Jane & Mike", imgSrc: "/donationHistory.jpg", link: "/hero2" },
-    { id: 3, name: "Sara & Ben", imgSrc: "/donationHistory.jpg", link: "/hero3" },
-    { id: 4, name: "Lisa & Tom", imgSrc: "/donationHistory.jpg", link: "/hero4" },
-    { id: 5, name: "Anna & Jack", imgSrc: "/donationHistory.jpg", link: "/hero5" },
-    { id: 6, name: "Mona & Paul", imgSrc: "/donationHistory.jpg", link: "/hero6" },
+    { id: 1, name: "John & Evan", imgSrc: "/donationHistory.jpg", link: "/hero1", type: "Kidney Donator" },
+    { id: 2, name: "Jane & Mike", imgSrc: "/donationHistory.jpg", link: "/hero2", type: "Blood Donator" },
+    { id: 3, name: "Sara & Ben", imgSrc: "/donationHistory.jpg", link: "/hero3", type: "Organ Donator" },
+    { id: 4, name: "Lisa & Tom", imgSrc: "/donationHistory.jpg", link: "/hero4", type: "Blood Donator" },
+    { id: 5, name: "Anna & Jack", imgSrc: "/donationHistory.jpg", link: "/hero5", type: "Kidney Donator" },
+    { id: 6, name: "Mona & Paul", imgSrc: "/donationHistory.jpg", link: "/hero6", type: "Organ Donator" },
   ];
 
   return (
@@ -117,10 +125,11 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between px-10 py-20 mt-20 mx-auto">
-          <div className="flex flex-col max-w-2xl">
+        {/* ================= DISCOVER THE HUMAN BODY ================= */}
+        <div className="flex flex-col md:flex-row items-center px-10 py-20 mt-20 mx-auto gap-20">
+          <div className="flex flex-col max-w-2xl ml-10">
             <span className="text-gray-400 mb-8 text-left">Explore</span>
-            <h2 className="text-5xl font-extrabold text-left text-gray-800 mb-2">
+            <h2 className="text-5xl font-extrabold text-left text-gray-900 mb-2">
               Discover the Human Body <br /> Like Never Before
             </h2>
             <p className="text-gray-600 mb-10 text-left">
@@ -136,9 +145,21 @@ export default function Home() {
               >
                 Start
               </button>
-              <button className="bg-gray-200 text-gray-700 px-5 py-2 rounded hover:bg-gray-300 transition">
+              <button className="bg-gray-200 text-gray-700 px-5 py-2 rounded hover:bg-gray-300 transition flex items-center gap-2">
                 Learn More
+                <FaArrowRight />
               </button>
+            </div>
+          </div>
+
+          {/* Human Body Illustration */}
+          <div className="flex-shrink-0 w-full md:w-auto">
+            <div className="human-body-container">
+              <img 
+                src={humanBodyIllustration} 
+                alt="Human body anatomy illustration" 
+                className="human-body-image"
+              />
             </div>
           </div>
         </div>
@@ -151,26 +172,26 @@ export default function Home() {
 
       {/* ================= SUPERHEROES ================= */}
       <div className="mt-14">
-        <h2 className="text-center text-xl font-semibold mb-6">
+        <h2 className="text-center text-4xl font-bold mb-6">
           Meet Our Superheroes <br /> & Discover Their Stories
         </h2>
 
-        <div className="flex overflow-x-auto space-x-8 px-4 scrollbar-hide">
-          {heroes.map(({ id, imgSrc, link, name }) => (
-            <div
-              key={id}
-              onClick={() => navigate(link)}
-              className="flex-shrink-0 cursor-pointer rounded-lg shadow-lg overflow-hidden"
-              style={{ width: "180px", height: "180px" }}
-            >
-              <img
-                src={imgSrc}
-                alt={name}
-                className="w-full h-full object-cover rounded-lg"
-              />
-            </div>
-          ))}
-        </div>
+        <SuperheroesCarousel heroes={heroes} />
+      </div>
+
+      {/* ================= QUESTION SECTION ================= */}
+      <QuestionSection />
+
+      {/* ================= GAME SECTION ================= */}
+      <GameSection />
+
+      <div className="bg-linear-to-r from-black to-gray-900">
+      {/* =============== Hospital Section ================= */}
+      <RegisteredHospitals />
+
+
+      {/* ================= FOOTER ================= */}
+      <Footer />
       </div>
     </>
   );

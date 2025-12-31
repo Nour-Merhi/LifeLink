@@ -87,8 +87,8 @@
 /* Articles Grid */
 .articles-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
     padding-bottom: 50px;
 }
 
@@ -173,8 +173,9 @@
 
 .article-footer {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
     margin-top: auto;
     padding-top: 1rem;
     border-top: 1px solid #3a3a3a;
@@ -188,6 +189,7 @@
 .read-article-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     background-color: #F12C31;
     color: #ffffff;
@@ -247,6 +249,12 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+    .articles-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .articles-container {
         padding: 0 1rem;

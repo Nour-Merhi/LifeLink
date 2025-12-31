@@ -1,0 +1,40 @@
+/* Human Body Section Styles */
+.human-body-container {
+    background-color: #000000;
+    border-radius: 5px;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.human-body-image {
+    width: 100%;
+    height: auto;
+    max-width: 450px;
+    object-fit: contain;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .human-body-container {
+        max-width: 100%;
+        padding: 30px;
+        min-height: 400px;
+    }
+
+    .human-body-image {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .human-body-container {
+        padding: 20px;
+        min-height: 350px;
+        margin-top: 20px;
+    }
+}
+

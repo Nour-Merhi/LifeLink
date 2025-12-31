@@ -49,7 +49,7 @@ export default function DonationWelcome() {
             () => navigate ("/register")
           }
         >
-          Signin
+          Signup
         </button>
         <button
           className={`btn login ${active === "login" ? "active" : ""}`}

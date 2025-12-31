@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.17.12",
     "axios": "^1.12.2",
     "chart.js": "^4.5.1",
+    "framer-motion": "^12.23.26",
     "leaflet": "^1.9.4",
     "motion": "^12.23.12",
     "react": "^19.1.1",

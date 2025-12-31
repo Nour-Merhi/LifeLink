@@ -45,7 +45,6 @@ button:disabled{
   z-index: 10;             /* in front of wave */
   width: 41%;
   height: auto; 
-  margin-top: -20px;
 }
 
 .wave{

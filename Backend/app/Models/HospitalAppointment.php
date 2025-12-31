@@ -17,6 +17,9 @@ class HospitalAppointment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'donor_id',
+        'hospital_Id',
+        'appointment_id',
         'state',
         'note',
         'code',

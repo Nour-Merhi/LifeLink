@@ -1,7 +1,7 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-import lifelink_logo from "../assets/imgs/LogoAdmin.png";
+import lifelink_logo from "../assets/imgs/Logo.png";
 import profile from "../assets/imgs/profile.svg";
 
 export default function Navbar() {
@@ -34,26 +34,46 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="px-6 py-3 flex items-center justify-between relative z-50">
+    <nav className="px-6 py-4 flex items-center justify-between relative z-50 quiz-navbar">
       {/* Logo */}
-      <div className="flex items-center gap-2">
-          <img src={lifelink_logo} alt="LifeLink Logo" className="h-30 w-auto mt-[-30px] ml-[-10px]" />
-      </div>
+      <Link to="/home" className="flex items-center gap-2">
+          <img src={lifelink_logo} alt="LifeLink Logo" className="h-10 w-auto cursor-pointer" />
+      </Link>
 
       {/* Navigation Links */}
-      <div className="flex items-center space-x-12 mt-[-30px]">
-        <Link to="/home" className="text-gray-800 font-semibold">
+      <div className="flex items-center space-x-12">
+        <NavLink 
+          to="/home" 
+          className={({ isActive }) => 
+            `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
+          }
+        >
           Home
-        </Link>
-        <Link to="/donation" className="text-white font-semibold hover:text-gray-800 transition-colors duration-200">
+        </NavLink>
+        <NavLink 
+          to="/donation" 
+          className={({ isActive }) => 
+            `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
+          }
+        >
           Donate
-        </Link>
-        <Link to="/play" className="text-white font-semibold hover:text-gray-800 transition-colors duration-200">
+        </NavLink>
+        <NavLink 
+          to="/quizzlit" 
+          className={({ isActive }) => 
+            `quiz-nav-link quiz-nav-link-play ${isActive ? 'quiz-nav-link-play-active' : ''}`
+          }
+        >
           Let's Play
-        </Link>
-        <Link to="/contact" className="text-white font-semibold hover:text-gray-800 transition-colors duration-200">
+        </NavLink>
+        <NavLink 
+          to="/contact" 
+          className={({ isActive }) => 
+            `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
+          }
+        >
           Contact Us
-        </Link>
+        </NavLink>
 
         {/* Authentication Section */}
         {user ? (

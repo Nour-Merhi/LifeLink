@@ -49,6 +49,9 @@
 .linear-blue{
     background: linear-gradient(to right, #285BFF, #183799);
 }
+.linear-light-blue{
+    background: linear-gradient(180deg, #96AFFF, #2349C2);
+}
 
 .organ-section{
  margin: 20px 10px;

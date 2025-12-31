@@ -8,9 +8,10 @@ import OrganDead from "./pages/OrganDead";
 import OrganAlive from "./pages/OrganAlive";
 import FinancialSupport from "./pages/FinancialSupport";
 import ScrollToTop from "./components/ScrollToTop";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminDashboard from "./pages/Dashboards/AdminDashboard";
 import { QuizProvider } from "./store/quizStore";
-import Home from "./pages/Home"
+import Home from "./pages/Home";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 import AfterDeathStepTwo from "./components/donation/afterLifeOrganForm/AfterDeathStepTwo.jsx";
 import AfterDeathStepThree from "./components/donation/afterLifeOrganForm/AfterDeathStepThree.jsx";
@@ -51,6 +52,35 @@ import QuizHome from "./pages/Quiz/QuizHome";
 import QuizQuestion from "./pages/Quiz/QuizQuestion";
 import QuizResults from "./pages/Quiz/QuizResults";
 
+/* Donor Dashboard */
+import DonorDashboard from "./pages/Dashboards/DonorDashboard";
+import DonorHome from "./components/donorDashboard/home.jsx";
+import MyDonations from "./components/donorDashboard/myDonatioins.jsx";
+import MyAppointments from "./components/donorDashboard/myAppointments.jsx";
+import Settings from "./components/donorDashboard/Settings.jsx";
+import Rewards from "./components/donorDashboard/Rewards.jsx";
+/* Support */
+import Support from "./pages/Support";
+/* End of Donor Dashboard */
+
+/* Nurse Dashboard */
+import NurseDashboard from "./pages/Dashboards/NurseDashboard";
+import NurseHome from "./components/nurseDashboard/Home.jsx";
+import NurseAppointments from "./components/nurseDashboard/myAppointments.jsx";
+import DonorRequests from "./components/nurseDashboard/DonorRequests.jsx";
+import HospitalInfo from "./components/nurseDashboard/HospitalInfo.jsx";
+import ManagerContact from "./components/nurseDashboard/ManagerContact.jsx";
+/* End of Nurse Dashboard */
+
+/* Quizzlit */
+import QuizzlitWelcome from "./pages/QuizzlitWelcome";
+/* End of Quizzlit */
+
+/* Find More Hospitals */
+import FindMoreHospitals from "./pages/FindMoreHospitals";
+import HospitalDetailHome from "./pages/HospitalDetail";
+/* End of Find More Hospitals */
+
 import "leaflet/dist/leaflet.css";
 
 
@@ -81,15 +111,15 @@ function App() {
         {/* Donation layout */}
         <Route path="/donation" element={<Donation />}>
           <Route index element={<DonationWelcome />} />
-          <Route path="home-blood-donation" element={<HomeBloodBooking pageType="home" />} />
-          <Route path="hospital-blood-donation" element={<HospitalBloodBooking pageType="hospital"/>} />
-          <Route path="after-death-donation" element={<OrganDead />} />
-          <Route path="alive-organ-donation" element={<OrganAlive />} />
-          <Route path="financial-support" element={<FinancialSupport />} />
-          <Route path="alive-organ-form" element={<AliveOrganForm />} />
-          <Route path="after-death-organ-form/stepTwo" element={<AfterDeathStepTwo />} />
-          <Route path="after-death-organ-form/stepThree" element={<AfterDeathStepThree />} />
-          <Route path="home-blood-from" element={<HomeBookForm />} />
+          <Route path="home-blood-donation" element={<ProtectedRoute><HomeBloodBooking pageType="home" /></ProtectedRoute>} />
+          <Route path="hospital-blood-donation" element={<ProtectedRoute><HospitalBloodBooking pageType="hospital"/></ProtectedRoute>} />
+          <Route path="after-death-donation" element={<ProtectedRoute><OrganDead /></ProtectedRoute>} />
+          <Route path="alive-organ-donation" element={<ProtectedRoute><OrganAlive /></ProtectedRoute>} />
+          <Route path="financial-support" element={<ProtectedRoute><FinancialSupport /></ProtectedRoute>} />
+          <Route path="alive-organ-form" element={<ProtectedRoute><AliveOrganForm /></ProtectedRoute>} />
+          <Route path="after-death-organ-form/stepTwo" element={<ProtectedRoute><AfterDeathStepTwo /></ProtectedRoute>} />
+          <Route path="after-death-organ-form/stepThree" element={<ProtectedRoute><AfterDeathStepThree /></ProtectedRoute>} />
+          <Route path="home-blood-from" element={<ProtectedRoute><HomeBookForm /></ProtectedRoute>} />
         </Route>
         
         {/* Articles Pages */}
@@ -128,10 +158,39 @@ function App() {
           <Route path="settings" element={<HospitalSettings />} />
         </Route>
         
+        {/* Donor Dashboard layout */}
+        <Route path="/donor" element={<DonorDashboard />}>
+          <Route path="home" element={<DonorHome />} />
+          <Route path="my-donations" element={<MyDonations />} />
+          <Route path="my-appointments" element={<MyAppointments />} />
+          <Route path="rewards" element={<Rewards />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+
+        {/* Nurse Dashboard layout */}
+        <Route path="/nurse" element={<NurseDashboard />}>
+          <Route path="home" element={<NurseHome />} />
+          <Route path="my-appointments" element={<NurseAppointments />} />
+          <Route path="donor-requests" element={<DonorRequests />} />
+          <Route path="hospital-info" element={<HospitalInfo />} />
+          <Route path="manager-contact" element={<ManagerContact />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+
         {/* Quiz Routes */}
         <Route path="/quiz" element={<QuizHome />} />
         <Route path="/quiz/results" element={<QuizResults />} />
         <Route path="/quiz/:category/question" element={<QuizQuestion />} />
+
+        {/* Quizzlit Routes */}
+        <Route path="/quizzlit" element={<QuizzlitWelcome />} />
+        
+        {/* Support Page */}
+        <Route path="/support" element={<Support />} />
+        
+        {/* Find More Hospitals Page */}
+        <Route path="/hospitals" element={<FindMoreHospitals />} />
+        <Route path="/hospitals/:id" element={<HospitalDetailHome />} />
         
         {/* Default redirect */}
         <Route path="/" element={<div>Welcome to LifeLink</div>} />

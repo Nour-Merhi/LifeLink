@@ -1,4 +1,4 @@
-import lifelinkLogoBlack from "../../assets/imgs/LifeLinkLogoBlack.svg";
+import lifelinkLogoBlack from "../../assets/imgs/LogoAdmin.png";
 import { GoHomeFill } from "react-icons/go";
 import { IoPerson } from "react-icons/io5";
 import { IoCalendarOutline } from "react-icons/io5";

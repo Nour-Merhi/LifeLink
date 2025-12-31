@@ -3,7 +3,7 @@ import { useQuiz } from "../../store/quizStore";
 import { FaTint, FaHeartbeat } from "react-icons/fa";
 import { MdHealthAndSafety as MdHealth } from "react-icons/md";
 import QuizCard from "../../components/quiz/QuizCard";
-import lifelink_logo from "../../assets/imgs/lifelink_logo.svg";
+import lifelink_logo from "../../assets/imgs/LogoAdmin.png";
 import "./QuizHome.css";
 
 export default function QuizHome() {

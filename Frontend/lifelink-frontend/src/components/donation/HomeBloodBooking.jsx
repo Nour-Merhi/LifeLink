@@ -7,15 +7,18 @@ import axios from 'axios';
 
 export default function HomeBloodBooking({ pageType }) {
   const prefix = pageType === "home" ? "home_" : "hospital_" 
-  const [step, setStep] = useState(()=> localStorage.getItem("step") || "hospitals"); 
+  const [step, setStep] = useState(()=> localStorage.getItem(prefix + "step") || "hospitals"); 
   const [hospitals, setHospitals] = useState([]);
   const [urgentHospitals, setUrgentHospitals] = useState([]);
   const [regularHospitals, setRegularHospitals] = useState([]);
+  const [filteredHospitals, setFilteredHospitals] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [appointments, setAppointments] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
   const [availableSlots, setAvailableSlots] = useState(0);
+  const hospitalsToShow = searchQuery.trim() === "" ? hospitals : filteredHospitals;
 
   const [hospital, setHospital] = useState(() => {
      const stored = localStorage.getItem(prefix + "hospital");
@@ -26,7 +29,7 @@ export default function HomeBloodBooking({ pageType }) {
       return null;
     }
   }); 
-  const [date, setDate] = useState(() => localStorage.getItem("date") || null); 
+  const [date, setDate] = useState(() => localStorage.getItem(prefix + "date") || null); 
 
   const [homeVisitData, setHomeVisitData] = useState ({
     hospital_name: hospital ? hospital.name : '',
@@ -55,6 +58,7 @@ export default function HomeBloodBooking({ pageType }) {
           setHospitals(hospitalsArray);
           setUrgentHospitals(urgentArray);
           setRegularHospitals(regularArray);
+          setFilteredHospitals(hospitalsArray);
           
           if (hospitalsArray.length === 0) {
             console.warn('No hospitals found with home donation appointments');
@@ -67,15 +71,16 @@ export default function HomeBloodBooking({ pageType }) {
           setHospitals([]);
           setUrgentHospitals([]);
           setRegularHospitals([]);
+          setFilteredHospitals([]);
         })
         .finally(() => setLoading(false));
     }
   }, [pageType]);
 
   useEffect(() => {
-    localStorage.setItem("step", step);
+    localStorage.setItem(prefix + "step", step);
     if (hospital) localStorage.setItem(prefix + "hospital", JSON.stringify(hospital));
-    if (date) localStorage.setItem("date", date);
+    if (date) localStorage.setItem(prefix + "date", date);
   }, [step, hospital, date, prefix]);
   
   // Fetch appointments when hospital is selected
@@ -122,15 +127,48 @@ export default function HomeBloodBooking({ pageType }) {
     }));
   }, [hospital, date]);
     
+  const handleSearch = (term) => {
+    setSearchQuery(term);
+
+    if (term.trim() === "") {
+      setFilteredHospitals(hospitals);
+    } else {
+      const filtered = hospitals.filter(h =>
+        h.name.toLowerCase().includes(term.toLowerCase())
+      );
+      setFilteredHospitals(filtered);
+    }
+  };
+    
   const handleBack = () => { 
-    if (step === "calendar") setStep("hospitals"); 
+    if (step === "calendar") {
+      setStep("hospitals");
+      setDate(null);
+      setHospital(null);
+      // Clear appointments and related state
+      setAppointments([]);
+      setTimeSlots([]);
+      setAvailableSlots(0);
+      // Reset home visit data
+      setHomeVisitData({
+        hospital_name: '',
+        appointment_time: '',
+        appointment_date: '',
+        home_form_data: {}
+      });
+      // Clear localStorage
+      localStorage.removeItem(prefix + "date");
+      localStorage.removeItem(prefix + "hospital");
+    }
   };
 
     
   return ( 
   <> 
     <div className="booking"> 
-      <Searchbar /> 
+      <Searchbar 
+        onSearch={handleSearch}
+      /> 
       
       {/* Step 1: Hospitals list */} 
       {step === "hospitals" && ( 
@@ -140,9 +178,10 @@ export default function HomeBloodBooking({ pageType }) {
             setStep("calendar"); 
            
           }}
-          showHospitals={pageType === "home" ? hospitals : []}
+          showHospitals={pageType === "home" ? hospitalsToShow : []}
           urgentHospitals={pageType === "home" ? urgentHospitals : []}
           regularHospitals={pageType === "home" ? regularHospitals : []}
+          searchQuery={searchQuery}
         /> 
       )} 
       
@@ -154,7 +193,11 @@ export default function HomeBloodBooking({ pageType }) {
           appointments={appointments}
           timeSlots={timeSlots}
           availableSlots={availableSlots}
-          setHomeVisitData = {setHomeVisitData}
+          setStep={setStep}
+          setTime={() => {}} // Not used for home bookings but required by Calendar
+          thankMessHospital={false}
+          setThankMessHospital={() => {}}
+          hospitalAppt={null}
           onSelectDate={(d) => { 
             setDate(d);
           }} 

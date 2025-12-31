@@ -26,7 +26,7 @@ export default function HospitalBloodBooking({ pageType }) {
   const [showHospitals, setShowHospitals] = useState([]);
   const [urgentHospitals, setUrgentHospitals] = useState([]);
   const [regularHospitals, setRegularHospitals] = useState([]);
-  const [filteredHospitals, setFilteredHospitals] = useState("");
+  const [filteredHospitals, setFilteredHospitals] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +38,8 @@ export default function HospitalBloodBooking({ pageType }) {
   //Hospital Appointment data setting
   const [hospitalAppt, setHospitalAppt] = useState({
     hospital_name: hospital ? hospital.name : '',
+    hospital_id: hospital ? hospital.id : null,
+    hospital: hospital || null, // Store full hospital object
     appointment_time: time || '',
     appointment_date: date || '',
   })
@@ -93,7 +95,6 @@ export default function HospitalBloodBooking({ pageType }) {
     if (hospital && hospital.id && pageType === "hospital") {
       setLoading(true);
       
-      // Build URL with appointment_type query parameter if available
       const appointmentType = hospital.appointment_type; // 'urgent' or 'regular'
       const url = appointmentType 
         ? `http://localhost:8000/api/blood/hospital_donation/${hospital.id}?appointment_type=${appointmentType}`
@@ -123,6 +124,8 @@ export default function HospitalBloodBooking({ pageType }) {
     setHospitalAppt((prev) => ({
       ...prev,
       hospital_name: hospital ? hospital.name : "",
+      hospital_id: hospital ? hospital.id : null,
+      hospital: hospital || null,
       appointment_time: time || '',
       appointment_date: date || '',
     }));
@@ -130,7 +133,28 @@ export default function HospitalBloodBooking({ pageType }) {
 
 
   const handleBack = () => {
-    if (step === "calendar") setStep("hospitals")
+    if (step === "calendar") {
+      setStep("hospitals");
+      setDate(null);
+      setTime(null);
+      setHospital(null);
+      // Clear appointments and related state
+      setAppointments([]);
+      setTimeSlots([]);
+      setAvailableSlots(0);
+      // Reset hospital appointment data
+      setHospitalAppt({
+        hospital_name: '',
+        hospital_id: null,
+        hospital: null,
+        appointment_time: '',
+        appointment_date: '',
+      });
+      // Clear localStorage
+      localStorage.removeItem(prefix + "date");
+      localStorage.removeItem(prefix + "time");
+      localStorage.removeItem(prefix + "hospital");
+    }
   }
 
   const handleSearch = (term) => {
@@ -168,7 +192,7 @@ export default function HospitalBloodBooking({ pageType }) {
       )} 
       
       {/* Step 2: Calendar step */} 
-      {step === "calendar" && ( 
+      {step === "calendar" && hospital && ( 
         <Calendar 
           pageType= {pageType}
           hospital={hospital} 
@@ -185,8 +209,8 @@ export default function HospitalBloodBooking({ pageType }) {
         /> 
       )} 
         
-        {/* Back button */} 
-        {step !== "hospitals" && ( 
+        {/* Back button - hide when modal/form is open */} 
+        {step !== "hospitals" &&( 
           <button 
             id="go-back-btn" 
             onClick={handleBack}

@@ -6,9 +6,13 @@ use App\Models\HospitalAppointment;
 use App\Models\Hospital;
 use App\Models\Donor;
 use App\Models\Appointment;
+use App\Models\User;
+use App\Models\BloodType;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class HospitalAppointmentController extends Controller
 {
@@ -732,25 +736,122 @@ class HospitalAppointmentController extends Controller
     public function store(Request $request)
     {
         try {
-            // For now, accept minimal data - hospital_name, appointment_date, appointment_time
-            // TODO: This should be updated to require donor information or get from authenticated user
             $validated = $request->validate([
-                'hospital_name' => 'required|string',
+                // Donor information
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'email' => 'required|email',
+                'phone_nb' => 'required|string|max:30',
+                'gender' => 'required|in:male,female',
+                'blood_type' => 'required|string',
+                'date_of_birth' => 'required|date|before:today',
+                // Appointment information
+                'hospital_id' => 'required|exists:hospitals,id',
                 'appointment_date' => 'required|date',
                 'appointment_time' => 'required|string',
+                // Optional fields
+                'last_donation' => 'nullable|date|before_or_equal:today',
+                'note' => 'nullable|string',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
-            // Find hospital by name
-            $hospital = Hospital::where('name', $validated['hospital_name'])->first();
+        // Validate blood type format before starting transaction
+        $bloodTypeString = $validated['blood_type'];
+        $bloodTypePattern = '/^(A|B|AB|O)([+-])$/';
+        if (!preg_match($bloodTypePattern, $bloodTypeString, $matches)) {
+            return response()->json(['message' => 'Invalid blood type format. Expected format: A+, B-, AB+, O+, etc.'], 422);
+        }
+        
+        $type = $matches[1]; // A, B, AB, or O
+        $rhFactor = $matches[2]; // + or -
+        
+        // Get blood type ID
+        $bloodType = BloodType::where('type', $type)
+            ->where('rh_factor', $rhFactor)
+            ->first();
             
-            if (!$hospital) {
-                return response()->json([
-                    'message' => 'Hospital not found'
-                ], 404);
+        if (!$bloodType) {
+            return response()->json(['message' => 'Blood type not found in database'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Check if user exists by email
+            $user = User::where('email', $validated['email'])->first();
+            $isNewUser = false;
+            $generatedPassword = null;
+            
+            if (!$user) {
+                // Generate a readable temporary password for new users
+                $generatedPassword = Str::random(12); // 12 character random password
+                $isNewUser = true;
+                
+                // Check if phone_nb is unique before creating user
+                if (User::where('phone_nb', $validated['phone_nb'])->exists()) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Phone number is already registered to another user'
+                    ], 422);
+                }
+                
+                // Create new user
+                $user = User::create([
+                    'first_name' => $validated['first_name'],
+                    'last_name' => $validated['last_name'],
+                    'phone_nb' => $validated['phone_nb'],
+                    'email' => $validated['email'],
+                    'role' => 'Donor',
+                    'password' => Hash::make($generatedPassword),
+                ]);
+            } else {
+                // Update existing user info (but check phone_nb uniqueness if changed)
+                $phoneChanged = $user->phone_nb !== $validated['phone_nb'];
+                
+                if ($phoneChanged && User::where('phone_nb', $validated['phone_nb'])->where('id', '!=', $user->id)->exists()) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Phone number is already registered to another user'
+                    ], 422);
+                }
+                
+                // Update user info
+                $user->update([
+                    'first_name' => $validated['first_name'],
+                    'last_name' => $validated['last_name'],
+                    'phone_nb' => $validated['phone_nb'],
+                ]);
+            }
+
+            // Get or create Donor
+            $donor = Donor::where('user_id', $user->id)->first();
+            
+            if (!$donor) {
+                // Create new donor
+                $donor = Donor::create([
+                    'user_id' => $user->id,
+                    'gender' => $validated['gender'],
+                    'date_of_birth' => $validated['date_of_birth'],
+                    'blood_type_id' => $bloodType->id,
+                    'last_donation' => $validated['last_donation'] ?? null,
+                ]);
+            } else {
+                // Update existing donor info
+                $donor->update([
+                    'gender' => $validated['gender'],
+                    'date_of_birth' => $validated['date_of_birth'],
+                    'blood_type_id' => $bloodType->id,
+                    'last_donation' => $validated['last_donation'] ?? null,
+                ]);
             }
 
             // Find the appointment based on hospital_id, date, donation_type, and time
-            $appointments = Appointment::where('hospital_id', $hospital->id)
+            $appointments = Appointment::where('hospital_id', $validated['hospital_id'])
                 ->where('appointment_date', $validated['appointment_date'])
                 ->where('donation_type', 'Hospital Blood Donation')
                 ->where('state', 'pending')
@@ -796,33 +897,86 @@ class HospitalAppointmentController extends Controller
             }
 
             if (!$appointment) {
+                DB::rollBack();
                 return response()->json([
-                    'message' => 'Appointment slot not found or not available'
+                    'message' => 'Appointment slot not found or already booked'
                 ], 404);
             }
 
-            // TODO: Get donor_id from authenticated user or require it in the request
-            // For now, return an error indicating donor information is required
-            return response()->json([
-                'message' => 'Donor information is required to create a hospital appointment. Please ensure you are logged in.',
-                'error' => 'missing_donor_info'
-            ], 400);
+            // Create Hospital Appointment
+            $hospitalAppointmentData = [
+                'donor_id' => $donor->id,
+                'hospital_Id' => $validated['hospital_id'],
+                'appointment_id' => $appointment->id,
+                'state' => 'pending',
+                'note' => $validated['note'] ?? null,
+            ];
+            
+            $hospitalAppointment = HospitalAppointment::create($hospitalAppointmentData);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            \Log::error('Error creating hospital appointment:', [
+            DB::commit();
+
+            // Prepare response
+            $response = [
+                'message' => 'Hospital appointment created successfully',
+                'hospital_appointment' => $hospitalAppointment->load(['donor.user', 'donor.bloodType', 'hospital', 'appointments']),
+                'donor' => $donor->load('user')
+            ];
+
+            // If new user was created, include login credentials
+            if ($isNewUser && $generatedPassword) {
+                $response['login_info'] = [
+                    'email' => $user->email,
+                    'password' => $generatedPassword,
+                    'message' => 'Your account has been created. Please use these credentials to log in.'
+                ];
+            }
+
+            return response()->json($response, 201);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            DB::rollBack();
+            \Log::error('Database error creating hospital appointment:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'sql' => $e->getSql(),
+                'bindings' => $e->getBindings(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'request_data' => $request->all()
             ]);
             
+            $errorMessage = config('app.debug') 
+                ? $e->getMessage() . ' | SQL: ' . $e->getSql()
+                : 'Database error occurred. Please check the logs.';
+            
             return response()->json([
                 'message' => 'Failed to create hospital appointment',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+                'error' => $errorMessage,
+                'type' => 'database_error'
+            ], 500);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error creating hospital appointment:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request_data' => $request->all()
+            ]);
+            
+            // Return more detailed error in development
+            $errorMessage = config('app.debug') 
+                ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine()
+                : 'Failed to create hospital appointment. Please try again.';
+            
+            return response()->json([
+                'message' => 'Failed to create hospital appointment',
+                'error' => $errorMessage,
+                'type' => 'general_error',
+                'details' => config('app.debug') ? [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ] : null
             ], 500);
         }
     }
