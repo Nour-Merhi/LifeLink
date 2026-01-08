@@ -132,6 +132,10 @@
   background: linear-gradient(to bottom, #96AFFF, #2349C2);
 }
 
+.linear-light-blue{
+  background: linear-gradient(to bottom, #96AFFF, #2349C2);
+}
+
 .links{
   font-size: 14px;
   font-weight: 500;
@@ -147,11 +151,62 @@
   padding-top: 10px;
   padding-bottom: 10px;
   box-sizing: border-box;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
 }
 
-.link-item:has(a.active) {
+/* Active state for gradient sidebars (admin and nurse dashboards) */
+.sidebar.linear-red .link-item:has(a.active),
+.sidebar.linear-blue .link-item:has(a.active),
+.sidebar.linear-hospital .link-item:has(a.active),
+.sidebar.linear-light-blue .link-item:has(a.active) {
   background-color: rgba(255, 255, 255, 0.2);
   border-left: 4px solid white;
+}
+
+/* Hover effect for gradient sidebars */
+.sidebar.linear-red .link-item:hover,
+.sidebar.linear-blue .link-item:hover,
+.sidebar.linear-hospital .link-item:hover,
+.sidebar.linear-light-blue .link-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Hover effect for white/non-gradient sidebars (matching ProfileDropdown) */
+.sidebar:not(.linear-red):not(.linear-hospital):not(.linear-blue):not(.linear-light-blue) .link-item:hover {
+  background-color: #f3f4f6;
+}
+
+/* Active state for white/non-gradient sidebars (donor dashboard) */
+.sidebar:not(.linear-red):not(.linear-hospital):not(.linear-blue):not(.linear-light-blue) .link-item:has(a.active) {
+  background-color: #f3f4f6;
+  border-left: 4px solid #da1d1d;
+}
+
+/* Icon color transitions for hover and active states */
+.link-item .icon-size {
+  transition: color 0.2s ease;
+}
+
+/* Hover icon color change for white sidebars */
+.sidebar:not(.linear-red):not(.linear-hospital):not(.linear-blue):not(.linear-light-blue) .link-item:hover .icon-size {
+  color: #383838;
+}
+
+/* Active icon color for white sidebars */
+.sidebar:not(.linear-red):not(.linear-hospital):not(.linear-blue):not(.linear-light-blue) .link-item:has(a.active) .icon-size {
+  color: #e21f1f;
+}
+
+/* Hover link text color for white sidebars */
+.sidebar:not(.linear-red):not(.linear-hospital):not(.linear-blue):not(.linear-light-blue) .link-item:hover a {
+  color: #2b2b2b;
+}
+
+/* Active link text color for white sidebars */
+.sidebar:not(.linear-red):not(.linear-hospital):not(.linear-blue):not(.linear-light-blue) .link-item:has(a.active) a {
+  color: #e01b1b;
+  font-weight: 600;
 }
 
 .icon-size{

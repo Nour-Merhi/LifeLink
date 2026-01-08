@@ -12,7 +12,7 @@ import {
     IoArrowBack
 } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 export default function DonorDetail() {
     const { donorCode } = useParams();
@@ -30,8 +30,8 @@ export default function DonorDetail() {
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/donors/${donorCode}`
+            const response = await api.get(
+                `/api/admin/dashboard/donors/${donorCode}`
             );
             setDonorData(response.data);
         } catch (err) {

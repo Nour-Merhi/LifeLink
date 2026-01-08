@@ -2,8 +2,15 @@ import { useState, useEffect } from "react"
 import { IoSearchSharp } from "react-icons/io5";
 import { FiEye, FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
+import ViewTransactionModal from "./ViewTransactionModal";
+import EditTransactionModal from "./EditTransactionModal";
+import api from "../../../api/axios";
 
-export default function Transactions({ transactions }){
+export default function Transactions({ transactions, onTransactionUpdated }){
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [selectedTransactionId, setSelectedTransactionId] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [transactionState, setTransactionState] = useState("all-states");
     const [paymentMethod, setPaymentMethod] = useState("all-methods");
@@ -35,6 +42,53 @@ export default function Transactions({ transactions }){
     //Displaying text
     const startDisplay = startIndex + 1;
     const endDisplay = Math.min(endIndex, totalTransactions);
+
+    const handleView = (transaction) => {
+        setSelectedTransactionId(transaction.id || transaction.db_id);
+        setViewModalOpen(true);
+    };
+
+    const handleEdit = (transaction) => {
+        setSelectedTransactionId(transaction.id || transaction.db_id);
+        setEditModalOpen(true);
+    };
+
+    const handleDelete = async (transaction) => {
+        if (deleteConfirm !== transaction.id) {
+            setDeleteConfirm(transaction.id);
+            return;
+        }
+
+        try {
+            await api.get("/sanctum/csrf-cookie");
+            await api.delete(`/api/admin/dashboard/financial/transactions/${transaction.id || transaction.db_id}`);
+            
+            if (onTransactionUpdated) {
+                onTransactionUpdated();
+            }
+            setDeleteConfirm(null);
+        } catch (error) {
+            console.error('Error deleting transaction:', error);
+            alert(error.response?.data?.message || "Failed to delete transaction");
+            setDeleteConfirm(null);
+        }
+    };
+
+    const handleCloseViewModal = () => {
+        setViewModalOpen(false);
+        setSelectedTransactionId(null);
+    };
+
+    const handleCloseEditModal = () => {
+        setEditModalOpen(false);
+        setSelectedTransactionId(null);
+    };
+
+    const handleTransactionUpdated = () => {
+        if (onTransactionUpdated) {
+            onTransactionUpdated();
+        }
+    };
 
     return(
         <section className="hospital-table-section">
@@ -149,9 +203,27 @@ export default function Transactions({ transactions }){
                             
                                 <td className="col-actions">
                                     <div className="row-actions">
-                                        <button className="icon-btn text-blue-800"><FiEye /></button>
-                                        <button className="icon-btn text-green-600"><FiEdit /></button>
-                                        <button className="icon-btn text-red-500"><RiDeleteBin6Line /></button>
+                                        <button 
+                                            className="icon-btn text-blue-800"
+                                            onClick={() => handleView(transaction)}
+                                            title="View Transaction"
+                                        >
+                                            <FiEye />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-green-600"
+                                            onClick={() => handleEdit(transaction)}
+                                            title="Edit Transaction"
+                                        >
+                                            <FiEdit />
+                                        </button>
+                                        <button 
+                                            className="icon-btn text-red-500"
+                                            onClick={() => handleDelete(transaction)}
+                                            title={deleteConfirm === transaction.id ? "Confirm Delete" : "Delete Transaction"}
+                                        >
+                                            <RiDeleteBin6Line />
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -194,6 +266,21 @@ export default function Transactions({ transactions }){
                     </div>
                 </div>
             </div>
+
+            {viewModalOpen && (
+                <ViewTransactionModal 
+                    onClose={handleCloseViewModal} 
+                    transactionId={selectedTransactionId}
+                />
+            )}
+
+            {editModalOpen && (
+                <EditTransactionModal 
+                    onClose={handleCloseEditModal}
+                    onTransactionUpdated={handleTransactionUpdated}
+                    transactionId={selectedTransactionId}
+                />
+            )}
         </section>
     );
 }

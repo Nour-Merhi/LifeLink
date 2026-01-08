@@ -7,7 +7,7 @@ export default function HeroSection() {
     const navigate = useNavigate();
 
     const handleStart = () => {
-        navigate("/quiz");
+        navigate("/quizlit/ready");
     };
 
     const handleLeaderboard = () => {

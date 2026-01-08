@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LuPhoneCall } from "react-icons/lu";
 import { FaRegClock } from "react-icons/fa";
 import { MdOutlineCalendarMonth } from "react-icons/md";
@@ -10,58 +10,75 @@ import { FaCheck } from "react-icons/fa";
 import { FaTimes } from "react-icons/fa";
 
 import "../../styles/Dashboard.css";
+import api from "../../api/axios";
 
 export default function DonorRequests(){
     const [activeTab, setActiveTab] = useState("All");
     const [bloodType, setBloodType] = useState("all-blood");
+    const [donorRequests, setDonorRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    // Sample data
-    const donorRequests = [
-        {
-            id: 1,
-            donorName: "Sarah Johnson",
-            gender: "Female",
-            bloodType: "O+",
-            address: "123 Oak Street, Downtown",
-            date: "2024-01-15",
-            time: "09:00 AM",
-            phone: "961 768900273",
-            emergencyContact: "Nour Merhi - 76543271"
-        },
-        {
-            id: 2,
-            donorName: "Sarah Johnson",
-            gender: "Female",
-            bloodType: "O+",
-            address: "123 Oak Street, Downtown",
-            date: "2024-01-15",
-            time: "09:00 AM",
-            phone: "961 768900273",
-            emergencyContact: "Nour Merhi - 76543271"
-        },
-        {
-            id: 3,
-            donorName: "Sarah Johnson",
-            gender: "Female",
-            bloodType: "O+",
-            address: "123 Oak Street, Downtown",
-            date: "2024-01-15",
-            time: "09:00 AM",
-            phone: "961 768900273",
-            emergencyContact: "Nour Merhi - 76543271"
-        },
-        {
-            id: 4,
-            donorName: "Sarah Johnson",
-            gender: "Female",
-            bloodType: "O+",
-            address: "123 Oak Street, Downtown",
-            date: "2024-01-15",
-            time: "09:00 AM",
-            phone: "961 768900273",
-            emergencyContact: "Nour Merhi - 76543271"
-        },
-    ];
+    useEffect(() => {
+        const fetchDonorRequests = async () => {
+            try {
+                setLoading(true);
+                setError("");
+                const response = await api.get("/api/nurse/donor-requests");
+                
+                if (response.data && response.data.requests) {
+                    setDonorRequests(response.data.requests);
+                } else {
+                    setError("No requests data received from server");
+                }
+            } catch (err) {
+                console.error("Error fetching donor requests:", err);
+                console.error("Error response:", err.response);
+                
+                let errorMessage = "Failed to load donor requests";
+                if (err.response?.data?.message) {
+                    errorMessage = err.response.data.message;
+                } else if (err.response?.status === 401) {
+                    errorMessage = "Please log in to view donor requests";
+                } else if (err.response?.status === 403) {
+                    errorMessage = "You don't have permission to access this page";
+                } else if (err.message) {
+                    errorMessage = err.message;
+                }
+                
+                setError(errorMessage);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDonorRequests();
+    }, []);
+
+    // Filter requests based on blood type
+    const filteredRequests = donorRequests.filter((request) => {
+        if (bloodType === "all-blood") return true;
+        return request.bloodType === bloodType;
+    });
+
+    if (loading) {
+        return (
+            <div className="nurse-section flex items-center justify-center h-64">
+                <p className="text-gray-500">Loading donor requests...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="nurse-section flex flex-col items-center justify-center h-64 p-4">
+                <p className="text-red-500 text-lg font-semibold mb-2">Error: {error}</p>
+                <p className="text-gray-600 text-sm">
+                    Please check your browser console for more details, or contact support if the issue persists.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="nurse-section">
@@ -104,7 +121,7 @@ export default function DonorRequests(){
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "20px" }}>
-                {donorRequests.map((request) => (
+                {filteredRequests.length > 0 ? filteredRequests.map((request) => (
                     <div key={request.id} className="donor-container" style={{ padding: "20px", display: "flex", flexDirection: "column" }}>
                         <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", gap: "20px" }}>
                             {/* Top Section - Donor Information */}
@@ -177,7 +194,16 @@ export default function DonorRequests(){
                             For emergency contact: {request.emergencyContact}
                         </div>
                     </div>
-                ))}
+                )) : (
+                    <div className="donor-container" style={{ padding: "40px", textAlign: "center" }}>
+                        <p className="text-gray-500 text-lg">No donor requests found</p>
+                        <p className="text-gray-400 text-sm mt-2">
+                            {bloodType !== "all-blood" 
+                                ? `No requests for blood type "${bloodType}"` 
+                                : "There are no pending donor requests at this time"}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     )

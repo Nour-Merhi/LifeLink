@@ -24,6 +24,13 @@
     flex-direction: row;
     align-items: center;
     gap:10px;
+    position: relative;
+}
+.admin-info img{
+    height: 40px !important;
+    width: 40px !important;
+    object-fit: cover;
+    border-radius: 50%;
 }
 .admin-name{
     display: flex;

@@ -29,6 +29,9 @@ import Phlebotomist from "./components/adminDashboard/Phlebotomist.jsx";
 import Financial from "./components/adminDashboard/Financial.jsx";
 import Notification from "./components/adminDashboard/Notification.jsx";
 import OrganPledges from "./components/adminDashboard/OrganPledges.jsx";
+import Articles from "./components/adminDashboard/Articles.jsx";
+import AdminSettings from "./components/adminDashboard/Settings.jsx";
+import AdminProfile from "./components/adminDashboard/AdminProfile.jsx";
 import Login from "./pages/Login";
 import Register from "./pages/Register"
 import axios from "axios";
@@ -61,6 +64,7 @@ import Settings from "./components/donorDashboard/Settings.jsx";
 import Rewards from "./components/donorDashboard/Rewards.jsx";
 /* Support */
 import Support from "./pages/Support";
+import AskQuestion from "./pages/AskQuestion";
 /* End of Donor Dashboard */
 
 /* Nurse Dashboard */
@@ -74,6 +78,8 @@ import ManagerContact from "./components/nurseDashboard/ManagerContact.jsx";
 
 /* Quizzlit */
 import QuizzlitWelcome from "./pages/QuizzlitWelcome";
+import QuizReady from "./pages/QuizReady";
+import GameInterface from "./components/Quizzlit/GameInterface.jsx";
 /* End of Quizzlit */
 
 /* Find More Hospitals */
@@ -139,7 +145,9 @@ function App() {
           <Route path="organ-pledges" element={<OrganPledges />} />
           <Route path="financials" element={<Financial />} />
           <Route path="notifications" element={<Notification />} />
-          <Route path="settings" element={<div><h1>Settings</h1></div>} />
+          <Route path="articles" element={<Articles />} />
+          <Route path="platform-settings" element={<AdminSettings />} />
+          <Route path="profile" element={<AdminProfile />} />
           <Route path="dashboard" element={<div><h1>Dashboard</h1></div>} />
         </Route>
         
@@ -182,11 +190,17 @@ function App() {
         <Route path="/quiz/results" element={<QuizResults />} />
         <Route path="/quiz/:category/question" element={<QuizQuestion />} />
 
+
         {/* Quizzlit Routes */}
-        <Route path="/quizzlit" element={<QuizzlitWelcome />} />
+        <Route path="/quizlit/ready" element={<QuizReady />} />
+        <Route path="/quizlit/welcome" element={<QuizzlitWelcome />} />
+        <Route path="/quizlit/game-interface" element={<GameInterface />} />
         
         {/* Support Page */}
         <Route path="/support" element={<Support />} />
+        
+        {/* Ask Question Page */}
+        <Route path="/ask-question" element={<AskQuestion />} />
         
         {/* Find More Hospitals Page */}
         <Route path="/hospitals" element={<FindMoreHospitals />} />

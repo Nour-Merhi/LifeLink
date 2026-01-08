@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from "axios";
+import api from "../../../api/axios";
 
 export default function AddNotificationForm({ onClose }) {
     const [loading, setLoading] = useState(false);
@@ -65,15 +65,10 @@ export default function AddNotificationForm({ onClose }) {
         setLoading(true);
 
         try {
-            const response = await axios.post(
-                "http://localhost:8000/api/admin/dashboard/create-notification",
-                notificationData,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                }
+            await api.get("/sanctum/csrf-cookie");
+            const response = await api.post(
+                "/api/admin/dashboard/create-notification",
+                notificationData
             );
             setShowSuccess(true);
             setTimeout(() => {

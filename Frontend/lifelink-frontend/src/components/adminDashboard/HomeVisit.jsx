@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { BiSolidBuildingHouse } from "react-icons/bi";
-import axios from 'axios'
+import api from "../../api/axios";
 
 import HomeOrderTable from "./homeVisitComponents/HomeOrderTable"
 import AddHomeApp from "./homeVisitComponents/AddHomeApp";
@@ -26,7 +26,7 @@ export default function HomeVisit(){
         setError("");
         
         // Fetch hospitals
-        axios.get('http://localhost:8000/api/admin/dashboard/get-hospitals')
+        api.get('/api/admin/dashboard/get-hospitals')
             .then((res) => {
                 const hospitalsData = res.data.hospitals || res.data || [];
                 setHospitals(Array.isArray(hospitalsData) ? hospitalsData : []);
@@ -36,7 +36,7 @@ export default function HomeVisit(){
             });
 
         // Fetch home visit orders
-        axios.get('http://localhost:8000/api/admin/dashboard/home-visit-orders')
+        api.get('/api/admin/dashboard/home-visit-orders')
             .then((res) => {
                 const ordersData = res.data.orders || res.data || [];
                 setOrderData(Array.isArray(ordersData) ? ordersData : []);
@@ -47,7 +47,7 @@ export default function HomeVisit(){
             });
 
         // Fetch home visit appointments
-        axios.get('http://localhost:8000/api/admin/dashboard/home-visit-appointments')
+        api.get('/api/admin/dashboard/home-visit-appointments')
             .then((res) => {
                 const appointmentsData = res.data.appointments || res.data || [];
                 setAppointmentData(Array.isArray(appointmentsData) ? appointmentsData : []);

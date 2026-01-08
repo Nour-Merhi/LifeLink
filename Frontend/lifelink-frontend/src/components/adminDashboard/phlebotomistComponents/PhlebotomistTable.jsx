@@ -5,7 +5,7 @@ import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import AssignPhlebotomistModal from "../homeVisitComponents/AssignPhlebotomistModal";
 import EditPhlebotomistForm from "./EditPhlebotomistForm";
 
@@ -371,14 +371,9 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
                                         setDeleteLoading(true);
                                         setDeleteError("");
                                         try {
-                                            await axios.delete(
-                                                `http://localhost:8000/api/admin/dashboard/phlebotomists/${deleteConfirm.phlebotomistCode}`,
-                                                {
-                                                    headers: {
-                                                        'Accept': 'application/json',
-                                                        'Content-Type': 'application/json'
-                                                    }
-                                                }
+                                            await api.get("/sanctum/csrf-cookie");
+                                            await api.delete(
+                                                `/api/admin/dashboard/phlebotomists/${deleteConfirm.phlebotomistCode}`
                                             );
                                             setDeleteConfirm(null);
                                             if (onPhlebotomistsUpdate) {

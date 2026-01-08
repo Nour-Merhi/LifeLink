@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 export default function ViewHospitalAppointmentModal({ onClose, appointmentCode }) {
     const [loading, setLoading] = useState(true);
@@ -21,14 +21,8 @@ export default function ViewHospitalAppointmentModal({ onClose, appointmentCode 
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/hospital-appointments/${appointmentCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/hospital-appointments/${appointmentCode}`
             );
             
             setAppointmentData(response.data.hospitalAppointment || response.data);

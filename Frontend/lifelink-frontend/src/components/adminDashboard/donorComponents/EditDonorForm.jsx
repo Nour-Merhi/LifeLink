@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from "axios"
+import api from "../../../api/axios";
 
 export default function EditDonorForm({ onClose, onDonorUpdated, donorCode, donorData }) {
     const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export default function EditDonorForm({ onClose, onDonorUpdated, donorCode, dono
 
     useEffect(() => {
         // Fetch blood types
-        axios.get('http://localhost:8000/api/admin/dashboard/get-blood-types')
+        api.get('/api/admin/dashboard/get-blood-types')
             .then(res => {
                 setBloodTypes(res.data.blood_types || []);
             })
@@ -151,15 +151,10 @@ export default function EditDonorForm({ onClose, onDonorUpdated, donorCode, dono
         setLoading(true);
 
         try {
-            const response = await axios.put(
-                `http://localhost:8000/api/admin/dashboard/donors/${donorCode}`,
-                changedFields, // Only send changed fields
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                }
+            await api.get("/sanctum/csrf-cookie");
+            const response = await api.put(
+                `/api/admin/dashboard/donors/${donorCode}`,
+                changedFields // Only send changed fields
             );
             
             setShowSuccess(true);

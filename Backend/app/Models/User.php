@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 
 use App\Models\Donor;
 use App\Models\MobilePhlebotomists;
+use App\Models\SupportTicket;
+use App\Models\Message;
 
 class User extends Authenticatable
 {
@@ -26,7 +28,9 @@ class User extends Authenticatable
         'city',
         'role',
         'password',
-        'code', 
+        'code',
+        'profile_picture',
+        'address',
     ];
     protected static function booted()
     {
@@ -63,5 +67,20 @@ class User extends Authenticatable
     public function mobilePhlebotomists(){
         return $this->hasOne(MobilePhlebotomist::class, 'id');
     }
-    
+
+    public function settings(){
+        return $this->hasOne(UserSetting::class, 'user_id');
+    }
+
+    public function supportTickets(){
+        return $this->hasMany(SupportTicket::class, 'user_id');
+    }
+
+    public function sentMessages(){
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function receivedMessages(){
+        return $this->hasMany(Message::class, 'receiver_id');
+    }
 }

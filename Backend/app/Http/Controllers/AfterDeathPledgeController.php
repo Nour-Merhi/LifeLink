@@ -90,6 +90,17 @@ class AfterDeathPledgeController extends Controller
                 'status' => 'active',
             ]);
 
+            // Award XP for after-death organ donation pledge
+            // Try to find donor by email
+            $user = \App\Models\User::where('email', $validated['email'])->first();
+            if ($user && $user->donor) {
+                \App\Services\XpService::awardAfterDeathDonationXp(
+                    $user->donor->id,
+                    \App\Models\AfterDeathPledge::class,
+                    $pledge->id
+                );
+            }
+
             return response()->json([
                 'message' => 'After-death organ donation pledge submitted successfully.',
                 'pledge' => $pledge

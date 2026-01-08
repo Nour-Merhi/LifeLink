@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { FaHospital } from "react-icons/fa";
 import "../../styles/Dashboard.css"
-import axios from 'axios';
+import api from "../../api/axios";
 
 import HospitalTable from "./hospitalComponents/HospitalTable"
 import AddHospitalForm from "./hospitalComponents/AddHospitalForm"
@@ -19,7 +19,7 @@ export default function Hospitals(){
         setLoading(true);
         setError("");
 
-        axios.get('http://localhost:8000/api/admin/dashboard/get-hospitals')
+        api.get('/api/admin/dashboard/get-hospitals')
             .then((res) => {
                 console.log('Hospitals API Response:', res.data);
                 // Backend returns { hospitals: [...], total: ... }

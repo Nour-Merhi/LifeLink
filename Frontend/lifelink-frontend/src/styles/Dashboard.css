@@ -178,6 +178,8 @@
     background-color: #fff;
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
     border-radius: 5px;
+    overflow-x: auto;
+    width: 100%;
 }
 .h1-table{
     width: 100%;
@@ -213,7 +215,7 @@
 }
 .h1-table th.col-donor,
 .h1-table td.col-donor{
-    min-width: 115px;
+    min-width: 80px;
     text-align: left;
 }
 
@@ -284,16 +286,72 @@
     text-align: center;
 }
 
+.h1-table th.col-select,
+.h1-table td.col-select {
+    width: 50px;
+    text-align: center;
+}
+
+.h1-table th.col-blood,
+.h1-table td.col-blood {
+    min-width: 70px;
+    max-width: 70px;
+    text-align: center;
+}
+
+.h1-table th.col-status,
+.h1-table td.col-status {
+    min-width: 80px;
+    max-width: 80px;
+    text-align: center;
+}
+
+.h1-table th.col-total,
+.h1-table td.col-total {
+    min-width: 90px;
+    max-width: 90px;
+    text-align: center;
+}
+
+.h1-table th.col-phone,
+.h1-table td.col-phone {
+    min-width: 130px;
+    max-width: 130px;
+    text-align: center;
+}
+
+.h1-table th.col-contact {
+    min-width: 110px;
+    max-width: 110px;
+    text-align: center;
+}
+
+.h1-table td.col-contact {
+    min-width: 120px;
+    max-width: 120px;
+    text-align: left;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.h1-table th.col-actions,
+.h1-table td.col-actions {
+    min-width: 80px;
+    max-width: 80px;
+    text-align: center;
+}
+
 .amount-value {
     color: #16a34a;
     font-weight: 600;
 }
 
 .h1-table th.col-address{
-    max-width: 125px;
+    max-width: 150px;
+    text-align: center;
 }
 .h1-table td.col-address {
-    max-width: 125px;
+    max-width: 150px;
     text-align: left;
 }
 
@@ -351,6 +409,8 @@ small.muted {
 }
 .row-actions{
     display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
 }
 .icon-btn {
@@ -1853,29 +1913,29 @@ small.muted {
     gap: 12px;
 }
 
-.donor-avatar {
-    font-size: 40px;
+.transaction-donor-avatar {
+    font-size: 48px;
     color: #285BFF;
 }
 
-.donor-details {
+.transaction-donor-details {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.donor-name {
-    font-size: 14px;
+.transaction-donor-name {
+    font-size: 16px;
     font-weight: 500;
     color: #333;
 }
 
-.donor-date {
+.transaction-donor-date {
     font-size: 12px;
     color: #B3B3B3;
 }
 
-.donor-amount {
+.transaction-donor-amount {
     font-size: 15px;
     font-weight: 600;
     color: #16a34a;
@@ -3935,6 +3995,928 @@ small.muted {
     }
 }
 
+/* Modern Hospital Detail Page Styles */
+
+
+.hospital-detail-back {
+    margin-bottom: 20px;
+}
+
+.hospital-detail-hero {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    margin-bottom: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.hospital-detail-hero-image {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #F12C31 0%, #CA2529 100%);
+}
+
+.hospital-detail-hero-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hospital-detail-hero-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #F12C31 0%, #CA2529 100%);
+    color: white;
+}
+
+.hospital-detail-hero-content {
+    padding: 30px;
+}
+
+.hospital-detail-hero-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.hospital-detail-hero-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #252E32;
+    margin: 0;
+}
+
+.hospital-detail-description {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.hospital-detail-hero-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.hospital-code {
+    font-size: 14px;
+    color: #666;
+    background: #f5f5f5;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.hospital-established {
+    font-size: 14px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hospital-detail-grid-modern {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.hospital-detail-card-modern {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hospital-detail-card-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.hospital-detail-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+    border-bottom: 2px solid #E5E7EB;
+}
+
+.hospital-detail-card-header .card-icon {
+    font-size: 24px;
+    color: #F12C31;
+}
+
+.hospital-detail-card-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #252E32;
+    margin: 0;
+}
+
+.hospital-detail-card-body {
+    padding: 25px;
+}
+
+.hospital-detail-info-item-modern {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px 0;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.hospital-detail-info-item-modern:last-child {
+    border-bottom: none;
+}
+
+.info-icon-wrapper {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: #FEF2F2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #F12C31;
+    font-size: 20px;
+}
+
+.info-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6B7280;
+}
+
+.info-value {
+    font-size: 16px;
+    font-weight: 500;
+    color: #252E32;
+    word-break: break-word;
+}
+
+.hospital-detail-map-card {
+    grid-column: span 2;
+}
+
+.hospital-detail-map-container {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 0 0 12px 12px;
+}
+
+.hospital-detail-map-container .map-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #FEF2F2;
+    color: #991B1B;
+    gap: 10px;
+}
+
+.hospital-detail-services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.hospital-detail-service-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-service-item:hover {
+    background: #FEF2F2;
+    border-color: #F12C31;
+    transform: translateX(4px);
+}
+
+.hospital-detail-service-item .service-icon {
+    color: #F12C31;
+    font-size: 18px;
+}
+
+.hospital-detail-service-item span {
+    font-size: 14px;
+    color: #252E32;
+    font-weight: 500;
+}
+
+.hospital-detail-urgent-needs-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.hospital-detail-urgent-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%);
+    border: 2px solid #F12C31;
+    border-radius: 8px;
+    color: #F12C31;
+    font-weight: 600;
+    font-size: 14px;
+    animation: pulse 2s infinite;
+}
+
+.hospital-detail-urgent-badge svg {
+    font-size: 16px;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.hospital-detail-blood-stock-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 15px;
+}
+
+.hospital-detail-blood-stock-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-blood-stock-item:hover {
+    background: #FEF2F2;
+    border-color: #F12C31;
+    transform: translateY(-2px);
+}
+
+.hospital-detail-blood-stock-item .blood-type-icon {
+    font-size: 24px;
+    color: #F12C31;
+}
+
+.blood-stock-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.blood-type {
+    font-size: 16px;
+    font-weight: 600;
+    color: #252E32;
+}
+
+.blood-count {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+/* Responsive Design for Modern Hospital Detail */
+@media (max-width: 1024px) {
+    .hospital-detail-grid-modern {
+        grid-template-columns: 1fr;
+    }
+    
+    .hospital-detail-map-card {
+        grid-column: span 1;
+    }
+    
+    .hospital-detail-hero-image {
+        height: 300px;
+    }
+    
+    .hospital-detail-hero-header h1 {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 768px) {
+    .hospital-detail-section {
+        padding: 15px;
+    }
+    
+    .hospital-detail-hero-image {
+        height: 250px;
+    }
+    
+    .hospital-detail-hero-content {
+        padding: 20px;
+    }
+    
+    .hospital-detail-hero-header h1 {
+        font-size: 24px;
+    }
+    
+    .hospital-detail-card-header {
+        padding: 15px 20px;
+    }
+    
+    .hospital-detail-card-body {
+        padding: 20px;
+    }
+    
+    .hospital-detail-services-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .hospital-detail-blood-stock-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+}
+
+/* Admin Dashboard Hospital Detail Page - Light Mode (Similar to Public Page) */
+.hospital-detail-section-admin {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 40px;
+    background-color: #ffffff;
+    min-height: 100vh;
+}
+
+.hospital-detail-back-admin {
+    margin-bottom: 2rem;
+}
+
+.hospital-detail-back-button-admin {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: transparent;
+    color: #252E32;
+    border: 1px solid #E5E7EB;
+    padding: 0.625rem 1.25rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.hospital-detail-back-button-admin:hover {
+    background-color: #F9FAFB;
+    border-color: #F12C31;
+    color: #F12C31;
+}
+
+.hospital-detail-error-admin {
+    min-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #252E32;
+    text-align: center;
+}
+
+.hospital-detail-error-admin h2 {
+    color: #F12C31;
+    margin-bottom: 1rem;
+}
+
+.back-to-hospitals-btn-admin {
+    margin-top: 1.5rem;
+    padding: 0.75rem 1.5rem;
+    background-color: #F12C31;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.back-to-hospitals-btn-admin:hover {
+    background-color: #d02025;
+}
+
+.hospital-detail-header-admin {
+    margin-bottom: 2rem;
+}
+
+.hospital-detail-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.hospital-detail-title-admin {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #252E32;
+    margin: 0;
+}
+
+.hospital-detail-subtitle-admin {
+    font-size: 1.1rem;
+    color: #6B7280;
+    line-height: 1.6;
+    max-width: 800px;
+    margin-bottom: 1rem;
+}
+
+.hospital-detail-meta-admin {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.hospital-code-admin {
+    font-size: 14px;
+    color: #6B7280;
+    background: #F9FAFB;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.hospital-established-admin {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+.hospital-detail-image-container-admin {
+    width: 100%;
+    height: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 3rem;
+    background: #F9FAFB;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hospital-detail-image-admin {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hospital-detail-grid-admin {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-bottom: 3rem;
+    align-items: start;
+}
+
+.hospital-detail-contact-map-wrapper-admin {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    grid-column: 1 / -1;
+    align-items: start;
+}
+
+.hospital-detail-section-admin-card {
+    background-color: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 2rem;
+    transition: box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.hospital-detail-section-admin-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.hospital-detail-section-full-admin {
+    grid-column: 1 / -1;
+}
+
+.hospital-detail-section-title-admin {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #252E32;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #F12C31;
+    padding-bottom: 0.5rem;
+}
+
+.hospital-detail-contact-list-admin {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    flex: 1;
+}
+
+.hospital-detail-contact-item-admin {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    min-height: 3rem;
+}
+
+.hospital-detail-contact-item-admin > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.hospital-detail-contact-icon-admin {
+    color: #F12C31;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hospital-detail-contact-item-admin strong {
+    display: block;
+    color: #252E32;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.hospital-detail-contact-item-admin p {
+    color: #6B7280;
+    font-size: 1rem;
+    margin: 0;
+}
+
+.hospital-detail-urgent-needs-admin {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.hospital-detail-urgent-button-admin {
+    background-color: #FEF2F2;
+    color: #F12C31;
+    border: 2px solid #F12C31;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-urgent-button-admin:hover {
+    background-color: #F12C31;
+    color: #ffffff;
+}
+
+.hospital-detail-info-list-admin {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.hospital-detail-info-item-admin {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.hospital-detail-info-item-admin:last-child {
+    border-bottom: none;
+}
+
+.hospital-detail-info-item-admin strong {
+    color: #252E32;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.hospital-detail-info-item-admin span {
+    color: #6B7280;
+    font-size: 1rem;
+}
+
+.hospital-detail-services-list-admin {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.hospital-detail-services-list-admin li {
+    color: #252E32;
+    padding: 0.75rem;
+    background-color: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    position: relative;
+    padding-left: 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-services-list-admin li:hover {
+    background-color: #FEF2F2;
+    border-color: #F12C31;
+}
+
+.hospital-detail-services-list-admin li::before {
+    content: "✓";
+    position: absolute;
+    left: 0.5rem;
+    color: #F12C31;
+    font-weight: bold;
+}
+
+.hospital-detail-map-container-admin {
+    width: 100%;
+    height: 300px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #F9FAFB;
+    flex: 1;
+    min-height: 300px;
+}
+
+.hospital-detail-map-section-admin {
+    display: flex;
+    flex-direction: column;
+}
+
+.map-error-admin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #FEF2F2;
+    color: #991B1B;
+    padding: 20px;
+    text-align: center;
+    border-radius: 8px;
+}
+
+.map-error-admin p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.hospital-detail-blood-stock-grid-admin {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 15px;
+}
+
+.hospital-detail-blood-stock-item-admin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-blood-stock-item-admin:hover {
+    background: #FEF2F2;
+    border-color: #F12C31;
+    transform: translateY(-2px);
+}
+
+.blood-type-icon-admin {
+    font-size: 24px;
+    color: #F12C31;
+}
+
+.blood-stock-info-admin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.blood-type-admin {
+    font-size: 16px;
+    font-weight: 600;
+    color: #252E32;
+}
+
+.blood-count-admin {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+/* Responsive Design for Admin Hospital Detail */
+@media (max-width: 768px) {
+    .hospital-detail-section-admin {
+        padding: 40px 20px;
+    }
+
+    .hospital-detail-title-admin {
+        font-size: 2rem;
+    }
+
+    .hospital-detail-subtitle-admin {
+        font-size: 1rem;
+    }
+
+    .hospital-detail-image-container-admin {
+        height: 250px;
+        margin-bottom: 2rem;
+    }
+
+    .hospital-detail-grid-admin {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .hospital-detail-contact-map-wrapper-admin {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .hospital-detail-section-admin-card {
+        padding: 1.5rem;
+    }
+
+    .hospital-detail-services-list-admin {
+        grid-template-columns: 1fr;
+    }
+
+    .hospital-detail-map-section-admin {
+        grid-column: span 1;
+    }
+
+    .hospital-detail-blood-stock-grid-admin {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+}
+
+/* Statistics Grid */
+.hospital-detail-stats-grid-admin {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+}
+
+.hospital-detail-stat-item-admin {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-stat-item-admin:hover {
+    background: #FEF2F2;
+    border-color: #F12C31;
+    transform: translateY(-2px);
+}
+
+.stat-icon-admin {
+    font-size: 24px;
+    color: #F12C31;
+    flex-shrink: 0;
+}
+
+.stat-content-admin {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-value-admin {
+    font-size: 20px;
+    font-weight: 700;
+    color: #252E32;
+}
+
+.stat-label-admin {
+    font-size: 12px;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Phlebotomists List */
+.hospital-detail-phlebotomists-list-admin {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hospital-detail-phlebotomist-item-admin {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.hospital-detail-phlebotomist-item-admin:hover {
+    background: #F9FAFB;
+    border-color: #F12C31;
+}
+
+.phlebotomist-icon-admin {
+    font-size: 24px;
+    color: #F12C31;
+    flex-shrink: 0;
+}
+
+.phlebotomist-info-admin {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.phlebotomist-info-admin strong {
+    font-size: 16px;
+    color: #252E32;
+    font-weight: 600;
+}
+
+.phlebotomist-info-admin span {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+.phlebotomist-code-admin {
+    font-size: 12px;
+    color: #9CA3AF;
+    background: #F9FAFB;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    width: fit-content;
+    margin-top: 4px;
+}
+
+/* Responsive adjustments for stats */
+@media (max-width: 768px) {
+    .hospital-detail-stats-grid-admin {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+
 /* Manager Contact Styles */
 .manager-profile-section {
     display: flex;
@@ -5396,6 +6378,18 @@ small.muted {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-direction: column;
+    padding: 10px;
+}
+
+.certificate-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.certificate-placeholder.certificate-unlocked {
+    background-color: white;
 }
 
 /* XP Section Styles */
@@ -5542,4 +6536,66 @@ small.muted {
     font-size: 16px;
     font-weight: 600;
     color: #932AEF;
+}
+
+/* Settings Card Styles */
+.settings-card {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+}
+
+.settings-section-header {
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.settings-section-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #252E32;
+    margin: 0;
+}
+
+.settings-card .form-group {
+    margin-bottom: 20px;
+}
+
+.settings-card label {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    color: #252E32;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.settings-card input[type="text"],
+.settings-card input[type="email"],
+.settings-card input[type="number"],
+.settings-card input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #B3B3B3;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.settings-card input[type="text"]:focus,
+.settings-card input[type="email"]:focus,
+.settings-card input[type="number"]:focus {
+    outline: none;
+    border-color: #F12C31;
+}
+
+.settings-card .muted {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
 }

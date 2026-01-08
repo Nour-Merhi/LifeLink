@@ -13,7 +13,7 @@ import {
     IoHourglassOutline
 } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 export default function PhlebotomistDetail() {
     const { phlebotomistCode } = useParams();
@@ -31,14 +31,8 @@ export default function PhlebotomistDetail() {
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/phlebotomists/${phlebotomistCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/phlebotomists/${phlebotomistCode}`
             );
             setPhlebotomistData(response.data.phlebotomist || response.data);
         } catch (err) {

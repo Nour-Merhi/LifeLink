@@ -5,7 +5,7 @@ import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { BsCalendar3, BsClock, BsHospital, BsChevronDown, BsChevronUp, BsListUl } from "react-icons/bs";
 import { MdLocationOn } from "react-icons/md";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import HospitalCalendarView from "./HospitalCalendarView";
 import EditAppointmentModal from "./EditAppointmentModal";
 
@@ -144,14 +144,12 @@ export default function HomeAppTable({ appointments = [], loading = false, error
         setDeleteError("");
 
         try {
+            // Get CSRF cookie first
+            await api.get("/sanctum/csrf-cookie");
+            
             // Delete all appointments
             const deletePromises = deleteConfirm.appointmentIds.map(appointmentId => 
-                axios.delete(`http://localhost:8000/api/admin/dashboard/appointments/${appointmentId}`, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                })
+                api.delete(`/api/admin/dashboard/appointments/${appointmentId}`)
             );
 
             const results = await Promise.allSettled(deletePromises);

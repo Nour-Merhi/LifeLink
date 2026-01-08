@@ -17,16 +17,82 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BloodInventoryController;
 use App\Http\Controllers\HospitalSettingController;
 use App\Http\Controllers\HomeVisitController;
+use App\Http\Controllers\BloodHeroesController;
 use App\Http\Controllers\LivingDonorController;
 use App\Http\Controllers\AfterDeathPledgeController;
 use App\Http\Controllers\HospitalsController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\DonorDashboardController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\RewardsController;
+use App\Http\Controllers\SupportController;
+use App\Http\Controllers\NurseDashboardController;
+use App\Http\Controllers\ArticleController;
+use App\Http\Controllers\FinancialDonationController;
+use App\Http\Controllers\PatientCaseController;
+use App\Http\Controllers\Admin\FinancialController;
 
 
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [AuthenticatedSessionController::class, 'login']);
 Route::middleware('auth:sanctum')->get('/user', [AuthenticatedSessionController::class, 'user']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthenticatedSessionController::class, 'logout']);
+
+// Donor Dashboard Routes
+Route::middleware('auth:sanctum')->prefix('/donor')->group(function(){
+    Route::get('/dashboard', [DonorDashboardController::class, 'index']);
+    Route::get('/my-donations', [DonorDashboardController::class, 'myDonations']);
+    Route::get('/my-appointments', [DonorDashboardController::class, 'myAppointments']);
+    Route::get('/rewards', [RewardsController::class, 'index']);
+});
+
+// Nurse Dashboard Routes
+Route::middleware('auth:sanctum')->prefix('/nurse')->group(function(){
+    Route::get('/dashboard', [NurseDashboardController::class, 'index']);
+    Route::get('/my-appointments', [NurseDashboardController::class, 'myAppointments']);
+    Route::get('/donor-requests', [NurseDashboardController::class, 'donorRequests']);
+    Route::get('/hospital-info', [NurseDashboardController::class, 'hospitalInfo']);
+    Route::get('/manager-contact', [NurseDashboardController::class, 'managerContact']);
+    Route::get('/messages', [NurseDashboardController::class, 'getMessages']);
+    Route::post('/messages', [NurseDashboardController::class, 'sendMessage']);
+});
+
+// Settings Routes (for all authenticated users)
+Route::middleware('auth:sanctum')->prefix('/settings')->group(function(){
+    // Get all settings at once (optimized)
+    Route::get('/all', [SettingsController::class, 'getAll']);
+    
+    // Profile
+    Route::get('/profile', [SettingsController::class, 'getProfile']);
+    Route::put('/profile', [SettingsController::class, 'updateProfile']);
+    
+    // Medical Information
+    Route::get('/medical', [SettingsController::class, 'getMedicalInfo']);
+    Route::put('/medical', [SettingsController::class, 'updateMedicalInfo']);
+    
+    // Password
+    Route::put('/password', [SettingsController::class, 'updatePassword']);
+    
+    // Notifications
+    Route::get('/notifications', [SettingsController::class, 'getNotificationSettings']);
+    Route::put('/notifications', [SettingsController::class, 'updateNotificationSettings']);
+    
+    // Communication Preferences
+    Route::get('/communication', [SettingsController::class, 'getCommunicationPreferences']);
+    Route::put('/communication', [SettingsController::class, 'updateCommunicationPreferences']);
+});
+
+// Support Routes
+Route::prefix('/support')->group(function(){
+    // Public route - anyone can submit a support ticket
+    Route::post('/tickets', [SupportController::class, 'store']);
+    
+    // Protected routes - only authenticated users can view their tickets
+    Route::middleware('auth:sanctum')->group(function(){
+        Route::get('/tickets', [SupportController::class, 'index']);
+        Route::get('/tickets/{id}', [SupportController::class, 'show']);
+    });
+});
 
 //Appointments Routes
 
@@ -111,11 +177,48 @@ Route::prefix('/admin/dashboard')->group(function(){
 
     //After Death Pledge Routes
     Route::get('/after-death-pledges', [AfterDeathPledgeController::class, 'index']);
+
+    //Article Routes
+    Route::get('/articles', [ArticleController::class, 'indexAdmin']);
+    Route::post('/articles', [ArticleController::class, 'store']);
+    Route::get('/articles/{code}', [ArticleController::class, 'show']);
+    Route::put('/articles/{code}', [ArticleController::class, 'update']);
+    Route::delete('/articles/{code}', [ArticleController::class, 'destroy']);
+
+    //Financial Dashboard Routes
+    Route::get('/financial/metrics', [FinancialController::class, 'getMetrics']);
+    Route::get('/financial/top-donors', [FinancialController::class, 'getTopDonors']);
+    Route::get('/financial/active-cases', [FinancialController::class, 'getActiveCases']);
+    Route::get('/financial/patient-cases', [FinancialController::class, 'getAllPatientCases']);
+    Route::post('/financial/patient-cases', [FinancialController::class, 'storePatientCase']);
+    Route::get('/financial/patient-cases/{id}', [FinancialController::class, 'getPatientCaseDetails']);
+    Route::put('/financial/patient-cases/{id}', [FinancialController::class, 'updatePatientCase']);
+    Route::get('/financial/transactions', [FinancialController::class, 'getTransactions']);
+    Route::put('/financial/transactions/{id}', [FinancialDonationController::class, 'update']); // Update transaction (admin only)
+    Route::delete('/financial/transactions/{id}', [FinancialDonationController::class, 'destroy']); // Delete transaction (admin only)
 });
 
 //Appointments Routes
 Route::get('/hospital', [HospitalsController::class, 'index']);
 Route::get('/hospital/{id}', [HospitalsController::class, 'getHospital']);
 
+// Public Article Routes
+Route::get('/articles', [ArticleController::class, 'index']);
+Route::get('/articles/{id}', [ArticleController::class, 'show']);
+
+// Public Blood Heroes Route
+Route::get('/blood-heroes', [BloodHeroesController::class, 'index']);
+
 //Hospital Appointment Route 
 Route::post('/hospital/appointments', [HospitalAppointmentController::class, 'store']);
+
+// Financial Donation Routes
+Route::post('/financial-donations', [FinancialDonationController::class, 'store']); // Public route for submitting donations
+Route::middleware('auth:sanctum')->group(function() {
+    Route::get('/financial-donations', [FinancialDonationController::class, 'index']); // View donations (own or all if admin)
+    Route::get('/financial-donations/{id}', [FinancialDonationController::class, 'show']); // View specific donation
+});
+
+// Patient Cases Routes (Public)
+Route::get('/patient-cases', [PatientCaseController::class, 'index']); // Get active patient cases
+Route::get('/patient-cases/{id}', [PatientCaseController::class, 'show']); // Get specific patient case

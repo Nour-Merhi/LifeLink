@@ -5,7 +5,7 @@ import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import EditHospitalForm from "./EditHospitalForm";
 
 export default function hospitalTable({ hospitals = [], loading = false, error = "", onHospitalsUpdate }){
@@ -60,15 +60,8 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
         setDeleteError("");
 
         try {
-            await axios.delete(
-                `http://localhost:8000/api/admin/dashboard/hospitals/${deleteConfirm.hospitalCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            await api.get("/sanctum/csrf-cookie");
+            await api.delete(`/api/admin/dashboard/hospitals/${deleteConfirm.hospitalCode}`);
 
             // Success - close modal and refresh data
             setDeleteConfirm(null);

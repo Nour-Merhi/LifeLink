@@ -7,7 +7,7 @@ import { BsCalendar3 } from "react-icons/bs";
 import { BsListUl } from "react-icons/bs";
 import { FiUserPlus } from "react-icons/fi";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import CalendarView from "./CalendarView";
 import AssignPhlebotomistModal from "./AssignPhlebotomistModal";
 import ViewHomeOrderModal from "./ViewHomeOrderModal";
@@ -474,14 +474,9 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
                                         setDeleteLoading(true);
                                         setDeleteError("");
                                         try {
-                                            await axios.delete(
-                                                `http://localhost:8000/api/admin/dashboard/home-visit-orders/${deleteConfirm.orderCode}`,
-                                                {
-                                                    headers: {
-                                                        'Accept': 'application/json',
-                                                        'Content-Type': 'application/json'
-                                                    }
-                                                }
+                                            await api.get("/sanctum/csrf-cookie");
+                                            await api.delete(
+                                                `/api/admin/dashboard/home-visit-orders/${deleteConfirm.orderCode}`
                                             );
                                             setDeleteConfirm(null);
                                             if (onOrdersUpdate) {

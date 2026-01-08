@@ -43,11 +43,40 @@ class HospitalController extends Controller
     {
         try {
             $hospital = Hospital::where('code', $code)
-                ->with(['healthCenterManager.user'])
+                ->with([
+                    'healthCenterManager.user',
+                    'mobilePhlebotomist.user'
+                ])
                 ->firstOrFail();
             
+            // Calculate statistics
+            $stats = [
+                'total_appointments' => $hospital->appointments()->count(),
+                'hospital_appointments' => $hospital->hospitalAppointments()->count(),
+                'home_appointments' => $hospital->homeAppointments()->count(),
+                'total_phlebotomists' => $hospital->mobilePhlebotomist()->count(),
+                'emergency_requests' => $hospital->emergencyRequests()->count(),
+                'pending_appointments' => $hospital->appointments()->where('state', 'pending')->count(),
+                'completed_appointments' => $hospital->appointments()->where('state', 'completed')->count(),
+            ];
+            
+            // Get manager additional info
+            $managerInfo = null;
+            if ($hospital->healthCenterManager) {
+                $managerInfo = [
+                    'position' => $hospital->healthCenterManager->position,
+                    'office_location' => $hospital->healthCenterManager->office_location,
+                    'working_hours' => $hospital->healthCenterManager->working_hours,
+                ];
+            }
+            
+            // Convert to array and add statistics and manager info
+            $hospitalData = $hospital->toArray();
+            $hospitalData['stats'] = $stats;
+            $hospitalData['manager_additional_info'] = $managerInfo;
+            
             return response()->json([
-                'hospital' => $hospital
+                'hospital' => $hospitalData
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
@@ -84,6 +113,12 @@ class HospitalController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
             'phone_nb' => 'required|string',
             'email' => 'required|email',
+            'image' => 'nullable|string',
+            'description' => 'nullable|string',
+            'services' => 'nullable|array',
+            'hours' => 'nullable|string|max:255',
+            'established' => 'nullable|string|max:255',
+            'urgent_needs' => 'nullable|array',
         
             'manager' => 'required|array',
             'manager.first_name' => 'required|string|max:255',
@@ -115,6 +150,12 @@ class HospitalController extends Controller
                     'longitude' => $validated['longitude'] ?? null,
                     'phone_nb' => $validated['phone_nb'],
                     'email' => $validated['email'],
+                    'image' => $validated['image'] ?? null,
+                    'description' => $validated['description'] ?? null,
+                    'services' => $validated['services'] ?? null,
+                    'hours' => $validated['hours'] ?? null,
+                    'established' => $validated['established'] ?? null,
+                    'urgent_needs' => $validated['urgent_needs'] ?? null,
                 ]);
         
                 //Create User 
@@ -173,6 +214,12 @@ class HospitalController extends Controller
                 'phone_nb' => 'sometimes|string|max:30',
                 'email' => 'sometimes|email',
                 'status' => 'sometimes|in:verified,unverified',
+                'image' => 'nullable|string',
+                'description' => 'nullable|string',
+                'services' => 'nullable|array',
+                'hours' => 'nullable|string|max:255',
+                'established' => 'nullable|string|max:255',
+                'urgent_needs' => 'nullable|array',
             ]);
 
             $hospital->update($validated);

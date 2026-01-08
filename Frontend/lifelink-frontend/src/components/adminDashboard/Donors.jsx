@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { IoPerson } from "react-icons/io5";
-import axios from "axios"
+import api from "../../api/axios"
 
 import DonorTable from "./donorComponents/DonorTable"
 import AddDonorForm from "./donorComponents/AddDonorForm";
@@ -14,9 +14,7 @@ export default function Donors(){
     // Function to fetch donors
     const fetchDonors = () => {
         setLoading(true);
-        axios.get(
-            "http://localhost:8000/api/admin/dashboard/get-donors"
-        )
+        api.get("/api/admin/dashboard/get-donors")
         .then(res => {
             setDonors(res.data.donors);
         })

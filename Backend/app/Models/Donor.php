@@ -11,6 +11,7 @@ use App\Models\HospitalAppointment;
 use App\Models\HomeAppointment;
 use App\Models\BloodType;
 use App\Models\User;
+use App\Models\XpTransaction;
 
 class Donor extends Model
 {
@@ -26,7 +27,11 @@ class Donor extends Model
         'gender',
         'medical_conditions',
         'status',
-        'code'
+        'code',
+        'address',
+        'weight',
+        'emergency_contact_name',
+        'emergency_contact_phone',
     ];
 
     protected $casts = [
@@ -55,5 +60,7 @@ class Donor extends Model
         return $this->belongsTo(BloodType::class, 'blood_type_id');
     }
 
-
+    public function xpTransactions(){
+        return $this->hasMany(XpTransaction::class, 'donor_id');
+    }
 }

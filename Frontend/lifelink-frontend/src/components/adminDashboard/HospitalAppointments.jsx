@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { FaHospital } from "react-icons/fa";
-import axios from 'axios'
+import api from "../../api/axios";
 
 import HospitalAppointmentTable from "./hospitalAppointmentComponents/HospitalAppointmentTable"
 import HospitalAppTable from "./hospitalAppointmentComponents/HospitalAppTable"
@@ -32,7 +32,7 @@ export default function HospitalAppointments(){
         setError("");
         
         // Fetch hospitals
-        axios.get('http://localhost:8000/api/admin/dashboard/get-hospitals')
+        api.get('/api/admin/dashboard/get-hospitals')
             .then((res) => {
                 const hospitalsData = res.data.hospitals || res.data || [];
                 setHospitals(Array.isArray(hospitalsData) ? hospitalsData : []);
@@ -42,7 +42,7 @@ export default function HospitalAppointments(){
             });
 
         // Fetch hospital appointments
-        axios.get('http://localhost:8000/api/admin/dashboard/hospital-appointments')
+        api.get('/api/admin/dashboard/hospital-appointments')
             .then((res) => {
                 const appointmentsData = res.data.appointments || res.data || [];
                 setAppointmentData(Array.isArray(appointmentsData) ? appointmentsData : []);
@@ -53,7 +53,7 @@ export default function HospitalAppointments(){
             });
 
         // Fetch hospital visit appointments (slots)
-        axios.get('http://localhost:8000/api/admin/dashboard/hospital-visit-appointments')
+        api.get('/api/admin/dashboard/hospital-visit-appointments')
             .then((res) => {
                 const slotsData = res.data.appointments || res.data || [];
                 setHospitalAppointmentSlots(Array.isArray(slotsData) ? slotsData : []);

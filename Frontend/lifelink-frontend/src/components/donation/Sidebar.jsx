@@ -25,7 +25,7 @@ export default function Sidebar() {
 
     <div className="sidebar pl-3 pr-3">
       <div className="top">
-        <img src={lifelinklogo} alt="life link logo" />
+        <img src={lifelinklogo} alt="life link logo" className="!m-0" />
         <h1>Donation Center</h1>
         <p>Choose your donation type</p>
       </div>

@@ -5,7 +5,7 @@ import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import EditDonorForm from "./EditDonorForm";
 
 export default function DonorTable({ donors = [], loading = false, error = "", onDonorsUpdate }){
@@ -18,11 +18,16 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
     const [deleteConfirm, setDeleteConfirm] = useState(null); // { donorCode, donorName }
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [deleteError, setDeleteError] = useState("");
+    const [selectedDonors, setSelectedDonors] = useState(new Set()); // Set of donor IDs
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+    const [bulkDeleteError, setBulkDeleteError] = useState("");
 
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(()=>{
         setCurrentPage(1);
+        // Clear selections when filters change
+        setSelectedDonors(new Set());
     }, [searchTerm, donorState, bloodType])
 
     // Blood type mapping (ID to string)
@@ -140,25 +145,27 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
         setDeleteError("");
     };
 
-    // Handle delete confirmation
+    // Handle delete confirmation (single donor)
     const handleDeleteConfirm = async () => {
-        if (!deleteConfirm) return;
+        if (!deleteConfirm || deleteConfirm.isBulk) return;
 
         setDeleteLoading(true);
         setDeleteError("");
 
         try {
-            await axios.delete(
-                `http://localhost:8000/api/admin/dashboard/donors/${deleteConfirm.donorCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            // Get CSRF cookie first
+            await api.get("/sanctum/csrf-cookie");
+            
+            // Then delete the donor
+            await api.delete(`/api/admin/dashboard/donors/${deleteConfirm.donorCode}`);
 
             setDeleteConfirm(null);
+            // Remove from selected donors if it was selected
+            setSelectedDonors(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(deleteConfirm.donorCode);
+                return newSet;
+            });
             if (onDonorsUpdate) {
                 onDonorsUpdate();
             }
@@ -189,6 +196,81 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
         }
     };
 
+    // Handle individual checkbox change
+    const handleCheckboxChange = (donorId, isChecked) => {
+        setSelectedDonors(prev => {
+            const newSet = new Set(prev);
+            if (isChecked) {
+                newSet.add(donorId);
+            } else {
+                newSet.delete(donorId);
+            }
+            return newSet;
+        });
+    };
+
+    // Handle select all checkbox
+    const handleSelectAll = (isChecked) => {
+        if (isChecked) {
+            const allDonorIds = new Set(currentDonor.map(d => d.id));
+            setSelectedDonors(allDonorIds);
+        } else {
+            setSelectedDonors(new Set());
+        }
+    };
+
+    // Check if all current page donors are selected
+    const isAllSelected = currentDonor.length > 0 && currentDonor.every(d => selectedDonors.has(d.id));
+
+    // Handle bulk delete
+    const handleBulkDelete = () => {
+        if (selectedDonors.size === 0) return;
+        
+        // Get names of all selected donors (from all pages, not just current page)
+        const selectedDonorNames = transformedDonors
+            .filter(d => selectedDonors.has(d.id))
+            .map(d => d.name)
+            .join(", ");
+        
+        setDeleteConfirm({
+            donorCodes: Array.from(selectedDonors),
+            donorNames: selectedDonorNames,
+            isBulk: true
+        });
+        setBulkDeleteError("");
+    };
+
+    // Handle bulk delete confirmation
+    const handleBulkDeleteConfirm = async () => {
+        if (!deleteConfirm || !deleteConfirm.isBulk || !deleteConfirm.donorCodes) return;
+
+        setBulkDeleteLoading(true);
+        setBulkDeleteError("");
+
+        try {
+            // Get CSRF cookie first
+            await api.get("/sanctum/csrf-cookie");
+            
+            // Delete all selected donors
+            const deletePromises = deleteConfirm.donorCodes.map(donorCode =>
+                api.delete(`/api/admin/dashboard/donors/${donorCode}`)
+            );
+
+            await Promise.all(deletePromises);
+
+            setDeleteConfirm(null);
+            setSelectedDonors(new Set());
+            if (onDonorsUpdate) {
+                onDonorsUpdate();
+            }
+        } catch (error) {
+            console.error('Error deleting donors:', error);
+            setBulkDeleteError(error.response?.data?.message || error.message || "Failed to delete some donors");
+        } finally {
+            setBulkDeleteLoading(false);
+        }
+    };
+
     return(
         <section className="hospital-table-section">
             <div className="control-panel control-panel-layout">
@@ -201,35 +283,75 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="filter-gap">
-                    <div className="filters">
-                        <select
-                            value = { bloodType } 
-                            onChange = { (e) => setBloodType (e.target.value) }
+                {selectedDonors.size > 0 ? (
+                    <div className="filter-gap" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ color: "#767676", fontSize: "14px" }}>
+                            {selectedDonors.size} donor{selectedDonors.size !== 1 ? 's' : ''} selected
+                        </span>
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={bulkDeleteLoading}
+                            style={{
+                                background: "linear-gradient(to right, #FF585D, #CA2529)",
+                                color: "white",
+                                border: "none",
+                                padding: "8px 16px",
+                                borderRadius: "5px",
+                                cursor: bulkDeleteLoading ? "not-allowed" : "pointer",
+                                fontSize: "14px",
+                                fontWeight: "500",
+                                opacity: bulkDeleteLoading ? 0.6 : 1
+                            }}
                         >
-                            <option value = "all-blood" >All blood types</option>
-                            <option value = "AB+" >AB+</option>
-                            <option value = "A+" >A+</option>
-                            <option value = "B+" >B+</option>
-                            <option value = "O+" >O+</option>
-                            <option value = "O-" >O-</option>
-                            <option value = "B-" >B-</option>
-                            <option value = "A-" >A-</option>
-                            <option value = "AB-" >AB-</option>
-                        </select>
-                    </div>
-                    <div className="filters">
-                        <select 
-                            value = { donorState } 
-                            onChange = { (e) => setDonorState (e.target.value) }
+                            {bulkDeleteLoading ? "Deleting..." : "Delete Selected"}
+                        </button>
+                        <button
+                            onClick={() => setSelectedDonors(new Set())}
+                            disabled={bulkDeleteLoading}
+                            style={{
+                                background: "transparent",
+                                color: "#767676",
+                                border: "1px solid #D9D9D9",
+                                padding: "8px 16px",
+                                borderRadius: "5px",
+                                cursor: bulkDeleteLoading ? "not-allowed" : "pointer",
+                                fontSize: "14px"
+                            }}
                         >
-                            <option value = "all-states" >All states</option>
-                            <option value = "active" >Active</option>
-                            <option value = "inactive" >Inactive</option>
-                            <option value = "blocked" >Blocked</option>
-                        </select>
+                            Clear Selection
+                        </button>
                     </div>
-                </div>
+                ) : (
+                    <div className="filter-gap">
+                        <div className="filters">
+                            <select
+                                value = { bloodType } 
+                                onChange = { (e) => setBloodType (e.target.value) }
+                            >
+                                <option value = "all-blood" >All blood types</option>
+                                <option value = "AB+" >AB+</option>
+                                <option value = "A+" >A+</option>
+                                <option value = "B+" >B+</option>
+                                <option value = "O+" >O+</option>
+                                <option value = "O-" >O-</option>
+                                <option value = "B-" >B-</option>
+                                <option value = "A-" >A-</option>
+                                <option value = "AB-" >AB-</option>
+                            </select>
+                        </div>
+                        <div className="filters">
+                            <select 
+                                value = { donorState } 
+                                onChange = { (e) => setDonorState (e.target.value) }
+                            >
+                                <option value = "all-states" >All states</option>
+                                <option value = "active" >Active</option>
+                                <option value = "inactive" >Inactive</option>
+                                <option value = "blocked" >Blocked</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Loading State */}
@@ -254,7 +376,13 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                     <thead>
                         <tr>
                             <th className="col-select">
-                                <input className="ml-3" type="checkbox" aria-label="select all"/>
+                                <input 
+                                    className="ml-3" 
+                                    type="checkbox" 
+                                    aria-label="select all"
+                                    checked={isAllSelected}
+                                    onChange={(e) => handleSelectAll(e.target.checked)}
+                                />
                             </th>
                             <th className="text-left col-donor">Donor</th>
                             <th className="col-blood">Blood Type</th>
@@ -272,7 +400,13 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                         {currentDonor.length > 0 ? currentDonor.map ((d, index) => (
                             <tr key={`${d.id}-${startIndex + index}`}>
                                 <td className="col-select">
-                                    <input className="ml-3" type="checkbox" aria-label={`select ${donorState.name}`}/>
+                                    <input 
+                                        className="ml-3" 
+                                        type="checkbox" 
+                                        aria-label={`select ${d.name}`}
+                                        checked={selectedDonors.has(d.id)}
+                                        onChange={(e) => handleCheckboxChange(d.id, e.target.checked)}
+                                    />
                                 </td>
                                 <td className="col-donor">
                                     <div className="cell-title">
@@ -343,7 +477,7 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan="10" style={{ textAlign: 'center', padding: '40px' }}>
+                                <td colSpan="11" style={{ textAlign: 'center', padding: '40px' }}>
                                     <p>No donors found</p>
                                 </td>
                             </tr>
@@ -403,48 +537,94 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                 <div className="modal-overlay modal-overlay-delete">
                     <div className="modal-container modal-container-delete">
                         <div className="modal-title">
-                            <h2>Delete Donor</h2>
-                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
+                            <h2>{deleteConfirm.isBulk ? "Delete Selected Donors" : "Delete Donor"}</h2>
+                            <button onClick={deleteConfirm.isBulk ? () => { setDeleteConfirm(null); setBulkDeleteError(""); } : handleDeleteCancel} disabled={deleteConfirm.isBulk ? bulkDeleteLoading : deleteLoading}>
                                 <IoClose />
                             </button>
                         </div>
                         <div className="modal-form">
-                            <p>Are you sure you want to delete <strong>{deleteConfirm.donorName}</strong>?</p>
-                            <p className="modal-text-secondary">
-                                This action cannot be undone. If the donor has active appointments, deletion will be prevented.
-                            </p>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteCancel}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
+                            {deleteConfirm.isBulk ? (
+                                <>
+                                    <p>Are you sure you want to delete <strong>{deleteConfirm.donorCodes.length} donor{deleteConfirm.donorCodes.length !== 1 ? 's' : ''}</strong>?</p>
+                                    <p className="modal-text-secondary">
+                                        This will delete: <strong>{deleteConfirm.donorNames}</strong>
+                                    </p>
+                                    <p className="modal-text-secondary">
+                                        This action cannot be undone. If any donor has active appointments, deletion will be prevented.
+                                    </p>
+                                    
+                                    {bulkDeleteError && (
+                                        <div className="error-message modal-error-container">
+                                            {bulkDeleteError}
+                                        </div>
                                     )}
-                                </button>
-                            </div>
+
+                                    <div className="form-actions form-actions-modal">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => { setDeleteConfirm(null); setBulkDeleteError(""); }}
+                                            disabled={bulkDeleteLoading}
+                                            className="btn-cancel"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={handleBulkDeleteConfirm}
+                                            disabled={bulkDeleteLoading}
+                                            className="submit-btn btn-delete-submit"
+                                        >
+                                            {bulkDeleteLoading ? (
+                                                <>
+                                                    <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                                    Deleting...
+                                                </>
+                                            ) : (
+                                                'Delete All'
+                                            )}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <p>Are you sure you want to delete <strong>{deleteConfirm.donorName}</strong>?</p>
+                                    <p className="modal-text-secondary">
+                                        This action cannot be undone. If the donor has active appointments, deletion will be prevented.
+                                    </p>
+                                    
+                                    {deleteError && (
+                                        <div className="error-message modal-error-container">
+                                            {deleteError}
+                                        </div>
+                                    )}
+
+                                    <div className="form-actions form-actions-modal">
+                                        <button 
+                                            type="button" 
+                                            onClick={handleDeleteCancel}
+                                            disabled={deleteLoading}
+                                            className="btn-cancel"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={handleDeleteConfirm}
+                                            disabled={deleteLoading}
+                                            className="submit-btn btn-delete-submit"
+                                        >
+                                            {deleteLoading ? (
+                                                <>
+                                                    <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
+                                                    Deleting...
+                                                </>
+                                            ) : (
+                                                'Delete'
+                                            )}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

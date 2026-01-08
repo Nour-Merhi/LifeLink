@@ -15,6 +15,12 @@ class DatabaseSeeder extends Seeder
     {
         // Seed blood types first (required for donors)
         $this->call(BloodTypeSeeder::class);
+        
+        // Create master admin user
+        $this->call(AdminUserSeeder::class);
+
+        // Seed articles
+        $this->call(ArticleSeeder::class);
 
         // User::factory(10)->create();
 

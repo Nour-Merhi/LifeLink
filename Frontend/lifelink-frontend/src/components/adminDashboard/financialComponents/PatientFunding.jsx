@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react"
 import AddPatientCaseForm from "./AddPatientCaseForm"
+import ViewPatientCaseModal from "./ViewPatientCaseModal"
+import EditPatientCaseModal from "./EditPatientCaseModal"
 
 import { IoSearchSharp } from "react-icons/io5";
 import { IoPersonCircle } from "react-icons/io5";
@@ -10,13 +12,16 @@ import { FiEdit3 } from "react-icons/fi";
 
 
 
-export default function PatientFunding({ patientCases }){
+export default function PatientFunding({ patientCases, onPatientCaseUpdated }){
     const [searchTerm, setSearchTerm] = useState("");
     const [patientState, setPatientState] = useState("all-states");
     const [caseSeverity, setCaseSeverity] = useState("all-severity");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(9);
     const [openModal, setOpenModal] = useState(false)
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [selectedPatientCaseId, setSelectedPatientCaseId] = useState(null);
 
     const onClose = () => {
         setOpenModal(false)
@@ -177,8 +182,24 @@ export default function PatientFunding({ patientCases }){
                             </div>
 
                             <div className="case-buttons">
-                                <button className="blue-btn" >View Details</button>
-                                <button className="filters edit-case-btn" ><FiEdit3 />Edit</button>
+                                <button 
+                                    className="blue-btn"
+                                    onClick={() => {
+                                        setSelectedPatientCaseId(p.id);
+                                        setViewModalOpen(true);
+                                    }}
+                                >
+                                    View Details
+                                </button>
+                                <button 
+                                    className="filters edit-case-btn"
+                                    onClick={() => {
+                                        setSelectedPatientCaseId(p.id);
+                                        setEditModalOpen(true);
+                                    }}
+                                >
+                                    <FiEdit3 />Edit
+                                </button>
                             </div>
                         </div>
                     )
@@ -222,9 +243,29 @@ export default function PatientFunding({ patientCases }){
             )}
 
             {openModal && 
-                <AddPatientCaseForm onClose = { onClose } />
+                <AddPatientCaseForm onClose = { onClose } onPatientCaseAdded={onPatientCaseUpdated} />
             }
 
+            {viewModalOpen && (
+                <ViewPatientCaseModal 
+                    onClose={() => {
+                        setViewModalOpen(false);
+                        setSelectedPatientCaseId(null);
+                    }}
+                    patientCaseId={selectedPatientCaseId}
+                />
+            )}
+
+            {editModalOpen && (
+                <EditPatientCaseModal 
+                    onClose={() => {
+                        setEditModalOpen(false);
+                        setSelectedPatientCaseId(null);
+                    }}
+                    onPatientCaseUpdated={onPatientCaseUpdated}
+                    patientCaseId={selectedPatientCaseId}
+                />
+            )}
 
         </section>
     );

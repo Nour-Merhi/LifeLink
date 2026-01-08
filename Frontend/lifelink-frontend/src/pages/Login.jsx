@@ -36,7 +36,18 @@ const Login = () => {
 
       // Login successful - trigger window event to refresh navbar
       window.dispatchEvent(new Event('auth-change'));
-      navigate("/home");
+      
+      // Redirect based on user role
+      const userRole = response.data?.user?.role?.toLowerCase();
+      if (userRole === 'admin') {
+        navigate("/admin/dashboard");
+      } else if (userRole === 'phlebotomist') {
+        navigate("/nurse/home");
+      } else if (userRole === 'donor') {
+        navigate("/home");
+      } else {
+        navigate("/home");
+      }
     } catch (err) {
       console.error('Login error:', err);
       console.error('Error response:', err.response);

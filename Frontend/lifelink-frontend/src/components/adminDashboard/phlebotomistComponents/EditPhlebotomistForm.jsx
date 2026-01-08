@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -62,14 +62,8 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
 
         setFetchLoading(true);
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/phlebotomists/${phlebotomistCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/phlebotomists/${phlebotomistCode}`
             );
             
             const phleb = response.data.phlebotomist || response.data;
@@ -150,15 +144,10 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
         setErrors({});
 
         try {
-            await axios.put(
-                `http://localhost:8000/api/admin/dashboard/phlebotomists/${phlebotomistCode}`,
-                changedFields,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            await api.get("/sanctum/csrf-cookie");
+            await api.put(
+                `/api/admin/dashboard/phlebotomists/${phlebotomistCode}`,
+                changedFields
             );
 
             if (onPhlebotomistUpdated) {

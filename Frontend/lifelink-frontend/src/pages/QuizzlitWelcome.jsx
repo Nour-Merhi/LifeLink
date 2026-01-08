@@ -1,8 +1,8 @@
 import Navbar from "../components/Navbar";
-import HeroSection from "./Quizzlit/HeroSection";
-import AboutSection from "./Quizzlit/AboutSection";
-import QuizSteps from "./Quizzlit/QuizSteps";
-import TopPlayers from "./Quizzlit/TopPlayers";
+import HeroSection from "../components/Quizzlit/HeroSection";
+import AboutSection from "../components/Quizzlit/AboutSection";
+import QuizSteps from "../components/Quizzlit/QuizSteps";
+import TopPlayers from "../components/Quizzlit/TopPlayers";
 import Footer from "../components/Footer";
 
 export default function QuizzlitWelcome() {

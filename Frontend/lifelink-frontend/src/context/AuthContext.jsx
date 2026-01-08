@@ -7,23 +7,25 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data } = await api.get("/api/user");
-        setUser(data?.id ? data : null);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchUser = async () => {
+    try {
+      const { data } = await api.get("/api/user");
+      setUser(data?.id ? data : null);
+      return data;
+    } catch {
+      setUser(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    checkAuth();
+  useEffect(() => {
+    fetchUser();
 
     // Listen for auth changes (triggered after login/register)
     const handleAuthChange = () => {
-      checkAuth();
+      fetchUser();
     };
 
     window.addEventListener("auth-change", handleAuthChange);
@@ -34,7 +36,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser }}>
+    <AuthContext.Provider value={{ user, loading, setUser, fetchUser }}>
       {children}
     </AuthContext.Provider>
   );

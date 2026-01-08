@@ -1,54 +1,55 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { IoArrowBack } from "react-icons/io5";
+import { IoArrowBack, IoTimeOutline } from "react-icons/io5";
 import { FaTint } from "react-icons/fa";
 import { MdOutlineLocationOn } from "react-icons/md";
 import { LuPhone } from "react-icons/lu";
 import { MdOutlineMail } from "react-icons/md";
 import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import RasoolImage from "../assets/imgs/HospitalsImage/Rasoul-Aazam-Hospital.png";
+import { useHospitals } from "../context/HospitalsContext";
+import MapIntegration from "../components/MapIntegration";
 import "../components/home/RegisteredHospitals.css";
+
+import api from "../api/axios";
+
+const API_BASE_URL = "http://localhost:8000";
 
 export default function HospitalDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { hospitals, getHospitalById } = useHospitals();
     const [hospital, setHospital] = useState(null);
     const [loading, setLoading] = useState(true);
-
-    // Sample hospitals data - in production, this would come from an API
-    const hospitalsData = [
-        {
-            id: 1,
-            name: "Rasoul Aazam Hospital",
-            image: RasoolImage,
-            address: "airport street, main road",
-            phone: "+961 1455456",
-            email: "alrasol.alaazam@hospital.org.lb",
-            bloodTypesNeeded: ["A+", "B+", "O+"],
-            urgentNeeds: ["AB-ve", "B+ve"],
-            description: "Rasoul Aazam Hospital is a leading healthcare institution dedicated to providing exceptional medical care and serving our community through comprehensive blood donation and organ transplant programs. We are committed to saving lives and improving health outcomes for all patients.",
-            services: [
-                "Blood Donation Center",
-                "Organ Transplant Services",
-                "Emergency Care",
-                "Surgery Department",
-                "Intensive Care Unit"
-            ],
-            hours: "Mon-Fri: 8AM-8PM",
-            established: "1985"
-        },
-        // Add more hospitals with full details as needed
-    ];
+    const [error, setError] = useState("");
 
     useEffect(() => {
-        // Simulate API call - in production, fetch from backend
-        const foundHospital = hospitalsData.find(h => h.id === parseInt(id));
-        if (foundHospital) {
-            setHospital(foundHospital);
+        const fetchHospital = async () => {
+            try {
+                setLoading(true);
+                setError("");
+                
+                // First try to get from context (shared hospitals)
+                let hospitalData = getHospitalById(id);
+                
+                // If not in context, fetch from API
+                if (!hospitalData) {
+                    const response = await api.get(`/api/hospital/${id}`);
+                    hospitalData = response.data.hospital || response.data;
+                }
+                
+                setHospital(hospitalData);
+            } catch (err) {
+                console.error('Error fetching hospital:', err);
+                setError(err.response?.data?.message || 'Failed to load hospital');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) {
+            fetchHospital();
         }
-        setLoading(false);
-    }, [id]);
+    }, [id, hospitals, getHospitalById]);
 
     const handleDonateBlood = () => {
         navigate(`/donation/hospital-blood-donation`);
@@ -59,7 +60,7 @@ export default function HospitalDetail() {
             <>
                 <section className="partner-hospitals-page">
                     <Navbar />
-                    <div className="hospital-detail-loading">
+                    <div className="hospital-detail-loading" style={{ padding: '4rem', textAlign: 'center', color: '#999' }}>
                         <p>Loading hospital information...</p>
                     </div>
                 </section>
@@ -67,15 +68,23 @@ export default function HospitalDetail() {
         );
     }
 
-    if (!hospital) {
+    if (error || !hospital) {
         return (
             <>
                 <section className="partner-hospitals-page">
                     <Navbar />
-                    <div className="hospital-detail-error">
+                    <div className="hospital-detail-error" style={{ padding: '4rem', textAlign: 'center' }}>
                         <h2>Hospital Not Found</h2>
-                        <p>The hospital you're looking for doesn't exist.</p>
-                        <button onClick={() => navigate('/hospitals')} className="back-to-hospitals-btn">
+                        <p>{error || "The hospital you're looking for doesn't exist."}</p>
+                        <button onClick={() => navigate('/hospitals')} className="back-to-hospitals-btn" style={{
+                            marginTop: '1rem',
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: '#F12C31',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer'
+                        }}>
                             Back to Hospitals
                         </button>
                     </div>
@@ -83,6 +92,24 @@ export default function HospitalDetail() {
             </>
         );
     }
+
+    const getImageSrc = () => {
+        if (!hospital?.image) return null;
+        // Handle base64 images
+        if (hospital.image.startsWith('data:image')) {
+            return hospital.image;
+        }
+        // Handle full URLs
+        if (hospital.image.startsWith('http://') || hospital.image.startsWith('https://')) {
+            return hospital.image;
+        }
+        // Handle relative paths
+        return `${API_BASE_URL}/${hospital.image}`;
+    };
+
+    const imageSrc = getImageSrc();
+    const services = Array.isArray(hospital.services) ? hospital.services : [];
+    const urgentNeeds = Array.isArray(hospital.urgent_needs) ? hospital.urgent_needs : [];
 
     return (
         <>
@@ -98,69 +125,112 @@ export default function HospitalDetail() {
                     {/* Hospital Header */}
                     <div className="hospital-detail-header">
                         <h1 className="hospital-detail-title">{hospital.name}</h1>
-                        <p className="hospital-detail-subtitle">{hospital.description}</p>
+                        {hospital.description && (
+                            <p className="hospital-detail-subtitle">{hospital.description}</p>
+                        )}
                     </div>
 
                     {/* Hospital Image */}
-                    <div className="hospital-detail-image-container">
-                        <img
-                            src={hospital.image}
-                            alt={hospital.name}
-                            className="hospital-detail-image"
-                            onError={(e) => {
-                                e.target.src = '/placeholder-hospital.jpg';
-                            }}
-                        />
-                    </div>
+                    {imageSrc ? (
+                        <div className="hospital-detail-image-container">
+                            <img
+                                src={imageSrc}
+                                alt={hospital.name}
+                                className="hospital-detail-image"
+                                onError={(e) => {
+                                    console.error('Image failed to load:', imageSrc);
+                                    e.target.src = '/image.png';
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <div className="hospital-detail-image-container">
+                            <div style={{
+                                width: '100%',
+                                height: '400px',
+                                backgroundColor: '#2a2a2a',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '12px',
+                                color: '#999'
+                            }}>
+                                No image available
+                            </div>
+                        </div>
+                    )}
 
                     {/* Hospital Information Grid */}
                     <div className="hospital-detail-grid">
-                        {/* Contact Information */}
-                        <div className="hospital-detail-section">
-                            <h2 className="hospital-detail-section-title">Contact Information</h2>
-                            <div className="hospital-detail-contact-list">
-                                <div className="hospital-detail-contact-item">
-                                    <MdOutlineLocationOn className="hospital-detail-contact-icon" />
-                                    <div>
-                                        <strong>Address</strong>
-                                        <p>{hospital.address}</p>
+                        {/* Contact Information and Location Map Side by Side */}
+                        <div className="hospital-detail-contact-map-wrapper">
+                            {/* Contact Information */}
+                            <div className="hospital-detail-section">
+                                <h2 className="hospital-detail-section-title">Contact Information</h2>
+                                <div className="hospital-detail-contact-list">
+                                    <div className="hospital-detail-contact-item">
+                                        <MdOutlineLocationOn className="hospital-detail-contact-icon" />
+                                        <div>
+                                            <strong>Address</strong>
+                                            <p>{hospital.address || 'N/A'}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="hospital-detail-contact-item">
-                                    <LuPhone className="hospital-detail-contact-icon" />
-                                    <div>
-                                        <strong>Phone</strong>
-                                        <p>{hospital.phone}</p>
+                                    <div className="hospital-detail-contact-item">
+                                        <LuPhone className="hospital-detail-contact-icon" />
+                                        <div>
+                                            <strong>Phone</strong>
+                                            <p>{hospital.phone_nb || 'N/A'}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="hospital-detail-contact-item">
-                                    <MdOutlineMail className="hospital-detail-contact-icon" />
-                                    <div>
-                                        <strong>Email</strong>
-                                        <p>{hospital.email}</p>
+                                    <div className="hospital-detail-contact-item">
+                                        <MdOutlineMail className="hospital-detail-contact-icon" />
+                                        <div>
+                                            <strong>Email</strong>
+                                            <p>{hospital.email || 'N/A'}</p>
+                                        </div>
                                     </div>
+                                    {hospital.hours && (
+                                        <div className="hospital-detail-contact-item">
+                                            <IoTimeOutline className="hospital-detail-contact-icon" />
+                                            <div>
+                                                <strong>Operating Hours</strong>
+                                                <p>{hospital.hours}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(hospital.latitude && hospital.longitude) && (
+                                        <div className="hospital-detail-contact-item">
+                                            <MdOutlineLocationOn className="hospital-detail-contact-icon" />
+                                            <div>
+                                                <strong>Coordinates</strong>
+                                                <p>Lat: {parseFloat(hospital.latitude).toFixed(6)}, Lng: {parseFloat(hospital.longitude).toFixed(6)}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Blood Types Needed */}
-                        <div className="hospital-detail-section">
-                            <h2 className="hospital-detail-section-title">Blood Types Needed</h2>
-                            <div className="hospital-detail-blood-types">
-                                {hospital.bloodTypesNeeded.map((bloodType, index) => (
-                                    <div key={index} className="hospital-detail-blood-type-badge">
-                                        {bloodType}
+                            {/* Location Map */}
+                            {hospital.latitude && hospital.longitude && (
+                                <div className="hospital-detail-section hospital-detail-map-section">
+                                    <h2 className="hospital-detail-section-title">Location</h2>
+                                    <div className="hospital-detail-map-container">
+                                        <MapIntegration
+                                            latitude={parseFloat(hospital.latitude)}
+                                            longitude={parseFloat(hospital.longitude)}
+                                            height="300px"
+                                        />
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Urgent Needs */}
-                        {hospital.urgentNeeds && hospital.urgentNeeds.length > 0 && (
+                        {urgentNeeds.length > 0 && (
                             <div className="hospital-detail-section">
                                 <h2 className="hospital-detail-section-title">Urgent Needs</h2>
                                 <div className="hospital-detail-urgent-needs">
-                                    {hospital.urgentNeeds.map((bloodType, index) => (
+                                    {urgentNeeds.map((bloodType, index) => (
                                         <button key={index} className="hospital-detail-urgent-button animate-pulse">
                                             {bloodType}
                                         </button>
@@ -169,31 +239,38 @@ export default function HospitalDetail() {
                             </div>
                         )}
 
-                        {/* Additional Information */}
-                        <div className="hospital-detail-section">
-                            <h2 className="hospital-detail-section-title">Hospital Information</h2>
-                            <div className="hospital-detail-info-list">
-                                {hospital.hours && (
-                                    <div className="hospital-detail-info-item">
-                                        <strong>Operating Hours:</strong>
-                                        <span>{hospital.hours}</span>
-                                    </div>
-                                )}
-                                {hospital.established && (
-                                    <div className="hospital-detail-info-item">
-                                        <strong>Established:</strong>
-                                        <span>{hospital.established}</span>
-                                    </div>
-                                )}
+                        {/* Hospital Information */}
+                        {(hospital.established || hospital.code || hospital.status) && (
+                            <div className="hospital-detail-section">
+                                <h2 className="hospital-detail-section-title">Hospital Information</h2>
+                                <div className="hospital-detail-info-list">
+                                    {hospital.established && (
+                                        <div className="hospital-detail-info-item">
+                                            <strong>Established:</strong>
+                                            <span>{hospital.established}</span>
+                                        </div>
+                                    )}
+                                    {hospital.status && (
+                                        <div className="hospital-detail-info-item">
+                                            <strong>Status:</strong>
+                                            <span style={{
+                                                color: hospital.status === 'verified' ? '#16a34a' : '#dc2626',
+                                                fontWeight: '600'
+                                            }}>
+                                                {hospital.status === 'verified' ? 'Verified' : 'Unverified'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Services */}
-                        {hospital.services && hospital.services.length > 0 && (
+                        {services.length > 0 && (
                             <div className="hospital-detail-section hospital-detail-section-full">
                                 <h2 className="hospital-detail-section-title">Services Offered</h2>
                                 <ul className="hospital-detail-services-list">
-                                    {hospital.services.map((service, index) => (
+                                    {services.map((service, index) => (
                                         <li key={index}>{service}</li>
                                     ))}
                                 </ul>
@@ -213,7 +290,6 @@ export default function HospitalDetail() {
                     </div>
                 </div>
             </section>
-            <Footer />
         </>
     );
 }

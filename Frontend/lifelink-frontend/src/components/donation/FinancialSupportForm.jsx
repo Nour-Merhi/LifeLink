@@ -15,9 +15,12 @@ import { BiSolidBadgeDollar } from "react-icons/bi";
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom";
+import api from "../../api/axios";
 
-export default function FinancialSupportForm({ setModal }){
+export default function FinancialSupportForm({ setModal, selectedPatientCaseId, selectedPatientName }){
     const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
     const [formData, setFormData] = useState({
         name: "",
@@ -27,9 +30,22 @@ export default function FinancialSupportForm({ setModal }){
         donation_type: "",
         donation_amount: 0.00,
         recipient_chosen: "",
+        patient_case_id: null,
         payment_method: "",
         preference: "",
     })
+
+    // Auto-select specific patient when a patient is selected from slider
+    useEffect(() => {
+        if (selectedPatientCaseId && selectedPatientName) {
+            setFormData(prev => ({
+                ...prev,
+                recipient_chosen: "specific patient",
+                patient_case_id: selectedPatientCaseId
+            }));
+        }
+        // Don't reset to general when no patient selected - let user's manual choice stand
+    }, [selectedPatientCaseId, selectedPatientName]);
 
     const handleChange = (e) => {
         const {name, value} = e.target 
@@ -40,22 +56,36 @@ export default function FinancialSupportForm({ setModal }){
         e.preventDefault(); 
 
         if (!formData.donation_type || !formData.donation_amount || !formData.payment_method) {
-            alert("Please choose a donation type, amount and payment method.");
+            setError("Please choose a donation type, amount and payment method.");
             return;
         }
 
+        if (formData.donation_amount <= 0) {
+            setError("Please enter a valid donation amount greater than 0.");
+            return;
+        }
+
+        setLoading(true);
+        setError("");
+
         try {
-            const response = await fetch("https://68c876995d8d9f5147357051.mockapi.io/api/donations/financial_support",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
-            }
-            );
+            // Get CSRF cookie first
+            await api.get("/sanctum/csrf-cookie");
 
-            const result = await response.json();
-            console.log("Saved:", result);
+            const response = await api.post("/api/financial-donations", {
+                name: formData.name || null,
+                phone: formData.phone || null,
+                email: formData.email || null,
+                address: formData.address || null,
+                donation_type: formData.donation_type,
+                donation_amount: parseFloat(formData.donation_amount) || 0,
+                recipient_chosen: formData.recipient_chosen || 'general patient',
+                patient_case_id: formData.patient_case_id || null,
+                payment_method: formData.payment_method,
+                preference: formData.preference || null,
+            });
 
+            // Reset form
             setFormData ({
                 name: "",
                 phone: "",
@@ -63,7 +93,8 @@ export default function FinancialSupportForm({ setModal }){
                 address: "",
                 donation_type: "",
                 donation_amount: 0.0,
-                recipient_chosen: "",
+                recipient_chosen: selectedPatientCaseId ? "specific patient" : "general patient",
+                patient_case_id: selectedPatientCaseId || null,
                 payment_method: "",
                 preference: "",
             })
@@ -71,24 +102,20 @@ export default function FinancialSupportForm({ setModal }){
             setModal(true)
 
         } catch (err) {
-            console.error(err);
+            console.error("Error submitting donation:", err);
+            
+            // Handle validation errors
+            if (err.response?.data?.errors) {
+                const validationErrors = Object.values(err.response.data.errors).flat();
+                setError(validationErrors.join(", "));
+            } else {
+                const errorMessage = err.response?.data?.message || "Failed to submit donation. Please try again.";
+                setError(errorMessage);
+            }
+        } finally {
+            setLoading(false);
         }
     };
-
-    useEffect(() => {
-        const fetchDonations = async () => {
-            const res = await fetch(
-            "https://68c876995d8d9f5147357051.mockapi.io/api/donations/financial_support"
-            );
-            const data = await res.json();
-            console.log("All donations:", data);
-        };
-
-        fetchDonations();
-    }, []);
-
-
-    console.log(formData);
 
     return (
         <>
@@ -210,7 +237,7 @@ export default function FinancialSupportForm({ setModal }){
                                 <div className="rec-chose">
                                     <button 
                                         type="button"
-                                        onClick={ ()=> setFormData (prev => ({...prev, recipient_chosen: "general patient"})) } 
+                                        onClick={ ()=> setFormData (prev => ({...prev, recipient_chosen: "general patient", patient_case_id: null})) } 
                                     >
                                         <div 
                                             className={`rec-type ${formData.recipient_chosen === "general patient" ? "selected-dn-btn" : ""}`}
@@ -232,7 +259,11 @@ export default function FinancialSupportForm({ setModal }){
                                             <FaUser className={`fin-icon ${formData.recipient_chosen === "specific patient" ? "white-color" : "green-color"}`}/>
                                             <div>
                                                 <h3>Specific Patient</h3>
-                                                <p>Choose a patient to support directly</p>
+                                                <p>
+                                                    {selectedPatientName 
+                                                        ? `Supporting: ${selectedPatientName}` 
+                                                        : "Choose a patient to support directly"}
+                                                </p>
                                             </div>
                                         </div>
                                     </button>
@@ -257,17 +288,7 @@ export default function FinancialSupportForm({ setModal }){
                                             <h3>Credit Card</h3>
                                         </div>
                                     </button>
-                                    <button 
-                                        type="button"
-                                        onClick={ ()=> setFormData (prev => ({...prev, payment_method: "paypal"})) } 
-                                    >
-                                        <div 
-                                            className={`pay-type ${formData.payment_method === "paypal" ? "selected-dn-btn" : ""}`}
-                                        >
-                                            <FaPaypal className={`fin-icon ${formData.payment_method === "paypal" ? "white-color" : "green-color"}`}/>
-                                            <h3>PayPal</h3>
-                                        </div>
-                                    </button>
+                                    
                                      <button 
                                         type="button"
                                         onClick={ ()=> setFormData (prev => ({...prev, payment_method: "wish"})) } 
@@ -279,7 +300,19 @@ export default function FinancialSupportForm({ setModal }){
                                                 <img src={WishIcon}  alt="wish money icon"/>
                                             </div>
                                             
-                                            <h3>Wish</h3>
+                                            <h3>Wish Money</h3>
+                                        </div>
+                                    </button>
+
+                                    <button 
+                                        type="button"
+                                        onClick={ ()=> setFormData (prev => ({...prev, payment_method: "cash"})) } 
+                                    >
+                                        <div 
+                                            className={`pay-type ${formData.payment_method === "cash" ? "selected-dn-btn" : ""}`}
+                                        >
+                                            <FaPaypal className={`fin-icon ${formData.payment_method === "cash" ? "white-color" : "green-color"}`}/>
+                                            <h3>Cash</h3>
                                         </div>
                                     </button>
                                 </div>
@@ -372,13 +405,44 @@ export default function FinancialSupportForm({ setModal }){
 
                             <div className="line"></div>
 
+                            {/* Error Message */}
+                            {error && (
+                                <div style={{ 
+                                    padding: "12px", 
+                                    backgroundColor: "#fee", 
+                                    color: "#c33", 
+                                    borderRadius: "8px", 
+                                    marginBottom: "20px",
+                                    border: "1px solid #fcc"
+                                }}>
+                                    {error}
+                                </div>
+                            )}
+
                             <div className="form-action">
                                 <button 
                                     type="submit" 
                                     className="next-step-btn organ-btn linear-green"
-                                    
+                                    disabled={loading}
                                 > 
-                                    <IoIosSend/> Donate Securely
+                                    {loading ? (
+                                        <>
+                                            <span style={{ marginRight: "8px" }}>Processing...</span>
+                                            <span className="spinner" style={{ 
+                                                display: "inline-block", 
+                                                width: "16px", 
+                                                height: "16px", 
+                                                border: "2px solid #fff", 
+                                                borderTopColor: "transparent", 
+                                                borderRadius: "50%", 
+                                                animation: "spin 0.6s linear infinite" 
+                                            }}></span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <IoIosSend/> Donate Securely
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>

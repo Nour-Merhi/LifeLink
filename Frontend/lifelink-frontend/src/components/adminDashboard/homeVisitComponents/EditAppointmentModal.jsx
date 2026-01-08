@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 export default function EditAppointmentModal({ onClose, onAppointmentUpdated, appointmentIds, hospitalId, date, hospitals = [] }) {
     const [loading, setLoading] = useState(false);
@@ -30,14 +30,8 @@ export default function EditAppointmentModal({ onClose, onAppointmentUpdated, ap
             // Fetch first appointment to get details (all appointments for same date should have similar structure)
             // In a real scenario, you might want to fetch all and merge or allow editing each separately
             // Note: appointmentIds contains appointment IDs (integers), not codes
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/appointments/${appointmentIds[0]}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/appointments/${appointmentIds[0]}`
             );
             
             const apt = response.data.appointment || response.data;
@@ -70,17 +64,14 @@ export default function EditAppointmentModal({ onClose, onAppointmentUpdated, ap
         setErrors({});
 
         try {
+            // Get CSRF cookie first
+            await api.get("/sanctum/csrf-cookie");
+            
             // Update all appointments for this date
             const updatePromises = appointmentIds.map(appointmentId =>
-                axios.put(
-                    `http://localhost:8000/api/admin/dashboard/appointments/${appointmentId}`,
-                    editData,
-                    {
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        }
-                    }
+                api.put(
+                    `/api/admin/dashboard/appointments/${appointmentId}`,
+                    editData
                 )
             );
 

@@ -6,7 +6,7 @@ import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { BsCalendar3 } from "react-icons/bs";
 import { BsListUl } from "react-icons/bs";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import CalendarView from "../homeVisitComponents/CalendarView";
 import EditHospitalAppointmentModal from "./EditHospitalAppointmentModal";
 import ViewHospitalAppointmentModal from "./ViewHospitalAppointmentModal";
@@ -169,14 +169,9 @@ export default function HospitalAppointmentTable({ appointments = [], loading = 
         setDeleteError("");
 
         try {
-            await axios.delete(
-                `http://localhost:8000/api/admin/dashboard/hospital-appointments/${deleteConfirm.appointmentCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            await api.get("/sanctum/csrf-cookie");
+            await api.delete(
+                `/api/admin/dashboard/hospital-appointments/${deleteConfirm.appointmentCode}`
             );
 
             // Success - close modal and refresh data

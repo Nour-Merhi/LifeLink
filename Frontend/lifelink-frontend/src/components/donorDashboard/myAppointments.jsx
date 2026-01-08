@@ -5,72 +5,35 @@ import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import "../../styles/Dashboard.css";
+import api from "../../api/axios";
 
 export default function MyAppointments(){
     const [activeTab, setActiveTab] = useState("All");
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("date-desc");
     const [showSortDropdown, setShowSortDropdown] = useState(false);
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    // Sample data - replace with actual API data
-    const appointments = [
-        {
-            id: 1,
-            donationType: "Home Donation",
-            hospitalName: "Al Harire Hospital",
-            date: "Jan 25, 2025",
-            time: "10:00 AM",
-        },
-        {
-            id: 2,
-            donationType: "Home Donation",
-            hospitalName: "Al Rasool Al Azaam Hospital",
-            date: "Jul 23, 2025",
-            time: "12:30 PM",
-        },
-        {
-            id: 3,
-            donationType: "Hospital Donation",
-            hospitalName: "Al Zahrani Hospital",
-            date: "Aug 01, 2023",
-            time: "3:00 PM",
-        },
-        {
-            id: 4,
-            donationType: "Live Organ Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            time: "3:30 AM",
-        },
-        {
-            id: 5,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            time: "5:45 PM",
-        },
-        {
-            id: 6,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            time: "9:00 AM",
-        },
-        {
-            id: 7,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            time: "8:30 PM",
-        },
-        {
-            id: 8,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            time: "8:30 AM",
-        }
-    ];
+    useEffect(() => {
+        const fetchAppointments = async () => {
+            try {
+                setLoading(true);
+                setError("");
+                const response = await api.get("/api/donor/my-appointments");
+                setAppointments(response.data.appointments || []);
+            } catch (err) {
+                console.error("Error fetching appointments:", err);
+                setError(err.response?.data?.message || "Failed to load appointments");
+                setAppointments([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAppointments();
+    }, []);
 
     useEffect(() => {
         // Reset to first page when search or sort changes
@@ -80,13 +43,13 @@ export default function MyAppointments(){
     // Filter appointments based on search term and active tab
     const filteredAppointments = appointments.filter((appointment) => {
         const searchLower = searchTerm.toLowerCase();
-        const matchesSearch = appointment.hospitalName.toLowerCase().includes(searchLower) || 
-                             appointment.donationType.toLowerCase().includes(searchLower);
+        const matchesSearch = (appointment.hospitalName && appointment.hospitalName.toLowerCase().includes(searchLower)) || 
+                             (appointment.donationType && appointment.donationType.toLowerCase().includes(searchLower));
         
-        // Filter by tab (if you add more tabs later)
+        // Filter by tab
         let matchesTab = true;
         if (activeTab !== "All") {
-            matchesTab = appointment.status?.toLowerCase() === activeTab.toLowerCase();
+            matchesTab = (appointment.status && appointment.status.toLowerCase() === activeTab.toLowerCase());
         }
         
         return matchesSearch && matchesTab;
@@ -113,16 +76,16 @@ export default function MyAppointments(){
                 return parseDate(a.date) - parseDate(b.date);
             case 'type-asc':
                 // Sort by donation type (A-Z)
-                return a.donationType.localeCompare(b.donationType);
+                return (a.donationType || '').localeCompare(b.donationType || '');
             case 'type-desc':
                 // Sort by donation type (Z-A)
-                return b.donationType.localeCompare(a.donationType);
+                return (b.donationType || '').localeCompare(a.donationType || '');
             case 'hospital-asc':
                 // Sort by hospital name (A-Z)
-                return a.hospitalName.localeCompare(b.hospitalName);
+                return (a.hospitalName || '').localeCompare(b.hospitalName || '');
             case 'hospital-desc':
                 // Sort by hospital name (Z-A)
-                return b.hospitalName.localeCompare(a.hospitalName);
+                return (b.hospitalName || '').localeCompare(a.hospitalName || '');
             default:
                 return 0;
         }
@@ -180,13 +143,39 @@ export default function MyAppointments(){
         // Add delete functionality here
     };
 
+    if (loading) {
+        return (
+            <section className="donor-section">
+                <div className="dashboard-title">
+                    <h2 className="text-2xl font-bold">Appointments</h2>
+                </div>
+                <div className="flex items-center justify-center h-64">
+                    <p className="text-gray-500">Loading appointments...</p>
+                </div>
+            </section>
+        );
+    }
+
+    if (error) {
+        return (
+            <section className="donor-section">
+                <div className="dashboard-title">
+                    <h2 className="text-2xl font-bold">Appointments</h2>
+                </div>
+                <div className="flex items-center justify-center h-64">
+                    <p className="text-red-500">Error: {error}</p>
+                </div>
+            </section>
+        );
+    }
+
     return (
         <section className="donor-section">
             <div className="dashboard-title">
                 <div>
-                    <h2 className="text-2xl font-bold">Upcoming Appointments</h2>
+                    <h2 className="text-2xl font-bold">Appointments</h2>
                 </div>
-                <p className="text-gray-500 !text-lg">Total Donations: {appointments.length}</p>
+                <p className="text-gray-500 !text-lg">Total Appointments: {appointments.length}</p>
             </div>
 
             <div className="control-panel">
@@ -196,7 +185,7 @@ export default function MyAppointments(){
                             <IoSearchSharp />
                             <input 
                                 type="search" 
-                                placeholder="Search by hospital" 
+                                placeholder="Search by hospital or type" 
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -246,11 +235,12 @@ export default function MyAppointments(){
                             <th className="text-left col-hospital">Hospital Name</th>
                             <th className="col-date">Date</th>
                             <th className="col-time">Time</th>
+                            <th className="col-status">Status</th>
                             <th className="col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedAppointments.length > 0 ? sortedAppointments.map((appointment, index) => (
+                        {sortedAppointments.length > 0 ? sortedAppointments.map((appointment) => (
                             <tr key={appointment.id}>
                                 <td className="col-select">
                                     <input 
@@ -263,6 +253,11 @@ export default function MyAppointments(){
                                 <td className="col-hospital text-left">{appointment.hospitalName}</td>
                                 <td className="col-date">{appointment.date}</td>
                                 <td className="col-time">{appointment.time}</td>
+                                <td className="col-status">
+                                    <span className={`status-badge status-${appointment.status?.toLowerCase() || 'pending'}`}>
+                                        {appointment.status || 'Pending'}
+                                    </span>
+                                </td>
                                 <td className="col-actions">
                                     <div className="row-actions">
                                         <button 
@@ -291,7 +286,7 @@ export default function MyAppointments(){
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan="6" className="text-center">No appointments found</td>
+                                <td colSpan="7" className="text-center">No appointments found</td>
                             </tr>
                         )}
                     </tbody>

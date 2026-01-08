@@ -3,10 +3,11 @@ import { MdMedication } from "react-icons/md";
 import { RiSurgicalMaskFill } from "react-icons/ri";
 import { IoMdArrowBack, IoMdArrowForward } from "react-icons/io";
 import { MdOutlineKeyboardDoubleArrowLeft, MdOutlineKeyboardDoubleArrowRight } from "react-icons/md";
-import ProgressBar from "../components/PorgressBar";
-import Patient from "../assets/imgs/patient.jpg"
+import { IoPersonCircle } from "react-icons/io5";
+import { IoCalendarSharp } from "react-icons/io5";
+import { GoClockFill } from "react-icons/go";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
@@ -14,10 +15,42 @@ import "slick-carousel/slick/slick-theme.css";
 import Financial_Img from "../assets/imgs/image.png";
 import FinancialSupportForm from "../components/donation/FinancialSupportForm";
 import ThankModal from "../components/donation/ThankModals/ThankYou";
+import api from "../api/axios";
+import Patient from "../assets/imgs/patient.jpg";
+import "../styles/Dashboard.css";
+
+const API_BASE_URL = "http://localhost:8000";
 
 export default function FinancialSupport() {
   const [thankModal, setThankModal] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [patientCases, setPatientCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedPatientCaseId, setSelectedPatientCaseId] = useState(null);
+  const [selectedPatientName, setSelectedPatientName] = useState(null);
+
+  // Fetch patient cases from backend
+  useEffect(() => {
+    const fetchPatientCases = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await api.get('/api/patient-cases');
+        const cases = response.data.patientCases || [];
+        setPatientCases(cases);
+      } catch (err) {
+        console.error('Error fetching patient cases:', err);
+        setError(err.response?.data?.error || 'Failed to load patient cases');
+        // Fallback to empty array or default cases if needed
+        setPatientCases([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPatientCases();
+  }, []);
 
   const NextArrow = ({ onClick }) => (
     <div
@@ -59,23 +92,26 @@ export default function FinancialSupport() {
     slidesToScroll: 1,
     arrows: true,
     centerMode: false,
-    variableWidth: true,
+    variableWidth: false,
+    adaptiveHeight: true,
     responsive: [
-      { breakpoint: 1024, settings: { slidesToShow: 2 } },
-      { breakpoint: 768, settings: { slidesToShow: 1 } },
+      { breakpoint: 1024, settings: { slidesToShow: 2, variableWidth: false } },
+      { breakpoint: 768, settings: { slidesToShow: 1, variableWidth: false } },
     ],
   };
 
   const handleCloseModal = () => {
     setThankModal(false);
     setFormKey((prev) => prev + 1);
+    setSelectedPatientCaseId(null);
+    setSelectedPatientName(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
     <div 
      className="organ"
-    style={{
+     style={{
         width: "73.4vw",      
         maxWidth: "100vw",               
         boxSizing: "border-box",
@@ -184,41 +220,138 @@ export default function FinancialSupport() {
           </div>
 
           <div className="pat-card">
-            <Slider {...settings}
-              nextArrow={<NextArrow />}
-              prevArrow={<PrevArrow />}          
-            >
-              {[...Array(4)].map((_, i) => (
-                  <div key={i} className="patient-container">
-                    <div className="patient" >
-                      <img src={ Patient } alt="patient image"/>
-                      <div className="texts">
-
-                        <div className="text-title">
-                            <h3>Ali, 12</h3>
-                            <span className="text-red-500">Kidney Transplant</span>
-                        </div>
-
-                        <p className="patient-dis">
-                            Ali has been on dialysis for more than 2 years and urgently needs a
-                            kidney transplant now. His family cannot afford the surgery costs.
-                        </p>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '4rem', color: '#999' }}>
+                <p>Loading patient cases...</p>
+              </div>
+            ) : error ? (
+              <div style={{ textAlign: 'center', padding: '4rem', color: '#F12C31' }}>
+                <p>{error}</p>
+              </div>
+            ) : patientCases.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '4rem', color: '#999' }}>
+                <p>No active patient cases available at the moment.</p>
+              </div>
+            ) : (
+              <Slider {...settings}
+                nextArrow={<NextArrow />}
+                prevArrow={<PrevArrow />}          
+              >
+                {patientCases.map((patient) => {
+                const fundingPercentage = Math.round((patient.currentFunding / patient.targetFunding) * 100);
+                
+                // Construct image URL from backend
+                let imageSrc = Patient; // Default fallback
+                if (patient.image) {
+                  if (patient.image.startsWith('http')) {
+                    // Already a full URL
+                    imageSrc = patient.image;
+                  } else {
+                    // Construct full URL from relative path
+                    imageSrc = `${API_BASE_URL}/${patient.image}`;
+                  }
+                }
+                
+                return (
+                  <div key={patient.id} className="patient-container">
+                    <div className="patient-case-design" style={{ width: "100%", maxWidth: "350px", margin: "0 auto", padding: "0", overflow: "hidden", borderRadius: "10px" }}>
+                      {/* Patient Image */}
+                      <div style={{ width: "100%", height: "160px", overflow: "hidden", borderRadius: "10px 10px 0 0", margin: "0", padding: "0" }}>
+                        <img 
+                          src={imageSrc} 
+                          alt={patient.patientName}
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          onError={(e) => {
+                            e.target.src = Patient;
+                          }}
+                        />
+                      </div>
                       
-                        <ProgressBar goal={1000} raised={346} />
+                      <div style={{ padding: "20px" }}>
+
+                      {/* Case Header */}
+                      <div className="case-header !mb-0">
+                        <div className="case-header-left">
+                          <div className="case-patient-info">
+                            <h4>{patient.patientName}</h4>
+                            <p>{patient.condition} • Age {patient.age}</p>
+                          </div>
+                        </div>
                       </div>
 
-                      <button className="support-patient-btn linear-blue" type="button">Support Ali</button>
+                        <div className="case-description">
+                          <small>
+                            {patient.description}
+                          </small>
+                        </div>
+                      {/* Case Stats */}
+                      <div className="case-stats !mb-5">
+                        <div>
+                          <FaHospital />
+                          <small>{patient.hospital}</small>
+                        </div>
+                        
+                      </div>
+
+                      {/* Case Body */}
+                      <div className="case-body">
+                        <div className="progress-case">
+                          <div className="funding-info">
+                            <span className="funding-label">Progress</span>
+                            <span className="funding-amount">
+                              ${patient.currentFunding.toLocaleString()} / ${patient.targetFunding.toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="progress-bar">
+                            <div 
+                              className="progress-fill" 
+                              style={{ width: `${fundingPercentage}%` }}
+                            ></div>
+                          </div>
+
+                          <div className="funding-stats">
+                            <span>{fundingPercentage}% funded</span>
+                          </div>
+                        </div>
+                      </div>
+
+
+                      {/* Support Button */}
+                      <div className="case-buttons">
+                        <button 
+                          className="blue-btn" 
+                          type="button"
+                          onClick={() => {
+                            setSelectedPatientCaseId(patient.id);
+                            setSelectedPatientName(patient.patientName);
+                            document
+                              .getElementById("financial-donor")
+                              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                        >
+                          Support {patient.patientName.split(' ')[0]}
+                        </button>
+                      </div>
+                      </div>
                     </div>
-                </div>
-              ))}
-            </Slider>
+                  </div>
+                );
+              })}
+              </Slider>
+            )}
           </div>
 
         </div>
       </div>
 
       {/* Financial Support Form */}
-      <FinancialSupportForm key={formKey} setModal={setThankModal} />
+      <FinancialSupportForm 
+        key={formKey} 
+        setModal={setThankModal} 
+        selectedPatientCaseId={selectedPatientCaseId}
+        selectedPatientName={selectedPatientName}
+      />
 
       {/* FAQ Section */}
       <div className="faq-section">

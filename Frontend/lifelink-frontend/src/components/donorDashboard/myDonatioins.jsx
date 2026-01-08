@@ -2,84 +2,34 @@ import { useState, useEffect } from "react";
 import { IoSearchSharp } from "react-icons/io5";
 import { IoChevronDown } from "react-icons/io5";
 import "../../styles/Dashboard.css";
+import api from "../../api/axios";
 
 export default function MyDonations(){
     const [activeTab, setActiveTab] = useState("All");
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("date-desc");
     const [showSortDropdown, setShowSortDropdown] = useState(false);
-
-    // Sample data - replace with actual API data
-    const donations = [
-        {
-            id: 1,
-            donationType: "Home Donation",
-            hospitalName: "Al Harire Hospital",
-            date: "Jan 25, 2025",
-            xpEarned: "+150 xp",
-            status: "Completed",
-        },
-        {
-            id: 2,
-            donationType: "Home Donation",
-            hospitalName: "Al Rasool Al Azaam Hospital",
-            date: "Jul 23, 2025",
-            xpEarned: "+150 xp",
-            status: "Completed",
-        },
-        {
-            id: 3,
-            donationType: "Hospital Donation",
-            hospitalName: "Al Zahrani Hospital",
-            date: "Aug 01, 2023",
-            xpEarned: "+0 xp",
-            status: "Canceled",
-        },
-        {
-            id: 4,
-            donationType: "Live Organ Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            xpEarned: "loading...",
-            status: "Pending",
-        },
-        {
-            id: 5,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            xpEarned: "+150 xp",
-            status: "Completed",
-        },
-        {
-            id: 6,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            xpEarned: "+150 xp",
-            status: "Completed",
-        },
-        {
-            id: 7,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            xpEarned: "+150 xp",
-        },
-        {
-            id: 8,
-            donationType: "Home Donation",
-            hospitalName: "Saint Goarge Hospital",
-            date: "Sep 01, 2023",
-            xpEarned: "+150 xp",
-            status: "Completed",
-        }
-    ];
+    const [donations, setDonations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     useEffect(() => {
-        // Reset to first page when search or sort changes
-        // (If you add pagination later)
-    }, [searchTerm, sortBy]);
+        const fetchDonations = async () => {
+            try {
+                setLoading(true);
+                const response = await api.get("/api/donor/my-donations");
+                setDonations(response.data.donations || []);
+            } catch (err) {
+                console.error("Error fetching donations:", err);
+                setError(err.response?.data?.message || "Failed to load donations");
+                setDonations([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDonations();
+    }, []);
 
     // Filter donations based on search term and active tab
     const filteredDonations = donations.filter((donation) => {
@@ -194,6 +144,26 @@ export default function MyDonations(){
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [showSortDropdown]);
+
+    if (loading) {
+        return (
+            <section className="donor-section">
+                <div className="flex items-center justify-center h-64">
+                    <p className="text-gray-500">Loading donations...</p>
+                </div>
+            </section>
+        );
+    }
+
+    if (error) {
+        return (
+            <section className="donor-section">
+                <div className="flex items-center justify-center h-64">
+                    <p className="text-red-500">Error: {error}</p>
+                </div>
+            </section>
+        );
+    }
 
     return (
         <section className="donor-section">

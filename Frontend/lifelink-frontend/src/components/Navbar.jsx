@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import lifelink_logo from "../assets/imgs/Logo.png";
 import profile from "../assets/imgs/profile.svg";
+import ProfileDropdown from "./ProfileDropdown";
+import AdminProfileDropdown from "./adminDashboard/AdminProfileDropdown";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -59,7 +61,7 @@ export default function Navbar() {
           Donate
         </NavLink>
         <NavLink 
-          to="/quizzlit" 
+          to="/quizlit/welcome" 
           className={({ isActive }) => 
             `quiz-nav-link quiz-nav-link-play ${isActive ? 'quiz-nav-link-play-active' : ''}`
           }
@@ -86,6 +88,11 @@ export default function Navbar() {
             >
               Logout
             </button>
+            {user.role?.toLowerCase() === "donor" ? (
+              <ProfileDropdown />
+            ) : user.role?.toLowerCase() === "admin" ? (
+              <AdminProfileDropdown />
+            ) : (
             <div className="flex items-center gap-2">
               <img 
                 src={profile} 
@@ -94,6 +101,7 @@ export default function Navbar() {
                 title={getUserName()}
               />
             </div>
+            )}
           </div>
         ) : (
           // User is not logged in - show sign in button

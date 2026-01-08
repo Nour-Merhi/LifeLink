@@ -1,51 +1,149 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FaHeartbeat } from "react-icons/fa";
 import "../../../styles/Dashboard.css";
+import api from "../../../api/axios";
 
-export default function MedicalInformation() {
+export default function MedicalInformation({ initialData, bloodTypes: initialBloodTypes, onUpdate }) {
     const [medicalData, setMedicalData] = useState({
-        bloodType: "O+",
-        emergencyContact: "Michael Johnson",
+        bloodTypeId: "",
+        bloodType: "",
+        emergencyContact: "",
         medicalConditions: "",
-        weight: "140",
-        emergencyPhone: "+1 (555) 987-6543"
+        weight: "",
+        emergencyPhone: ""
     });
-
     const [charCount, setCharCount] = useState(0);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState(false);
+    const [bloodTypes, setBloodTypes] = useState([]);
+
+    // Initialize form data from props
+    useEffect(() => {
+        if (initialData) {
+            const medicalConditionsValue = typeof initialData.medical_conditions === 'string' 
+                ? initialData.medical_conditions 
+                : (initialData.medical_conditions ? JSON.stringify(initialData.medical_conditions) : "");
+
+            setMedicalData({
+                bloodTypeId: initialData.blood_type_id || "",
+                bloodType: initialData.blood_type || "",
+                emergencyContact: initialData.emergency_contact_name || "",
+                medicalConditions: medicalConditionsValue,
+                weight: initialData.weight ? initialData.weight.toString() : "",
+                emergencyPhone: initialData.emergency_contact_phone || ""
+            });
+
+            setCharCount(medicalConditionsValue.length);
+        }
+
+        if (initialBloodTypes && initialBloodTypes.length > 0) {
+            setBloodTypes(initialBloodTypes);
+        } else {
+            // Fallback: fetch blood types if not provided
+            const fetchBloodTypes = async () => {
+                try {
+                    const response = await api.get("/api/blood-types");
+                    setBloodTypes(response.data.blood_types || []);
+                } catch (err) {
+                    console.error("Error fetching blood types:", err);
+                }
+            };
+            fetchBloodTypes();
+        }
+    }, [initialData, initialBloodTypes]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setMedicalData(prev => ({ ...prev, [name]: value }));
         
         if (name === "medicalConditions") {
             setCharCount(value.length);
+            setMedicalData(prev => ({ ...prev, [name]: value }));
+        } else if (name === "bloodType") {
+            // Find blood type ID when blood type changes
+            const selectedBloodType = bloodTypes.find(bt => 
+                `${bt.type}${bt.rh_factor}` === value || bt.full_name === value || bt.full_type === value
+            );
+            setMedicalData(prev => ({ 
+                ...prev, 
+                bloodType: value,
+                bloodTypeId: selectedBloodType?.id || "" 
+            }));
+        } else {
+            setMedicalData(prev => ({ ...prev, [name]: value }));
+        }
+        
+        setSuccess(false);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            setSaving(true);
+            setError("");
+            setSuccess(false);
+
+            const updateData = {
+                blood_type_id: medicalData.bloodTypeId || null,
+                weight: medicalData.weight ? parseFloat(medicalData.weight) : null,
+                emergency_contact_name: medicalData.emergencyContact || null,
+                emergency_contact_phone: medicalData.emergencyPhone || null,
+                medical_conditions: medicalData.medicalConditions || null,
+            };
+
+            await api.put("/api/settings/medical", updateData);
+
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+            
+            // Refresh settings data
+            if (onUpdate) {
+                onUpdate();
+            }
+        } catch (err) {
+            console.error("Error updating medical information:", err);
+            setError(err.response?.data?.message || "Failed to update medical information");
+            if (err.response?.data?.errors) {
+                const errorMessages = Object.values(err.response.data.errors).flat();
+                setError(errorMessages.join(", "));
+            }
+        } finally {
+            setSaving(false);
         }
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        console.log('Medical data:', medicalData);
-        // Add save functionality here
-    };
-
     const handleCancel = () => {
-        // Reset form or navigate away
-        console.log('Cancel clicked');
-    };
+        // Reset form to original values
+        if (initialData) {
+            const medicalConditionsValue = typeof initialData.medical_conditions === 'string' 
+                ? initialData.medical_conditions 
+                : (initialData.medical_conditions ? JSON.stringify(initialData.medical_conditions) : "");
 
-    const bloodTypes = [
-        "A+",
-        "A-",
-        "B+",
-        "B-",
-        "AB+",
-        "AB-",
-        "O+ (Universal Donor)",
-        "O-"
-    ];
+            setMedicalData({
+                bloodTypeId: initialData.blood_type_id || "",
+                bloodType: initialData.blood_type || "",
+                emergencyContact: initialData.emergency_contact_name || "",
+                medicalConditions: medicalConditionsValue,
+                weight: initialData.weight ? initialData.weight.toString() : "",
+                emergencyPhone: initialData.emergency_contact_phone || ""
+            });
+            setCharCount(medicalConditionsValue.length);
+        }
+    };
 
     return (
         <div className="settings-form-container">
+            {error && (
+                <div style={{ padding: "10px", marginBottom: "20px", backgroundColor: "#fee", color: "#c33", borderRadius: "5px" }}>
+                    {error}
+                </div>
+            )}
+            {success && (
+                <div style={{ padding: "10px", marginBottom: "20px", backgroundColor: "#efe", color: "#3c3", borderRadius: "5px" }}>
+                    Medical information updated successfully!
+                </div>
+            )}
+
             <div className="medical-header">
                 <FaHeartbeat className="medical-icon" />
                 <div>
@@ -63,22 +161,26 @@ export default function MedicalInformation() {
                             value={medicalData.bloodType}
                             onChange={handleChange}
                         >
-                            {bloodTypes.map((type) => (
-                                <option key={type} value={type}>
-                                    {type}
+                            <option value="">Select blood type</option>
+                            {bloodTypes.map((bt) => (
+                                <option key={bt.id} value={bt.full_name || bt.full_type || `${bt.type}${bt.rh_factor}`}>
+                                    {bt.full_name || bt.full_type || `${bt.type}${bt.rh_factor}`}
                                 </option>
                             ))}
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="weight">Weight (lbs)</label>
+                        <label htmlFor="weight">Weight (kg)</label>
                         <input
-                            type="text"
+                            type="number"
                             id="weight"
                             name="weight"
                             value={medicalData.weight}
                             onChange={handleChange}
-                            placeholder="Enter weight"
+                            placeholder="Enter weight in kg"
+                            step="0.1"
+                            min="0"
+                            max="500"
                         />
                     </div>
                 </div>
@@ -128,12 +230,11 @@ export default function MedicalInformation() {
                     <button type="button" className="btn-cancel" onClick={handleCancel}>
                         Cancel
                     </button>
-                    <button type="submit" className="save-changes-button">
-                        Update Medical Info
+                    <button type="submit" className="save-changes-button" disabled={saving}>
+                        {saving ? "Updating..." : "Update Medical Info"}
                     </button>
                 </div>
             </form>
         </div>
     );
 }
-

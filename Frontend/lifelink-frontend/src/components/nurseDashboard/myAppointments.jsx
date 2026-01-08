@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LuPhoneCall } from "react-icons/lu";
 import { FaRegClock } from "react-icons/fa";
 import { MdOutlineCalendarMonth } from "react-icons/md";
@@ -8,62 +8,50 @@ import { FaClipboardList } from "react-icons/fa6";
 import { FaMapMarkerAlt } from "react-icons/fa";
 
 import "../../styles/Dashboard.css";
+import api from "../../api/axios";
 
 export default function MyAppointments(){
     const [activeTab, setActiveTab] = useState("All");
     const [bloodType, setBloodType] = useState("all-blood");
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-    // Sample data
-    const appointments = [
-        {
-            id: 1,
-            donorName: "Sarah Johnson",
-            gender: "Female",
-            bloodType: "O+",
-            address: "123 Oak Street, Downtown",
-            date: "2024-01-15",
-            time: "09:00 AM",
-            phone: "961 768900273",
-            emergencyContact: "Nour Mari - 76543271",
-            status: "Confirmed"
-        },
-        {
-            id: 2,
-            donorName: "John Doe",
-            gender: "Male",
-            bloodType: "A+",
-            address: "456 Main Street, Uptown",
-            date: "2024-01-16",
-            time: "10:00 AM",
-            phone: "961 768900274",
-            emergencyContact: "Jane Doe - 76543272",
-            status: "Pending"
-        },
-        {
-            id: 3,
-            donorName: "Emily Smith",
-            gender: "Female",
-            bloodType: "B+",
-            address: "789 Park Avenue, Midtown",
-            date: "2024-01-17",
-            time: "11:00 AM",
-            phone: "961 768900275",
-            emergencyContact: "Mike Smith - 76543273",
-            status: "Completed"
-        },
-        {
-            id: 4,
-            donorName: "Michael Brown",
-            gender: "Male",
-            bloodType: "AB+",
-            address: "321 Elm Street, Downtown",
-            date: "2024-01-18",
-            time: "02:00 PM",
-            phone: "961 768900276",
-            emergencyContact: "Sarah Brown - 76543274",
-            status: "Cancelled"
-        },
-    ];
+    useEffect(() => {
+        const fetchAppointments = async () => {
+            try {
+                setLoading(true);
+                setError("");
+                const response = await api.get("/api/nurse/my-appointments");
+                
+                if (response.data && response.data.appointments) {
+                    setAppointments(response.data.appointments);
+                } else {
+                    setError("No appointments data received from server");
+                }
+            } catch (err) {
+                console.error("Error fetching appointments:", err);
+                console.error("Error response:", err.response);
+                
+                let errorMessage = "Failed to load appointments";
+                if (err.response?.data?.message) {
+                    errorMessage = err.response.data.message;
+                } else if (err.response?.status === 401) {
+                    errorMessage = "Please log in to view your appointments";
+                } else if (err.response?.status === 403) {
+                    errorMessage = "You don't have permission to access this page";
+                } else if (err.message) {
+                    errorMessage = err.message;
+                }
+                
+                setError(errorMessage);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAppointments();
+    }, []);
 
     // Filter appointments based on active tab
     const filteredAppointments = appointments.filter((appointment) => {
@@ -86,6 +74,25 @@ export default function MyAppointments(){
         return "";
     };
 
+    if (loading) {
+        return (
+            <div className="nurse-section flex items-center justify-center h-64">
+                <p className="text-gray-500">Loading appointments...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="nurse-section flex flex-col items-center justify-center h-64 p-4">
+                <p className="text-red-500 text-lg font-semibold mb-2">Error: {error}</p>
+                <p className="text-gray-600 text-sm">
+                    Please check your browser console for more details, or contact support if the issue persists.
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="nurse-section">
             <div className="dashboard-title">
@@ -94,7 +101,7 @@ export default function MyAppointments(){
                         <FaClipboardList />
                         <h2>My Appointments</h2>
                     </div>
-                    <p>anage your scheduled home donation visits</p>
+                    <p>Manage your scheduled home donation visits</p>
                 </div>
                 <p>Total Appointments: {appointments.length}</p>
             </div>
@@ -127,7 +134,7 @@ export default function MyAppointments(){
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "20px" }}>
-                {filteredAppointments.map((appointment) => (
+                {filteredAppointments.length > 0 ? filteredAppointments.map((appointment) => (
                     <div key={appointment.id} className="donor-container" style={{ padding: "20px", display: "flex", flexDirection: "column" }}>
                         {/* Left Side - Donor Information */}
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "20px", flex: 1 }}>
@@ -197,7 +204,16 @@ export default function MyAppointments(){
                             For emergency contact: {appointment.emergencyContact}
                         </div>
                     </div>
-                ))}
+                )) : (
+                    <div className="donor-container" style={{ padding: "40px", textAlign: "center" }}>
+                        <p className="text-gray-500 text-lg">No appointments found</p>
+                        <p className="text-gray-400 text-sm mt-2">
+                            {activeTab !== "All" 
+                                ? `No appointments with status "${activeTab}"` 
+                                : "You don't have any appointments yet"}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     )

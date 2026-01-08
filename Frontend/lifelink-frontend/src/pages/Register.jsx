@@ -26,7 +26,6 @@ const Register = () => {
     confirmPassword: "",
     dob: "",
     bloodType: "",
-    lastDonation: "",
     city: "",
   });
 
@@ -76,7 +75,6 @@ const Register = () => {
         confirmPassword: formData.confirmPassword,
         dob: formData.dob,
         bloodType: formData.bloodType,
-        lastDonation: formData.lastDonation || null,
         city: formData.city || null,
       });
 
@@ -277,25 +275,14 @@ const Register = () => {
               </select>
             </div>
 
-            <div className="flex gap-3">
-              <input
-                type="date"
-                name="lastDonation"
-                value={formData.lastDonation}
-                onChange={handleChange}
-                className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600"
-                title="Last Donation (Optional)"
-              />
-
               <input
                 type="text"
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
                 placeholder="City"
-                className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600"
+              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600"
               />
-            </div>
 
             <button
               type="submit"

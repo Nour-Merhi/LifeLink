@@ -9,6 +9,7 @@ use App\Models\BloodType;
 use App\Models\MobilePhlebotomist;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Services\XpService;
 
 class HomeVisitController extends Controller
 {
@@ -547,6 +548,10 @@ class HomeVisitController extends Controller
                 'medical_conditions' => 'nullable|array',
             ]);
 
+            // Check if state is being changed to 'completed' to award XP
+            $wasCompleted = $order->state === 'completed';
+            $willBeCompleted = isset($validated['state']) && $validated['state'] === 'completed' && !$wasCompleted;
+
             // Update only provided fields
             if (isset($validated['state'])) {
                 $order->state = $validated['state'];
@@ -571,6 +576,15 @@ class HomeVisitController extends Controller
             }
 
             $order->save();
+
+            // Award XP if donation was just completed
+            if ($willBeCompleted && $order->donor_id) {
+                \App\Services\XpService::awardBloodDonationXp(
+                    $order->donor_id,
+                    \App\Models\HomeAppointment::class,
+                    $order->id
+                );
+            }
 
             return response()->json([
                 'message' => 'Home visit order updated successfully',

@@ -9,16 +9,14 @@ export default function GameSection() {
     const navigate = useNavigate();
 
     const handleStart = () => {
-        navigate("/quizlit");
+        navigate("/quizlit/ready");
     };
 
     const handleLearnMore = () => {
-        // Navigate to learn more page or scroll to more info
-        console.log("Learn more clicked");
+       navigate("/quizlit/welcome");
     };
     const handleAskQuestion = () => {
-        // Navigate to contact page or open a form
-        console.log("Ask question clicked");
+        navigate("/ask-question");
     };
 
     return (

@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-
-import axios from "axios"
+import api from "../../../api/axios";
 
 export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomistAdded }) {
     const [workingDates, setWorkingDates] = useState([]);
@@ -84,15 +83,13 @@ export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomist
         setLoading (true);
 
         try{
-            const response = await axios.post(
-                "http://localhost:8000/api/admin/dashboard/add-phlebotomist",
-                addPhlebotomistData,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                }
+            // First, get the CSRF cookie from Sanctum
+            await api.get("/sanctum/csrf-cookie");
+
+            // Then, make the POST request
+            const response = await api.post(
+                "/api/admin/dashboard/add-phlebotomist",
+                addPhlebotomistData
             );
             setShowSuccess(true);
             setTimeout(() => {

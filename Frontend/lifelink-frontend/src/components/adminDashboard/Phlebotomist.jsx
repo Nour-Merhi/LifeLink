@@ -4,7 +4,7 @@ import { LiaUserNurseSolid } from "react-icons/lia";
 import { FiCheckCircle } from "react-icons/fi";
 import { PiChartLineUpBold } from "react-icons/pi";
 
-import axios from "axios"
+import api from "../../api/axios";
 import PhlebotomistTable from "./phlebotomistComponents/PhlebotomistTable";
 import AddPhlebotomistForm from "./phlebotomistComponents/AddPhlebotomistForm";
 
@@ -24,7 +24,7 @@ export default function Phlebotomist(){
     })
 
     const fetchHospitals = () => {
-        axios.get("http://localhost:8000/api/admin/dashboard/get-hospitals")
+        api.get("/api/admin/dashboard/get-hospitals")
         .then(res => {
             setHospitals(res.data.hospitals)
         })
@@ -34,7 +34,7 @@ export default function Phlebotomist(){
     const fetchPhlebotomists = () => {
         setLoading(true)
         setError("")
-        axios.get("http://localhost:8000/api/admin/dashboard/get-phlebotomists")
+        api.get("/api/admin/dashboard/get-phlebotomists")
         .then(res => {
             setPhlebotomists(res.data.phlebotomists || [])
             if (res.data.metrics) {

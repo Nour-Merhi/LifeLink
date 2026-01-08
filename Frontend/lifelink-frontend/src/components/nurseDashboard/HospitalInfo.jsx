@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { 
     IoArrowBack,
     IoLocationOutline,
@@ -10,12 +10,11 @@ import {
 } from "react-icons/io5";
 import { FaHospital } from "react-icons/fa";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../api/axios";
 import MapIntegration from "../MapIntegration";
 import "../../styles/Dashboard.css";
 
 export default function HospitalDetail() {
-    const { hospitalCode } = useParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -23,25 +22,37 @@ export default function HospitalDetail() {
 
     useEffect(() => {
         fetchHospitalDetails();
-    }, [hospitalCode]);
+    }, []);
 
     const fetchHospitalDetails = async () => {
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/hospitals/${hospitalCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-            setHospitalData(response.data.hospital || response.data);
+            const response = await api.get("/api/nurse/hospital-info");
+            
+            if (response.data && response.data.hospital) {
+                setHospitalData(response.data.hospital);
+            } else {
+                setError("No hospital data received from server");
+            }
         } catch (err) {
             console.error('Error fetching hospital details:', err);
-            setError(err.response?.data?.message || "Failed to fetch hospital details");
+            console.error('Error response:', err.response);
+            
+            let errorMessage = "Failed to fetch hospital details";
+            if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            } else if (err.response?.status === 401) {
+                errorMessage = "Please log in to view hospital information";
+            } else if (err.response?.status === 403) {
+                errorMessage = "You don't have permission to access this page";
+            } else if (err.response?.status === 404) {
+                errorMessage = err.response.data?.message || "Hospital not found or not assigned";
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -89,15 +100,15 @@ export default function HospitalDetail() {
         return (
             <section className="hospital-detail-section">
                 <div className="hospital-detail-back">
-                    <button onClick={() => navigate('/admin/hospitals')} className="back-link">
+                    <button onClick={() => navigate('/nurse/home')} className="back-link">
                         <IoArrowBack />
-                        <span>Back to Hospital List</span>
+                        <span>Back to Dashboard</span>
                     </button>
                 </div>
                 <div className="error-container">
                     <p>Error: {error || "Hospital not found"}</p>
-                    <button onClick={() => navigate('/admin/hospitals')} className="btn-cancel">
-                        Back to Hospital List
+                    <button onClick={() => navigate('/nurse/home')} className="btn-cancel">
+                        Back to Dashboard
                     </button>
                 </div>
             </section>
@@ -105,15 +116,9 @@ export default function HospitalDetail() {
     }
 
     return (
-        <section className="hospital-detail-section">
+        <section >
             {/* Back Button */}
-            <div className="hospital-detail-back">
-                <button onClick={() => navigate('/admin/hospitals')} className="back-link">
-                    <IoArrowBack />
-                    <span>Back to Hospital List</span>
-                </button>
-            </div>
-
+           
             {/* Hospital Info and Map Container */}
             <div className="hospital-info-map-container">
                 {/* Hospital Information Card */}

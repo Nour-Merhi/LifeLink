@@ -1,18 +1,17 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { 
-    IoArrowBack,
-    IoLocationOutline,
-    IoCallOutline,
-    IoMailOutline,
-    IoTimeOutline,
-    IoPersonOutline
-} from "react-icons/io5";
-import { FaHospital } from "react-icons/fa";
+import { IoArrowBack } from "react-icons/io5";
+import { FaTint, FaUserMd, FaCalendarCheck, FaAmbulance, FaUsers } from "react-icons/fa";
+import { MdOutlineLocationOn } from "react-icons/md";
+import { LuPhone } from "react-icons/lu";
+import { MdOutlineMail } from "react-icons/md";
+import { IoTimeOutline, IoPersonOutline, IoCalendarOutline, IoStatsChart } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 import MapIntegration from "../../MapIntegration";
 import "../../../styles/Dashboard.css";
+
+const API_BASE_URL = "http://localhost:8000";
 
 export default function HospitalDetail() {
     const { hospitalCode } = useParams();
@@ -29,14 +28,8 @@ export default function HospitalDetail() {
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/hospitals/${hospitalCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/hospitals/${hospitalCode}`
             );
             setHospitalData(response.data.hospital || response.data);
         } catch (err) {
@@ -46,7 +39,6 @@ export default function HospitalDetail() {
             setLoading(false);
         }
     };
-
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -76,6 +68,33 @@ export default function HospitalDetail() {
         return 'N/A';
     };
 
+    const getImageSrc = () => {
+        if (!hospitalData?.image) {
+            console.log('No image data found');
+            return null;
+        }
+        
+        const image = hospitalData.image;
+        console.log('Image data type:', typeof image);
+        console.log('Image data length:', image?.length);
+        console.log('Image data preview:', image?.substring(0, 50));
+        
+        // Handle base64 images
+        if (image.startsWith('data:image')) {
+            console.log('Using base64 image');
+            return image;
+        }
+        // Handle full URLs
+        if (image.startsWith('http://') || image.startsWith('https://')) {
+            console.log('Using full URL:', image);
+            return image;
+        }
+        // Handle relative paths
+        const fullPath = `${API_BASE_URL}/${image}`;
+        console.log('Using relative path:', fullPath);
+        return fullPath;
+    };
+
     if (loading) {
         return (
             <div className="loader">
@@ -87,16 +106,17 @@ export default function HospitalDetail() {
 
     if (error || !hospitalData) {
         return (
-            <section className="hospital-detail-section">
-                <div className="hospital-detail-back">
-                    <button onClick={() => navigate('/admin/hospitals')} className="back-link">
+            <section className="hospital-detail-section-admin">
+                <div className="hospital-detail-back-admin">
+                    <button onClick={() => navigate('/admin/hospitals')} className="hospital-detail-back-button-admin">
                         <IoArrowBack />
                         <span>Back to Hospital List</span>
                     </button>
                 </div>
-                <div className="error-container">
-                    <p>Error: {error || "Hospital not found"}</p>
-                    <button onClick={() => navigate('/admin/hospitals')} className="btn-cancel">
+                <div className="hospital-detail-error-admin">
+                    <h2>Hospital Not Found</h2>
+                    <p>{error || "The hospital you're looking for doesn't exist."}</p>
+                    <button onClick={() => navigate('/admin/hospitals')} className="back-to-hospitals-btn-admin">
                         Back to Hospital List
                     </button>
                 </div>
@@ -104,178 +124,363 @@ export default function HospitalDetail() {
         );
     }
 
+    const imageSrc = getImageSrc();
+    const services = Array.isArray(hospitalData.services) ? hospitalData.services : [];
+    const urgentNeeds = Array.isArray(hospitalData.urgent_needs) ? hospitalData.urgent_needs : [];
+    const stats = hospitalData.stats || {};
+    const managerAdditionalInfo = hospitalData.manager_additional_info || {};
+    const phlebotomists = hospitalData.mobile_phlebotomist || hospitalData.mobilePhlebotomist || [];
+
     return (
-        <section className="hospital-detail-section">
+        <section>
             {/* Back Button */}
-            <div className="hospital-detail-back">
-                <button onClick={() => navigate('/admin/hospitals')} className="back-link">
+            <div className="hospital-detail-back-admin">
+                <button onClick={() => navigate('/admin/hospitals')} className="hospital-detail-back-button-admin">
                     <IoArrowBack />
                     <span>Back to Hospital List</span>
                 </button>
             </div>
 
-            {/* Hospital Info and Map Container */}
-            <div className="hospital-info-map-container">
-                {/* Hospital Information Card */}
-                <div className="detail-card hospital-info-card">
-                    <div className="detail-card-header">
-                        <div className="hospital-info-header">
-                            <h2>{hospitalData.name || 'N/A'}</h2>
-                            <div className="donor-stats">
-                                <span>{hospitalData.code || 'N/A'}</span>
-                            </div>
-                        </div>
-                        <span className={`badge ${hospitalData.status === "verified" ? "badge-success" : "badge-danger"}`}>
-                            {hospitalData.status === "verified" ? "Verified" : "Unverified"}
+            {/* Hospital Header */}
+            <div className="hospital-detail-header-admin">
+                <div className="hospital-detail-header-top">
+                    <h1 className="hospital-detail-title-admin">{hospitalData.name || 'N/A'}</h1>
+                    <span className={`badge ${hospitalData.status === "verified" ? "badge-success" : "badge-danger"}`}>
+                        {hospitalData.status === "verified" ? "Verified" : "Unverified"}
+                    </span>
+                </div>
+                <div className="hospital-detail-meta-admin">
+                    <span className="hospital-code-admin">Code: {hospitalData.code || 'N/A'}</span>
+                    {hospitalData.established && (
+                        <span className="hospital-established-admin">
+                            Established: {hospitalData.established}
                         </span>
-                    </div>
-                    
-                    <div className="detail-card-body">
-                        <div className="detail-info-item">
-                            <div className="detail-icon">
-                                <IoMailOutline />
-                            </div>
-                            <div className="info">
-                                <span>Email</span>
-                                <span className="detail-info-value">{hospitalData.email || 'N/A'}</span>
-                            </div>
-                        </div>
-                        <div className="detail-info-item">
-                            <div className="detail-icon">
-                                <IoLocationOutline />
-                            </div>
-                            <div className="info">
-                                <span>Address</span>
-                                <span className="detail-info-value">{hospitalData.address || 'N/A'}</span>
-                            </div>
-                        </div>
-                        <div className="detail-info-item">
-                            <div className="detail-icon">
-                                <IoCallOutline />
-                            </div>
-                            <div className="info">
-                                <span>Phone Number</span>
-                                <span className="detail-info-value">{hospitalData.phone_nb || 'N/A'}</span>
-                            </div>
-                        </div>
-                        <div className="detail-info-item">
-                            <div className="detail-icon">
-                                <IoTimeOutline />
-                            </div>
-                            <div className="info">
-                                <span>Date Added</span>
-                                <span className="detail-info-value">{formatDate(hospitalData.created_at) || 'N/A'}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Map Card */}
-                <div className="detail-card map-card">
-                    <div className="map-container">
-                        {hospitalData.latitude && hospitalData.longitude ? (
-                            <MapIntegration
-                                latitude={parseFloat(hospitalData.latitude)}
-                                longitude={parseFloat(hospitalData.longitude)}
-                                height="100%"
-                            />
-                        ) : (
-                            <div className="map-error">
-                                <p>Location coordinates not available</p>
-                            </div>
-                        )}
-                    </div>
+                    )}
                 </div>
             </div>
 
-            {/* Manager Information Card */}
-            <div className="detail-card">
-                <div className="detail-card-header">
-                    <h3>Manager Information</h3>
+            {/* Hospital Image */}
+            {imageSrc ? (
+                <div className="hospital-detail-image-container-admin">
+                    <img
+                        src={imageSrc}
+                        alt={hospitalData.name}
+                        className="hospital-detail-image-admin"
+                        onError={(e) => {
+                            console.error('Image failed to load:', imageSrc);
+                            e.target.src = '/image.png'; // Fallback image
+                        }}
+                    />
                 </div>
-                
-                <div className="detail-card-body">
-                    <div className="detail-info-grid">
-                        <div className="detail-info-item">
-                            <div className="detail-info-label">
-                                <IoPersonOutline />
-                                <span>Contact Person</span>
+            ) : (
+                <div className="hospital-detail-image-container-admin">
+                    <div style={{
+                        width: '100%',
+                        height: '300px',
+                        backgroundColor: '#f3f4f6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '8px',
+                        color: '#6b7280'
+                    }}>
+                        No image available
+                    </div>
+                </div>
+            )}
+
+            {/* Hospital Information Grid */}
+            <div className="hospital-detail-grid-admin">
+                {/* Contact Information and Location Map Side by Side */}
+                <div className="hospital-detail-contact-map-wrapper-admin">
+                    {/* Contact Information */}
+                    <div className="hospital-detail-section-admin-card">
+                        <h2 className="hospital-detail-section-title-admin">Contact Information</h2>
+                        <div className="hospital-detail-contact-list-admin">
+                            <div className="hospital-detail-contact-item-admin">
+                                <MdOutlineLocationOn className="hospital-detail-contact-icon-admin" />
+                                <div>
+                                    <strong>Address</strong>
+                                    <p>{hospitalData.address || 'N/A'}</p>
+                                </div>
                             </div>
-                            <div className="detail-info-value">
-                                {getManagerName(hospitalData)}
+                            <div className="hospital-detail-contact-item-admin">
+                                <LuPhone className="hospital-detail-contact-icon-admin" />
+                                <div>
+                                    <strong>Phone</strong>
+                                    <p>{hospitalData.phone_nb || 'N/A'}</p>
+                                </div>
                             </div>
+                            <div className="hospital-detail-contact-item-admin">
+                                <MdOutlineMail className="hospital-detail-contact-icon-admin" />
+                                <div>
+                                    <strong>Email</strong>
+                                    <p>{hospitalData.email || 'N/A'}</p>
+                                </div>
+                            </div>
+                            {hospitalData.hours && (
+                                <div className="hospital-detail-contact-item-admin">
+                                    <IoTimeOutline className="hospital-detail-contact-icon-admin" />
+                                    <div>
+                                        <strong>Operating Hours</strong>
+                                        <p>{hospitalData.hours}</p>
+                                    </div>
+                                </div>
+                            )}
+                            {(hospitalData.latitude && hospitalData.longitude) && (
+                                <div className="hospital-detail-contact-item-admin">
+                                    <MdOutlineLocationOn className="hospital-detail-contact-icon-admin" />
+                                    <div>
+                                        <strong>Coordinates</strong>
+                                        <p>Lat: {parseFloat(hospitalData.latitude).toFixed(6)}, Lng: {parseFloat(hospitalData.longitude).toFixed(6)}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-
-                        {hospitalData.health_center_manager?.user && (
-                            <>
-                                <div className="detail-info-item">
-                                    <div className="detail-info-label">
-                                        <IoMailOutline />
-                                        <span>Manager Email</span>
-                                    </div>
-                                    <div className="detail-info-value">
-                                        {hospitalData.health_center_manager.user.email || 'N/A'}
-                                    </div>
-                                </div>
-
-                                <div className="detail-info-item">
-                                    <div className="detail-info-label">
-                                        <IoCallOutline />
-                                        <span>Manager Phone</span>
-                                    </div>
-                                    <div className="detail-info-value">
-                                        {hospitalData.health_center_manager.user.phone_nb || 'N/A'}
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {hospitalData.health_center_manager && (
-                            <>
-                                <div className="detail-info-item">
-                                    <div className="detail-info-label">
-                                        <IoTimeOutline />
-                                        <span>Working Hours</span>
-                                    </div>
-                                    <div className="detail-info-value">
-                                        {hospitalData.health_center_manager.start_time || 'N/A'} - {hospitalData.health_center_manager.end_time || 'N/A'}
-                                    </div>
-                                </div>
-                            </>
-                        )}
                     </div>
-                </div>
-            </div>
 
-            {/* Blood Stock Information Card */}
-            {hospitalData.blood_stock && typeof hospitalData.blood_stock === 'object' && (
-                <div className="detail-card">
-                    <div className="detail-card-header">
-                        <h3>Blood Stock</h3>
-                    </div>
-                    
-                    <div className="detail-card-body">
-                        <div className="detail-info-grid">
-                            {Object.keys(hospitalData.blood_stock).length > 0 ? (
-                                Object.entries(hospitalData.blood_stock).map(([type, count]) => (
-                                    <div key={type} className="detail-info-item">
-                                        <div className="detail-info-label">
-                                            <span>Blood Type {type}</span>
-                                        </div>
-                                        <div className="detail-info-value">
-                                            <span className="badge">{count} units</span>
-                                        </div>
-                                    </div>
-                                ))
+                    {/* Location Map */}
+                    <div className="hospital-detail-section-admin-card hospital-detail-map-section-admin">
+                        <h2 className="hospital-detail-section-title-admin">Location</h2>
+                        <div className="hospital-detail-map-container-admin">
+                            {hospitalData.latitude && hospitalData.longitude ? (
+                                <MapIntegration
+                                    latitude={parseFloat(hospitalData.latitude)}
+                                    longitude={parseFloat(hospitalData.longitude)}
+                                    height="300px"
+                                />
                             ) : (
-                                <div className="detail-info-item full-width">
-                                    <p>No stock data available</p>
+                                <div className="map-error-admin">
+                                    <p>Location coordinates not available</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
-            )}
+
+                {/* Statistics Card */}
+                <div className="hospital-detail-section-admin-card">
+                    <h2 className="hospital-detail-section-title-admin">
+                        <IoStatsChart className="hospital-detail-contact-icon-admin" style={{ display: 'inline', marginRight: '8px' }} />
+                        Statistics
+                    </h2>
+                    <div className="hospital-detail-stats-grid-admin">
+                        <div className="hospital-detail-stat-item-admin">
+                            <FaCalendarCheck className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.total_appointments || 0}</span>
+                                <span className="stat-label-admin">Total Appointments</span>
+                            </div>
+                        </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <FaUserMd className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.hospital_appointments || 0}</span>
+                                <span className="stat-label-admin">Hospital Appointments</span>
+                            </div>
+                        </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <FaAmbulance className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.home_appointments || 0}</span>
+                                <span className="stat-label-admin">Home Appointments</span>
+                            </div>
+                        </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <FaUsers className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.total_phlebotomists || 0}</span>
+                                <span className="stat-label-admin">Phlebotomists</span>
+                            </div>
+                        </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <FaTint className="stat-icon-admin" style={{ color: '#F12C31' }} />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.emergency_requests || 0}</span>
+                                <span className="stat-label-admin">Emergency Requests</span>
+                            </div>
+                        </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <IoTimeOutline className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.pending_appointments || 0}</span>
+                                <span className="stat-label-admin">Pending</span>
+                            </div>
+                        </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <IoCalendarOutline className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{stats.completed_appointments || 0}</span>
+                                <span className="stat-label-admin">Completed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Urgent Needs */}
+                {urgentNeeds.length > 0 && (
+                    <div className="hospital-detail-section-admin-card">
+                        <h2 className="hospital-detail-section-title-admin">Urgent Needs</h2>
+                        <div className="hospital-detail-urgent-needs-admin">
+                            {urgentNeeds.map((bloodType, index) => (
+                                <button key={index} className="hospital-detail-urgent-button-admin animate-pulse">
+                                    {bloodType}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Additional Information */}
+                <div className="hospital-detail-section-admin-card">
+                    <h2 className="hospital-detail-section-title-admin">Hospital Information</h2>
+                    <div className="hospital-detail-info-list-admin">
+                        {hospitalData.hours && (
+                            <div className="hospital-detail-info-item-admin">
+                                <strong>Operating Hours:</strong>
+                                <span>{hospitalData.hours}</span>
+                            </div>
+                        )}
+                        {hospitalData.established && (
+                            <div className="hospital-detail-info-item-admin">
+                                <strong>Established:</strong>
+                                <span>{hospitalData.established}</span>
+                            </div>
+                        )}
+                        <div className="hospital-detail-info-item-admin">
+                            <strong>Date Added:</strong>
+                            <span>{formatDate(hospitalData.created_at)}</span>
+                        </div>
+                        {hospitalData.updated_at && (
+                            <div className="hospital-detail-info-item-admin">
+                                <strong>Last Updated:</strong>
+                                <span>{formatDate(hospitalData.updated_at)}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Services */}
+                {services.length > 0 && (
+                    <div className="hospital-detail-section-admin-card hospital-detail-section-full-admin">
+                        <h2 className="hospital-detail-section-title-admin">Services Offered</h2>
+                        <ul className="hospital-detail-services-list-admin">
+                            {services.map((service, index) => (
+                                <li key={index}>{service}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Manager Information */}
+                <div className="hospital-detail-section-admin-card hospital-detail-section-full-admin">
+                    <h2 className="hospital-detail-section-title-admin">Manager Information</h2>
+                    <div className="hospital-detail-contact-list-admin">
+                        <div className="hospital-detail-contact-item-admin">
+                            <IoPersonOutline className="hospital-detail-contact-icon-admin" />
+                            <div>
+                                <strong>Contact Person</strong>
+                                <p>{getManagerName(hospitalData)}</p>
+                            </div>
+                        </div>
+                        {hospitalData.health_center_manager?.user && (
+                            <>
+                                <div className="hospital-detail-contact-item-admin">
+                                    <MdOutlineMail className="hospital-detail-contact-icon-admin" />
+                                    <div>
+                                        <strong>Manager Email</strong>
+                                        <p>{hospitalData.health_center_manager.user.email || 'N/A'}</p>
+                                    </div>
+                                </div>
+                                <div className="hospital-detail-contact-item-admin">
+                                    <LuPhone className="hospital-detail-contact-icon-admin" />
+                                    <div>
+                                        <strong>Manager Phone</strong>
+                                        <p>{hospitalData.health_center_manager.user.phone_nb || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                        {hospitalData.health_center_manager && (
+                            <>
+                                {hospitalData.health_center_manager.start_time && hospitalData.health_center_manager.end_time && (
+                                    <div className="hospital-detail-contact-item-admin">
+                                        <IoTimeOutline className="hospital-detail-contact-icon-admin" />
+                                        <div>
+                                            <strong>Working Hours</strong>
+                                            <p>
+                                                {hospitalData.health_center_manager.start_time || 'N/A'} - {hospitalData.health_center_manager.end_time || 'N/A'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                {managerAdditionalInfo.position && (
+                                    <div className="hospital-detail-contact-item-admin">
+                                        <IoPersonOutline className="hospital-detail-contact-icon-admin" />
+                                        <div>
+                                            <strong>Position</strong>
+                                            <p>{managerAdditionalInfo.position}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {managerAdditionalInfo.office_location && (
+                                    <div className="hospital-detail-contact-item-admin">
+                                        <MdOutlineLocationOn className="hospital-detail-contact-icon-admin" />
+                                        <div>
+                                            <strong>Office Location</strong>
+                                            <p>{managerAdditionalInfo.office_location}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Phlebotomists */}
+                {phlebotomists.length > 0 && (
+                    <div className="hospital-detail-section-admin-card hospital-detail-section-full-admin">
+                        <h2 className="hospital-detail-section-title-admin">Phlebotomists ({phlebotomists.length})</h2>
+                        <div className="hospital-detail-phlebotomists-list-admin">
+                            {phlebotomists.map((phleb, index) => {
+                                const user = phleb.user || phleb;
+                                const name = user.first_name && user.last_name 
+                                    ? `${user.first_name} ${user.middle_name || ''} ${user.last_name}`.trim()
+                                    : 'N/A';
+                                return (
+                                    <div key={phleb.id || index} className="hospital-detail-phlebotomist-item-admin">
+                                        <FaUserMd className="phlebotomist-icon-admin" />
+                                        <div className="phlebotomist-info-admin">
+                                            <strong>{name}</strong>
+                                            {user.email && <span>{user.email}</span>}
+                                            {phleb.code && <span className="phlebotomist-code-admin">Code: {phleb.code}</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Blood Stock Information */}
+                {hospitalData.blood_stock && typeof hospitalData.blood_stock === 'object' && Object.keys(hospitalData.blood_stock).length > 0 && (
+                    <div className="hospital-detail-section-admin-card hospital-detail-section-full-admin">
+                        <h2 className="hospital-detail-section-title-admin">Blood Stock</h2>
+                        <div className="hospital-detail-blood-stock-grid-admin">
+                            {Object.entries(hospitalData.blood_stock).map(([type, count]) => (
+                                <div key={type} className="hospital-detail-blood-stock-item-admin">
+                                    <FaTint className="blood-type-icon-admin" />
+                                    <div className="blood-stock-info-admin">
+                                        <span className="blood-type-admin">{type}</span>
+                                        <span className="blood-count-admin">{count} units</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
         </section>
     );
 }
+

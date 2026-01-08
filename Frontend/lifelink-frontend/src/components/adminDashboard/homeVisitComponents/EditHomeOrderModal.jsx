@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 export default function EditHomeOrderModal({ onClose, onOrderUpdated, orderCode }) {
     const [loading, setLoading] = useState(false);
@@ -30,14 +30,8 @@ export default function EditHomeOrderModal({ onClose, onOrderUpdated, orderCode 
 
         setFetchLoading(true);
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/home-visit-orders/${orderCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/home-visit-orders/${orderCode}`
             );
             
             const order = response.data.order || response.data;
@@ -95,15 +89,10 @@ export default function EditHomeOrderModal({ onClose, onOrderUpdated, orderCode 
                 updateData.medical_conditions = editData.medical_conditions;
             }
 
-            await axios.put(
-                `http://localhost:8000/api/admin/dashboard/home-visit-orders/${orderCode}`,
-                updateData,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            await api.get("/sanctum/csrf-cookie");
+            await api.put(
+                `/api/admin/dashboard/home-visit-orders/${orderCode}`,
+                updateData
             );
 
             if (onOrderUpdated) {

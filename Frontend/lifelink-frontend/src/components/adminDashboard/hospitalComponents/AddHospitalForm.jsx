@@ -26,6 +26,12 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
         longitude: null,
         phone_nb: "",
         email: "",
+        image: null,
+        description: "",
+        services: [],
+        hours: "",
+        established: "",
+        urgent_needs: [],
         manager: {
             name: '',
             first_name: '',
@@ -39,6 +45,8 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
             working_dates: [],
         },
     });
+    const [serviceInput, setServiceInput] = useState("");
+    const [urgentNeedInput, setUrgentNeedInput] = useState("");
 
 
     const handleChange = (e) => {
@@ -163,6 +171,12 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
                     longitude: null,
                     phone_nb: "",
                     email: "",
+                    image: null,
+                    description: "",
+                    services: [],
+                    hours: "",
+                    established: "",
+                    urgent_needs: [],
                     manager: {
                       name: '',
                       first_name: '',
@@ -179,6 +193,8 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
                 setManagerFullName("");
                 setWorkingDates([]);
                 setPasswordMes("");
+                setServiceInput("");
+                setUrgentNeedInput("");
                 setPasswordChecks({
                     length: false,
                     upper: false,
@@ -274,7 +290,105 @@ export default function AddHospitalForm({ onClose, onHospitalAdded }) {
                                         onChange={handleChange}
                                     />
                                 </div>
-                            </div>  
+                            </div>
+                            <div className="form-group">
+                                <div style={{ width: '100%' }}>
+                                    <label htmlFor="image">Hospital Image (URL or base64)</label>
+                                    <input
+                                        id="image"
+                                        name="image"
+                                        type="text"
+                                        className="input"
+                                        value={addHospitalData.image || ""}
+                                        placeholder="Enter image URL or leave empty"
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <div style={{ width: '100%' }}>
+                                    <label htmlFor="description">Description</label>
+                                    <textarea
+                                        id="description"
+                                        name="description"
+                                        className="input"
+                                        value={addHospitalData.description}
+                                        placeholder="Enter hospital description"
+                                        onChange={handleChange}
+                                        rows="4"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <div style={{ width: '100%' }}>
+                                    <label htmlFor="services">Services (comma-separated)</label>
+                                    <input
+                                        id="services"
+                                        type="text"
+                                        className="input"
+                                        value={serviceInput}
+                                        placeholder="e.g., Blood Donation Center, Organ Transplant Services, Emergency Care"
+                                        onChange={(e) => setServiceInput(e.target.value)}
+                                        onBlur={(e) => {
+                                            const servicesArray = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                                            setAddHospitalData(prev => ({ ...prev, services: servicesArray }));
+                                        }}
+                                    />
+                                    {addHospitalData.services.length > 0 && (
+                                        <small className="muted" style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                                            Services: {addHospitalData.services.join(', ')}
+                                        </small>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <div>
+                                    <label htmlFor="hours">Operating Hours</label>
+                                    <input
+                                        id="hours"
+                                        name="hours"
+                                        type="text"
+                                        className="input"
+                                        value={addHospitalData.hours}
+                                        placeholder="e.g., Mon-Fri: 8AM-8PM"
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="established">Established Year</label>
+                                    <input
+                                        id="established"
+                                        name="established"
+                                        type="text"
+                                        className="input"
+                                        value={addHospitalData.established}
+                                        placeholder="e.g., 1985"
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <div style={{ width: '100%' }}>
+                                    <label htmlFor="urgent_needs">Urgent Blood Type Needs (comma-separated)</label>
+                                    <input
+                                        id="urgent_needs"
+                                        type="text"
+                                        className="input"
+                                        value={urgentNeedInput}
+                                        placeholder="e.g., A+, B-, AB+, O-"
+                                        onChange={(e) => setUrgentNeedInput(e.target.value)}
+                                        onBlur={(e) => {
+                                            const needsArray = e.target.value.split(',').map(n => n.trim()).filter(n => n);
+                                            setAddHospitalData(prev => ({ ...prev, urgent_needs: needsArray }));
+                                        }}
+                                    />
+                                    {addHospitalData.urgent_needs.length > 0 && (
+                                        <small className="muted" style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                                            Urgent Needs: {addHospitalData.urgent_needs.join(', ')}
+                                        </small>
+                                    )}
+                                </div>
+                            </div>
                             <div className="form-group">
                                 <div>
                                     <label>Hospital Location</label>

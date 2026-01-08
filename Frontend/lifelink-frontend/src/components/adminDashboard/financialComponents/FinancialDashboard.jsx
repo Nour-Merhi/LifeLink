@@ -4,12 +4,19 @@ import { BsArrowRight } from "react-icons/bs";
 
 import AddPatientCaseForm from "./AddPatientCaseForm"
 
-export default function FinancialDashboard({ metricsData, topDonors, activeCases }){
+export default function FinancialDashboard({ metricsData, topDonors, activeCases, onPatientCaseAdded }){
     const [selectedPeriod, setSelectedPeriod] = useState("last-month");
     const [openModal, setOpenModal] = useState(false)
 
     const onClose = () => {
         setOpenModal(false)
+    }
+
+    const handlePatientCaseAdded = () => {
+        if (onPatientCaseAdded) {
+            onPatientCaseAdded();
+        }
+        setOpenModal(false);
     }
 
     return(
@@ -60,13 +67,13 @@ export default function FinancialDashboard({ metricsData, topDonors, activeCases
                         {topDonors.map((donor, index) => (
                             <div key={index} className="donor-item">
                                 <div className="donor-info">
-                                    <IoPersonCircle className="donor-avatar" />
-                                    <div className="donor-details">
-                                        <span className="donor-name">{donor.name}</span>
-                                        <small className="donor-date">{donor.date}</small>
+                                    <IoPersonCircle className="transaction-donor-avatar" />
+                                    <div className="transaction-donor-details">
+                                        <span className="transaction-donor-name">{donor.name}</span>
+                                        <small className="transaction-donor-date">{donor.date}</small>
                                     </div>
                                 </div>
-                                <span className="donor-amount">{donor.amount}</span>
+                                <span className="transaction-donor-amount">{donor.amount}</span>
                             </div>
                         ))}
                     </div>
@@ -130,7 +137,7 @@ export default function FinancialDashboard({ metricsData, topDonors, activeCases
                 </div>
             </div>
             {openModal && 
-                <AddPatientCaseForm onClose = { onClose } />
+                <AddPatientCaseForm onClose={onClose} onPatientCaseAdded={handlePatientCaseAdded} />
             }
         </section>
     )

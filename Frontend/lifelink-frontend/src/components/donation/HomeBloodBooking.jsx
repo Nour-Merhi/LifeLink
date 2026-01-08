@@ -3,7 +3,7 @@ import Hospitals from "./Hospitals"
 import Calendar from "./Calender" 
 
 import { useState, useEffect } from "react" 
-import axios from 'axios';
+import api from "../../api/axios";
 
 export default function HomeBloodBooking({ pageType }) {
   const prefix = pageType === "home" ? "home_" : "hospital_" 
@@ -44,12 +44,15 @@ export default function HomeBloodBooking({ pageType }) {
       setLoading(true);
       setError("");
       
-      axios.get('http://localhost:8000/api/blood/home_donation')
+      api.get('/api/blood/home_donation')
         .then((res) => {
           console.log('Home donation API response:', res.data);
-          const hospitalsData = res.data.hospitals || res.data || [];
-          const urgentData = res.data.urgent_hospitals || [];
-          const regularData = res.data.regular_hospitals || [];
+          
+          // Handle the response structure from the backend
+          const responseData = res.data || {};
+          const hospitalsData = responseData.hospitals || [];
+          const urgentData = responseData.urgent_hospitals || [];
+          const regularData = responseData.regular_hospitals || [];
           
           const hospitalsArray = Array.isArray(hospitalsData) ? hospitalsData : [];
           const urgentArray = Array.isArray(urgentData) ? urgentData : [];
@@ -61,7 +64,7 @@ export default function HomeBloodBooking({ pageType }) {
           setFilteredHospitals(hospitalsArray);
           
           if (hospitalsArray.length === 0) {
-            console.warn('No hospitals found with home donation appointments');
+            console.log('No hospitals found with home donation appointments. This is normal if no appointments have been created yet.');
           }
         })
         .catch(err => {
@@ -91,10 +94,10 @@ export default function HomeBloodBooking({ pageType }) {
       // Build URL with appointment_type query parameter if available
       const appointmentType = hospital.appointment_type; // 'urgent' or 'regular'
       const url = appointmentType 
-        ? `http://localhost:8000/api/blood/home_donation/${hospital.id}?appointment_type=${appointmentType}`
-        : `http://localhost:8000/api/blood/home_donation/${hospital.id}`;
+        ? `/api/blood/home_donation/${hospital.id}?appointment_type=${appointmentType}`
+        : `/api/blood/home_donation/${hospital.id}`;
       
-      axios.get(url)
+      api.get(url)
         .then((res) => {
           const appointmentsData = res.data.appointments || [];
           const timeSlotsData = res.data.time_slots || [];

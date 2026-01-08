@@ -103,6 +103,18 @@ export default function ThankModalHospitalBlood({hospitalAppt, onClose}){
         throw new Error('Please fill in all required fields');
       }
 
+      // Check eligibility: last donation must be at least 56 days ago
+      if (donorData.last_donation) {
+        const lastDonationDate = new Date(donorData.last_donation);
+        const today = new Date();
+        const daysSinceLastDonation = Math.floor((today - lastDonationDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysSinceLastDonation < 56) {
+          const daysRemaining = 56 - daysSinceLastDonation;
+          throw new Error(`You are not eligible to donate yet. You must wait at least 56 days between donations. You can donate again in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}.`);
+        }
+      }
+
       // Prepare complete appointment data
       const appointmentData = {
         ...donorData,
@@ -121,11 +133,20 @@ export default function ThankModalHospitalBlood({hospitalAppt, onClose}){
       setShowForm(false);
     } catch (error) {
       console.error('Error saving hospital appointment:', error);
-      const errorMessage = error.response?.data?.message 
-        || error.response?.data?.error 
-        || error.message 
-        || 'Failed to save appointment. Please try again.';
-      setError(errorMessage);
+      console.error('Error response:', error.response?.data);
+      
+      // Handle validation errors
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.values(errors).flat().join(', ');
+        setError(errorMessages || error.response?.data?.message || 'Validation failed. Please check your input.');
+      } else {
+        const errorMessage = error.response?.data?.message 
+          || error.response?.data?.error 
+          || error.message 
+          || 'Failed to save appointment. Please try again.';
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -238,7 +259,6 @@ export default function ThankModalHospitalBlood({hospitalAppt, onClose}){
                     name="last_donation" 
                     value={formData.last_donation}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
               </div>

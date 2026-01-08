@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-
-import axios from "axios"
+import api from "../../../api/axios";
 
 export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentAdded }) {
     const [loading, setLoading] = useState(false);
@@ -141,15 +140,10 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                 }
             }
 
-            const response = await axios.post(
-                'http://localhost:8000/api/admin/dashboard/generate-hospital-appointments',
-                submitData,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
-                }
+            await api.get("/sanctum/csrf-cookie");
+            const response = await api.post(
+                '/api/admin/dashboard/generate-hospital-appointments',
+                submitData
             );
 
             // Trigger refresh of appointments list immediately

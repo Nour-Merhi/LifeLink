@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from 'axios';
+import api from "../../../api/axios";
 
 export default function EditHospitalAppointmentModal({ onClose, onAppointmentUpdated, appointmentCode }) {
     const [loading, setLoading] = useState(false);
@@ -25,14 +25,8 @@ export default function EditHospitalAppointmentModal({ onClose, onAppointmentUpd
 
         setFetchLoading(true);
         try {
-            const response = await axios.get(
-                `http://localhost:8000/api/admin/dashboard/hospital-appointments/${appointmentCode}`,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            const response = await api.get(
+                `/api/admin/dashboard/hospital-appointments/${appointmentCode}`
             );
             
             const apt = response.data.hospitalAppointment || response.data;
@@ -63,15 +57,10 @@ export default function EditHospitalAppointmentModal({ onClose, onAppointmentUpd
         setErrors({});
 
         try {
-            await axios.put(
-                `http://localhost:8000/api/admin/dashboard/hospital-appointments/${appointmentCode}`,
-                editData,
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                }
+            await api.get("/sanctum/csrf-cookie");
+            await api.put(
+                `/api/admin/dashboard/hospital-appointments/${appointmentCode}`,
+                editData
             );
 
             if (onAppointmentUpdated) {

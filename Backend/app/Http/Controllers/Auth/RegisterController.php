@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WelcomeEmail;
 use App\Models\User;
 use App\Models\Donor;
 use App\Models\BloodType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class RegisterController extends Controller
@@ -31,14 +34,12 @@ class RegisterController extends Controller
                 'confirmPassword' => 'required|string|same:password',
                 'dob' => 'required|date|before:today',
                 'bloodType' => 'required|string|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-                'lastDonation' => 'nullable|date|before_or_equal:today',
                 'city' => 'nullable|string|max:100',
             ]);
         } catch (ValidationException $e) {
             $errors = $e->errors();
             
-            // Check if email is already taken and return generic error message
-            // Laravel returns "The email has already been taken." for unique validation
+            // Check if email is already taken and return appropriate error message
             if (isset($errors['email'])) {
                 $emailErrors = $errors['email'];
                 // Check if any email error contains "already been taken" or "has already been taken"
@@ -53,8 +54,8 @@ class RegisterController extends Controller
                 
                 if ($isEmailTaken) {
                     return response()->json([
-                        'message' => 'Email or password is incorrect',
-                        'errors' => ['email' => ['Email or password is incorrect']]
+                        'message' => 'This email is already registered. Please use a different email or try logging in.',
+                        'errors' => ['email' => ['This email is already registered. Please use a different email or try logging in.']]
                     ], 422);
                 }
             }
@@ -116,17 +117,30 @@ class RegisterController extends Controller
                 'gender' => 'male', // Default, can be updated later
                 'date_of_birth' => $validated['dob'],
                 'blood_type_id' => $bloodType->id,
-                'last_donation' => $validated['lastDonation'] ?? null,
             ]);
 
             DB::commit();
 
-            // Auto-login the user after registration
-            auth()->login($user);
+            // Send welcome email (in background to avoid blocking)
+            try {
+                Mail::to($user->email)->send(new WelcomeEmail($user->first_name));
+            } catch (\Exception $mailException) {
+                // Log email error but don't fail registration
+                \Log::warning('Failed to send welcome email:', [
+                    'user_id' => $user->id,
+                    'error' => $mailException->getMessage()
+                ]);
+            }
+
+            // Auto-login the user after registration using web guard (session-based)
+            Auth::guard('web')->login($user);
+
+            // Load donor relationship with blood type
+            $user->load(['donor.bloodType']);
 
             return response()->json([
                 'message' => 'Registration successful',
-                'user' => $user->load('donor')
+                'user' => $user
             ], 201);
 
         } catch (\Illuminate\Database\QueryException $e) {

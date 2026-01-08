@@ -32,6 +32,17 @@ class Hospital extends Model
         'longitude',
         'code',
         'status',
+        'image',
+        'description',
+        'services',
+        'hours',
+        'established',
+        'urgent_needs',
+    ];
+
+    protected $casts = [
+        'services' => 'array',
+        'urgent_needs' => 'array',
     ];
     protected static function booted()
     {

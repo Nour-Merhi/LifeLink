@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { IoSearchSharp } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
-import axios from "axios";
+import api from "../../../api/axios";
 
 export default function AssignPhlebotomistModal({ onClose, orders = [], onAssignSuccess }) {
     const [phlebotomists, setPhlebotomists] = useState([]);
@@ -63,7 +63,7 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
         setLoading(true);
         setError("");
         try {
-            const response = await axios.get('http://localhost:8000/api/admin/dashboard/get-phlebotomists');
+            const response = await api.get('/api/admin/dashboard/get-phlebotomists');
             const phlebotomistsData = response.data.phlebotomists || [];
             setPhlebotomists(phlebotomistsData);
             setFilteredPhlebotomists(phlebotomistsData);
@@ -102,7 +102,9 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
             // Assign phlebotomist to all selected orders
             const assignmentPromises = orders.map(async (order) => {
                 const orderCode = order.id || order.code;
-                return axios.post(`http://localhost:8000/api/admin/dashboard/home-visit-orders/${encodeURIComponent(orderCode)}/assign-phlebotomist`, {
+                // Get CSRF cookie first
+                await api.get("/sanctum/csrf-cookie");
+                return api.post(`/api/admin/dashboard/home-visit-orders/${encodeURIComponent(orderCode)}/assign-phlebotomist`, {
                     phlebotomist_id: selectedPhlebotomist.id
                 });
             });

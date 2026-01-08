@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../api/axios";
 
 import { RiUserHeartLine } from "react-icons/ri";
 import { MdOutlineHealthAndSafety } from "react-icons/md";
@@ -72,7 +72,7 @@ export default function OrganPledges() {
     const fetchLivingDonors = () => {
         setLoading(true);
         setError("");
-        axios.get("http://localhost:8000/api/admin/dashboard/living-donors")
+        api.get("/api/admin/dashboard/living-donors")
             .then(res => {
                 setLivingDonorsData(res.data.living_donors || []);
             })
@@ -87,7 +87,7 @@ export default function OrganPledges() {
     const fetchAfterDeathPledges = () => {
         setLoadingAfterDeath(true);
         setErrorAfterDeath("");
-        axios.get("http://localhost:8000/api/admin/dashboard/after-death-pledges")
+        api.get("/api/admin/dashboard/after-death-pledges")
             .then(res => {
                 setAfterDeathPledgesData(res.data.after_death_pledges || []);
             })

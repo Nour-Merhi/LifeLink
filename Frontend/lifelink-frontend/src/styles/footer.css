@@ -6,9 +6,8 @@
 .footer-contact {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-    margin-top: 40px;
-    margin-bottom: 60px;
+    gap: 5px;
+    margin: 40px 100px 60px 100px;
 }
 
 .footer-contact-item {
@@ -20,13 +19,13 @@
     margin-top: 40px;
 }
 .footer-contact-item-icon {
-    width: 80px;
-    height:80px;
+    width: 70px;
+    height:70px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 15px;
-    font-size: 25px;
+    font-size: 20px;
 }
 .footer-contact-item-icon-red {
     background-color: rgba(255, 4, 4, 0.5);
@@ -55,7 +54,7 @@
 .footer-social-media{
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 50px;
+    gap: 40px;
     margin-top: 60px;
 }
 
@@ -63,7 +62,7 @@
 .footer-quick-actions,
 .footer-follow-us{
     background-color: rgba(255, 255, 255, 0.05);
-    padding: 30px;
+    padding: 20px 30px;
     border-radius: 15px;
     backdrop-filter: blur(10px);
 }
@@ -84,7 +83,7 @@
 
 .footer-send-message-form label {
     color: #ffffff;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     margin-bottom: 8px;
     display: block;
@@ -100,7 +99,7 @@
     margin-bottom: 0;
     background-color: rgba(40, 40, 40, 0.8) !important;
     color: #ffffff !important;
-    font-size: 14px;
+    font-size: 12px;
     transition: border-color 0.3s, background-color 0.3s;
 }
 
@@ -146,7 +145,7 @@
     border: none;
     border-radius: 8px;
     padding: 14px 28px;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: transform 0.2s;
@@ -208,14 +207,10 @@
     padding: 20px;
     transition: transform 0.2s;
 }
-.quick-actions-item-red{
-    background-color: rgba(204, 5, 4, 0.5);
-}
-.quick-actions-item-blue{
-    background-color: rgba(21, 9, 197, 0.37);
-}
+.quick-actions-item-red,
+.quick-actions-item-blue,
 .quick-actions-item-green{
-    background-color: rgba(0, 167, 133, 0.37);
+    background-color: rgba(153, 152, 152, 0.1);
 }
 .quick-actions-item-icon{
     display: flex;
@@ -223,17 +218,13 @@
     justify-content: center;
     border-radius: 10px;
     padding: 10px;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.5);
     transition: transform 0.25s ease, background-color 0.25s ease;
 }
-.quick-actions-item-icon-red{
-    background-color: #D82D32;
-}
-.quick-actions-item-icon-blue{
-    background-color: #122394;
-}
+.quick-actions-item-icon-red,
+.quick-actions-item-icon-blue,
 .quick-actions-item-icon-green{
-    background-color:#42D269;
+    background-color: rgba(255, 255, 255, 0.062);
 }
 .quick-actions-item:hover{
     transform: translateY(-2px);
@@ -247,8 +238,8 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: center;
-    gap: 30px;
+    justify-content: flex-start;
+    gap: 20px;
 }
 .footer-follow-us-list-item{
     display: flex;
@@ -264,7 +255,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 10px;
-    font-size: 45px;
+    font-size: 35px;
     color: #ffffff;
     transition: transform 0.25s ease, background-color 0.25s ease;
 }
