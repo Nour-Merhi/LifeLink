@@ -143,7 +143,7 @@ export default function PhlebotomistDetail() {
                         </div>
                     </div>
                 </div>
-                <div className="donor-profile-info">
+                <div className="donor-profile-info mt-5">
                     <div className="detail-info-item">
                         <IoMailOutline className="info-icon" />
                         <span className="info-value">{phlebotomistData.email}</span>
@@ -164,7 +164,7 @@ export default function PhlebotomistDetail() {
             </div>
 
             {/* Statistics Cards */}
-            <div className="metrics-grid-4" style={{ marginTop: '20px', marginBottom: '20px' }}>
+            <div className="metrics-grid-4">
                 <div className="metric-card margin-bottom-10">
                     <div className="metric-content">
                         <div className="metric-info">

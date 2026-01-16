@@ -1,7 +1,7 @@
 /* Human Body Section Styles */
 .human-body-container {
     background-color: #000000;
-    border-radius: 5px;
+    border-radius: 3px;
     padding: 20px 40px;
     display: flex;
     align-items: center;
@@ -38,3 +38,24 @@
     }
 }
 
+
+/*Human Body Animation*/
+.organ-map svg{
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 100vh;
+    padding: 20px;
+}
+
+/* Let only the top-level group handle clicks */
+#heart-main, #lungs, #liver, #kidneys, #intestines, #stomach, #brain {
+    cursor: pointer;
+    pointer-events: visiblePainted; /* normal behavior */
+  }
+  
+  /* Prevent inner paths from capturing events */
+  #heart *, #lungs *, #liver *, #kidneys *, #base *, #intestines *, #stomach *, #brain * {
+    pointer-events: none;
+  }
+  

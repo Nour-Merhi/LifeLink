@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { IoPerson, IoLockClosed, IoTime, IoShieldCheckmark } from "react-icons/io5";
 import { FaUserShield, FaCheckCircle } from "react-icons/fa";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import profile from "../../assets/imgs/profile.svg";
 import "../../styles/Dashboard.css";
 import api from "../../api/axios";
@@ -44,6 +45,13 @@ export default function AdminProfile() {
         lower: false,
         number: false,
         special: false
+    });
+
+    // Password visibility toggles
+    const [showPasswords, setShowPasswords] = useState({
+        current_password: false,
+        new_password: false,
+        confirm_password: false
     });
 
     // Account Activity
@@ -257,7 +265,8 @@ export default function AdminProfile() {
             await api.get("/sanctum/csrf-cookie");
             await api.put("/api/settings/password", {
                 current_password: passwordData.current_password,
-                new_password: passwordData.new_password
+                new_password: passwordData.new_password,
+                new_password_confirmation: passwordData.confirm_password
             });
 
             setPasswordSuccess(true);
@@ -520,41 +529,116 @@ export default function AdminProfile() {
 
                 <form onSubmit={handleChangePassword}>
                     <div className="form-group">
-                        <div>
+                        <div style={{ position: 'relative' }}>
                             <label htmlFor="current_password">Current Password *</label>
                             <input
                                 id="current_password"
-                                type="password"
+                                type={showPasswords.current_password ? "text" : "password"}
                                 value={passwordData.current_password}
                                 onChange={(e) => handlePasswordChange('current_password', e.target.value)}
                                 placeholder="Enter current password"
                                 required
+                                style={{ paddingRight: '40px' }}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, current_password: !prev.current_password }))}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '40px',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#666',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '5px',
+                                    zIndex: 10
+                                }}
+                                tabIndex={-1}
+                            >
+                                {showPasswords.current_password ? (
+                                    <AiOutlineEyeInvisible size={20} />
+                                ) : (
+                                    <AiOutlineEye size={20} />
+                                )}
+                            </button>
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <div>
+                        <div style={{ position: 'relative' }}>
                             <label htmlFor="new_password">New Password *</label>
                             <input
                                 id="new_password"
-                                type="password"
+                                type={showPasswords.new_password ? "text" : "password"}
                                 value={passwordData.new_password}
                                 onChange={(e) => handlePasswordChange('new_password', e.target.value)}
                                 placeholder="Enter new password"
                                 required
+                                style={{ paddingRight: '40px' }}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, new_password: !prev.new_password }))}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '40px',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#666',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '5px',
+                                    zIndex: 10
+                                }}
+                                tabIndex={-1}
+                            >
+                                {showPasswords.new_password ? (
+                                    <AiOutlineEyeInvisible size={20} />
+                                ) : (
+                                    <AiOutlineEye size={20} />
+                                )}
+                            </button>
                         </div>
-                        <div>
+                        <div style={{ position: 'relative' }}>
                             <label htmlFor="confirm_password">Confirm New Password *</label>
                             <input
                                 id="confirm_password"
-                                type="password"
+                                type={showPasswords.confirm_password ? "text" : "password"}
                                 value={passwordData.confirm_password}
                                 onChange={(e) => handlePasswordChange('confirm_password', e.target.value)}
                                 placeholder="Confirm new password"
                                 required
+                                style={{ paddingRight: '40px' }}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, confirm_password: !prev.confirm_password }))}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '40px',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#666',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '5px',
+                                    zIndex: 10
+                                }}
+                                tabIndex={-1}
+                            >
+                                {showPasswords.confirm_password ? (
+                                    <AiOutlineEyeInvisible size={20} />
+                                ) : (
+                                    <AiOutlineEye size={20} />
+                                )}
+                            </button>
                         </div>
                     </div>
 

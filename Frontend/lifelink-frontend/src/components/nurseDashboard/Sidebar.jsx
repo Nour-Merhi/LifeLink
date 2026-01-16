@@ -7,13 +7,28 @@ import { RiSettings5Fill } from "react-icons/ri";
 import { IoMdArrowForward } from "react-icons/io";
 import { FaUserMd } from "react-icons/fa";
 import { FaHouseUser } from "react-icons/fa";
-
+import { FiLogOut } from "react-icons/fi";
 
 
 import { NavLink, useNavigate } from "react-router-dom";
+import api from "../../api/axios";
 
 export default function Sidebar(){
     const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        try {
+          await api.post("/api/logout");
+          // Trigger auth change to update context
+          window.dispatchEvent(new Event('auth-change'));
+          navigate("/home");
+        } catch (error) {
+          console.error('Logout error:', error);
+          // Trigger auth change anyway
+          window.dispatchEvent(new Event('auth-change'));
+          navigate("/home");
+        }
+      };
     
     return (
         <>
@@ -49,13 +64,13 @@ export default function Sidebar(){
                 </div>
                 <div className="link-item">
                     <RiSettings5Fill className="icon-size text-white"/>
-                    <NavLink to="/nurse/settings" className="text-white">Settings</NavLink>
+                    <NavLink to="/nurse/settings" className="text-white">Profile Settings</NavLink>
                 </div>
             </div>
 
             <div className="logout">
-                <IoMdArrowForward className="icon-size text-white"/>
-                <button className="logout-button text-white">Logout</button>
+                <FiLogOut className="icon-size text-white"/>
+                <button className="logout-button text-white" onClick={handleLogout}>Logout</button>
             </div>
         </div>
         </>

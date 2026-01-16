@@ -49,9 +49,9 @@ class Appointment extends Model
         return $this->belongsTo(Hospital::class, 'hospital_id');
     }
     public function homeAppointments(){
-        return $this->hasMany(HomeAppointment::class, 'id');
+        return $this->hasMany(HomeAppointment::class, 'appointment_id');
     }
     public function hospitalAppointments(){
-        return $this->hasMany(HospitalAppointment::class, 'id');
+        return $this->hasMany(HospitalAppointment::class, 'appointment_id');
     }
 }

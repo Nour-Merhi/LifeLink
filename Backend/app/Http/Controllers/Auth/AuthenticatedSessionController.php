@@ -32,9 +32,17 @@ class AuthenticatedSessionController extends Controller
             
             $user = Auth::user();
             
+            // Load relationships based on role
+            $role = strtolower($user->role ?? '');
+            if ($role === 'donor') {
+                $user->load(['donor.bloodType']);
+            } elseif ($role === 'manager') {
+                $user->load(['healthCenterManager.hospital']);
+            }
+            
             return response()->json([
                 'message' => 'Login successful',
-                'user' => $user->load('donor')
+                'user' => $user
             ], 200);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -59,8 +67,18 @@ class AuthenticatedSessionController extends Controller
     {
         $user = $request->user();
         if ($user) {
-            // Load donor relationship with blood type
+            // Load relationships based on user role
+            $role = strtolower($user->role ?? '');
+            
+            if ($role === 'donor') {
             $user->load(['donor.bloodType']);
+            }
+            
+            if ($role === 'manager') {
+                $user->load(['healthCenterManager.hospital']);
+            }
+            
+            // Also load for other roles if needed (nurse, admin, etc.)
         }
         return response()->json($user);
     }

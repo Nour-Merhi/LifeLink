@@ -314,6 +314,13 @@ export default function HospitalDetail() {
                                 <span className="stat-label-admin">Completed</span>
                             </div>
                         </div>
+                        <div className="hospital-detail-stat-item-admin">
+                            <FaCalendarCheck className="stat-icon-admin" />
+                            <div className="stat-content-admin">
+                                <span className="stat-value-admin">{hospitalData.requests || stats.requests || 0}</span>
+                                <span className="stat-label-admin">Total Requests</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -465,17 +472,44 @@ export default function HospitalDetail() {
                 {/* Blood Stock Information */}
                 {hospitalData.blood_stock && typeof hospitalData.blood_stock === 'object' && Object.keys(hospitalData.blood_stock).length > 0 && (
                     <div className="hospital-detail-section-admin-card hospital-detail-section-full-admin">
-                        <h2 className="hospital-detail-section-title-admin">Blood Stock</h2>
+                        <h2 className="hospital-detail-section-title-admin">Blood Stock & Shortage States</h2>
                         <div className="hospital-detail-blood-stock-grid-admin">
-                            {Object.entries(hospitalData.blood_stock).map(([type, count]) => (
-                                <div key={type} className="hospital-detail-blood-stock-item-admin">
-                                    <FaTint className="blood-type-icon-admin" />
-                                    <div className="blood-stock-info-admin">
-                                        <span className="blood-type-admin">{type}</span>
-                                        <span className="blood-count-admin">{count} units</span>
+                            {Object.entries(hospitalData.blood_stock).map(([type, count]) => {
+                                const shortageState = hospitalData.shortage_states?.[type] || 'critical';
+                                const getStateColor = (state) => {
+                                    if (state === 'critical') return '#E92C30';
+                                    if (state === 'low stock') return '#F5CF26';
+                                    return '#16a34a';
+                                };
+                                const getStateBg = (state) => {
+                                    if (state === 'critical') return '#FDE8E8';
+                                    if (state === 'low stock') return '#fcf7d6';
+                                    return '#e8f9ef';
+                                };
+                                return (
+                                    <div key={type} className="hospital-detail-blood-stock-item-admin" style={{
+                                        border: `2px solid ${getStateColor(shortageState)}`,
+                                        backgroundColor: getStateBg(shortageState),
+                                        borderRadius: '8px',
+                                        padding: '12px'
+                                    }}>
+                                        <FaTint className="blood-type-icon-admin" style={{ color: getStateColor(shortageState) }} />
+                                        <div className="blood-stock-info-admin">
+                                            <span className="blood-type-admin">{type}</span>
+                                            <span className="blood-count-admin">{count} units</span>
+                                            <span style={{
+                                                fontSize: '11px',
+                                                fontWeight: '600',
+                                                color: getStateColor(shortageState),
+                                                marginTop: '4px',
+                                                textTransform: 'capitalize'
+                                            }}>
+                                                {shortageState}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}

@@ -27,6 +27,13 @@ class LivingDonor extends Model
         'medical_status',
         'ethics_status',
         'hospital_id',
+        'recipient_full_name',
+        'recipient_age',
+        'recipient_contact',
+        'recipient_contact_type',
+        'recipient_blood_type',
+        'id_picture',
+        'hospital_selection',
     ];
 
     protected $casts = [

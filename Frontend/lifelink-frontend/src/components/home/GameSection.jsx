@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { IoArrowForward } from "react-icons/io5";
 
 import GameAnimation from "../../assets/illustrations/GameAnimation_1.svg";
@@ -7,8 +8,46 @@ import "./GameSection.css";
 
 export default function GameSection() {
     const navigate = useNavigate();
+    const { user, loading } = useAuth();
 
     const handleStart = () => {
+        // Wait for auth to load
+        if (loading) {
+            return;
+        }
+
+        // Redirect to login if not authenticated
+        if (!user) {
+            navigate("/login", { 
+                state: { 
+                    from: "/quizlit/ready",
+                    message: "Please log in as a donor to play the quiz"
+                } 
+            });
+            return;
+        }
+
+        // Check if user is a donor
+        if (user.role?.toLowerCase() !== "donor") {
+            navigate("/quizlit/welcome", { 
+                state: { 
+                    message: "Quiz game is only available for donors. Please log in with a donor account."
+                } 
+            });
+            return;
+        }
+
+        // Check if user has a donor profile
+        if (!user.donor) {
+            navigate("/quizlit/welcome", { 
+                state: { 
+                    message: "Please complete your donor profile to play the quiz."
+                } 
+            });
+            return;
+        }
+
+        // All checks passed, navigate to quiz ready page
         navigate("/quizlit/ready");
     };
 

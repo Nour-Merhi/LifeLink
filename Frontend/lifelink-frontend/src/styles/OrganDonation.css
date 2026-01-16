@@ -264,10 +264,12 @@
     align-items: flex-start;
 }
 .personal-info{
-    background-color: var(--frame-color);
-    border-radius: 20px;
-    padding: 30px;
     margin-bottom: 15px;
+    margin-top: 20px;
+    background-color: #f8f9fa;
+    padding: 20px; 
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
 }
 .info-title{
     display: flex;
@@ -280,6 +282,7 @@
 .organ-form-group{
     display: flex;
     flex-direction: row;
+    align-items: flex-start;
     margin-bottom: 16px;
     gap: 20px
 }
@@ -352,15 +355,14 @@
 }
 
 .agreement {
-    background-color: var(--frame-color);
-    border-radius: 20px;
-    padding: 20px;
+    background-color: transparent;
+    padding-top: 15px ;
     margin-bottom: 10px;
 }
 .agreement > label{
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 20px;
     color: var(--red-color);
 }
 
@@ -371,7 +373,6 @@
     justify-content: center;
     align-items: center;
     flex-direction: column;
-    max-width: 50%;
     height: calc(100vh - 65px);
     margin: 0 auto;
 }
@@ -765,7 +766,8 @@
 
 .organ-donate label,
 .form-group > .declare{
-    font-size: 18px;
+    font-size: 16px;
+    font-weight: 500;
 }
 .organ-donate input {
     margin-right: 8px ;
@@ -795,6 +797,18 @@
   display: inline-block;
   width: 1em;
   margin-left: -1em;
+}
+.hospital-selection{
+    margin-bottom: 20px;
+    padding: 10px 8px;
+    border: 1px solid #B8C9FF;
+    border-radius: 5px;
+}
+.hospital-selection-options{
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    align-items: flex-start;
 }
 
 /*Progress Bar*/

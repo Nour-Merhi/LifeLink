@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../../api/axios";
 
 import { IoMdHeart } from "react-icons/io";
 
@@ -9,6 +9,14 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep, afterD
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [hospitals, setHospitals] = useState([]);
+    const [loadingHospitals, setLoadingHospitals] = useState(false);
+    const [hospitalSelection, setHospitalSelection] = useState(
+        afterDeathFormData.hospital_selection || "general"
+    );
+    const [selectedHospitalId, setSelectedHospitalId] = useState(
+        afterDeathFormData.hospital_id || ""
+    );
     
     // List of all organ IDs (excluding all-organs)
     const allOrganIds = [
@@ -35,6 +43,36 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep, afterD
 
     // State to hold form data for submission
     const [formDataState, setFormDataState] = useState(null);
+
+    // Fetch hospitals on component mount
+    useEffect(() => {
+        fetchHospitals();
+    }, []);
+
+    const fetchHospitals = async () => {
+        setLoadingHospitals(true);
+        try {
+            const response = await api.get("/api/hospital");
+            if (response.data && Array.isArray(response.data)) {
+                setHospitals(response.data);
+            } else if (response.data.hospitals && Array.isArray(response.data.hospitals)) {
+                setHospitals(response.data.hospitals);
+            }
+        } catch (err) {
+            console.error("Error fetching hospitals:", err);
+            // Try alternative endpoint
+            try {
+                const altResponse = await api.get("/api/admin/dashboard/get-hospitals");
+                if (altResponse.data && altResponse.data.hospitals) {
+                    setHospitals(altResponse.data.hospitals);
+                }
+            } catch (altErr) {
+                console.error("Error fetching hospitals from alternative endpoint:", altErr);
+            }
+        } finally {
+            setLoadingHospitals(false);
+        }
+    };
 
     // Handle individual organ checkbox change
     const handleOrganChange = (organId, checked) => {
@@ -139,6 +177,12 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep, afterD
         // Blood type (required)
         formData.append('blood_type', afterDeathFormData.blood_type);
 
+        // Hospital selection
+        formData.append('hospital_selection', hospitalSelection);
+        if (hospitalSelection === 'specific' && selectedHospitalId) {
+            formData.append('hospital_id', selectedHospitalId);
+        }
+
         return formData;
     };
 
@@ -174,14 +218,21 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep, afterD
                 return;
             }
 
+            // Validate hospital selection if specific is chosen
+            if (hospitalSelection === 'specific' && !selectedHospitalId) {
+                setError("Please select a hospital or choose general donation.");
+                setLoading(false);
+                return;
+            }
+
             // Build FormData from state
             const formData = buildFormData();
             
             // Update formDataState
             setFormDataState(formData);
 
-            const response = await axios.post(
-                "http://localhost:8000/api/organ/after-death-pledge",
+            const response = await api.post(
+                "/api/organ/after-death-pledge",
                 formData,
                 {
                     headers: {
@@ -258,10 +309,72 @@ export default function AliveOrganFormStepThree({ setThankMess, prevStep, afterD
                     {/* Form Starts Here */}
                     <div>
                         <form action="#" className="form" onSubmit= { handleSubmit }>
+                            {/* Hospital Selection */}
+                            <h3 style={{ marginBottom: '15px', fontSize: '16px', fontWeight: '500' }}>
+                                Hospital Selection
+                            </h3>
+                            <div className="hospital-selection">
+                                <div className="hospital-selection-options">
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                                        <input
+                                            type="radio"
+                                            name="hospital_selection"
+                                            value="general"
+                                            checked={hospitalSelection === 'general'}
+                                            onChange={(e) => {
+                                                setHospitalSelection(e.target.value);
+                                                setSelectedHospitalId("");
+                                            }}
+                                            style={{ marginRight: '8px', cursor: 'pointer' }}
+                                        />
+                                        General Donation (not specific to a hospital)
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                                        <input
+                                            type="radio"
+                                            name="hospital_selection"
+                                            value="specific"
+                                            checked={hospitalSelection === 'specific'}
+                                            onChange={(e) => setHospitalSelection(e.target.value)}
+                                            style={{ marginRight: '8px', cursor: 'pointer' }}
+                                        />
+                                        Select Specific Hospital
+                                    </label>
+                                </div>
+                                {hospitalSelection === 'specific' && (
+                                    <div style={{ marginTop: '15px' }}>
+                                        <label htmlFor="after-death-hospital" style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                                            Hospital
+                                        </label>
+                                        <select
+                                            id="after-death-hospital"
+                                            value={selectedHospitalId}
+                                            onChange={(e) => setSelectedHospitalId(e.target.value)}
+                                            required={hospitalSelection === 'specific'}
+                                            disabled={loadingHospitals}
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px',
+                                                fontSize: '14px',
+                                                border: '1px solid #ddd',
+                                                borderRadius: '4px',
+                                                backgroundColor: loadingHospitals ? '#f5f5f5' : 'white'
+                                            }}
+                                        >
+                                            <option value="" disabled>
+                                                {loadingHospitals ? 'Loading hospitals...' : 'Select Hospital'}
+                                            </option>
+                                            {hospitals.map(hospital => (
+                                                <option key={hospital.id} value={hospital.id}>
+                                                    {hospital.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
                             <div className="form-group">
-                                
-                                    <p className="declare">I declare, in full possession of my mental faculties and my own free will, that I donate after my death:</p>
-                                
+                                <p className="declare">I declare, in full possession of my mental faculties and my own free will, that I donate after my death:</p>
                             </div>
                             <div className="form-group">
                                  <div>

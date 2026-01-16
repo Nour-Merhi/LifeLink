@@ -60,7 +60,7 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
             {/* Urgent Need Section - Dynamic */}
             {urgentHospitals && urgentHospitals.length > 0 && (
               <div className="urgent-needs">
-                <h1>Urgent Need:</h1>
+                
                 {urgentHospitals.map((h) => {
                   // Format due date and time for display
                   const formatDueDate = (dateStr) => {
@@ -101,12 +101,14 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                       </div>
 
                       <div className="info">
-                        <h2>
-                          {h.name}{" "}
-                          <span className="urgent-blood-types animate-pulse bg-red-600">
-                            Urgent: Due {dueDisplay}
+                        <div className="flex flex-row">
+                          <h2>
+                            {h.name}{" "}
+                          </h2>
+                          <span className="urgent-blood-types animate-pulse bg-red-500">
+                            Urgent: Due Today
                           </span>
-                        </h2>
+                        </div>
                         <div className="details">
                           <div className="location">
                             <FaLocationDot />

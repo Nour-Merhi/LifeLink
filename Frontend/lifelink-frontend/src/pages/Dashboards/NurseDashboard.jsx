@@ -15,7 +15,7 @@ export default function NurseDashboard(){
         return <Navigate to="/login" replace />;
     }
 
-    if (user.role?.toLowerCase() !== "phlebotomist" && user.role?.toLowerCase() !== "admin"){
+    if (user.role?.toLowerCase() !== "phlebotomist"){
         return <Navigate to="/login" replace />;
     }
 

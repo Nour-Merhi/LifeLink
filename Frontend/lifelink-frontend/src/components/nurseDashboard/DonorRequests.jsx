@@ -18,40 +18,41 @@ export default function DonorRequests(){
     const [donorRequests, setDonorRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [startingAppointment, setStartingAppointment] = useState(null); // Track which appointment is being started
+
+    const fetchDonorRequests = async () => {
+        try {
+            setLoading(true);
+            setError("");
+            const response = await api.get("/api/nurse/donor-requests");
+            
+            if (response.data && response.data.requests) {
+                setDonorRequests(response.data.requests);
+            } else {
+                setError("No requests data received from server");
+            }
+        } catch (err) {
+            console.error("Error fetching donor requests:", err);
+            console.error("Error response:", err.response);
+            
+            let errorMessage = "Failed to load donor requests";
+            if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            } else if (err.response?.status === 401) {
+                errorMessage = "Please log in to view donor requests";
+            } else if (err.response?.status === 403) {
+                errorMessage = "You don't have permission to access this page";
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            setError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchDonorRequests = async () => {
-            try {
-                setLoading(true);
-                setError("");
-                const response = await api.get("/api/nurse/donor-requests");
-                
-                if (response.data && response.data.requests) {
-                    setDonorRequests(response.data.requests);
-                } else {
-                    setError("No requests data received from server");
-                }
-            } catch (err) {
-                console.error("Error fetching donor requests:", err);
-                console.error("Error response:", err.response);
-                
-                let errorMessage = "Failed to load donor requests";
-                if (err.response?.data?.message) {
-                    errorMessage = err.response.data.message;
-                } else if (err.response?.status === 401) {
-                    errorMessage = "Please log in to view donor requests";
-                } else if (err.response?.status === 403) {
-                    errorMessage = "You don't have permission to access this page";
-                } else if (err.message) {
-                    errorMessage = err.message;
-                }
-                
-                setError(errorMessage);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchDonorRequests();
     }, []);
 
@@ -60,6 +61,44 @@ export default function DonorRequests(){
         if (bloodType === "all-blood") return true;
         return request.bloodType === bloodType;
     });
+
+    // Handle starting an appointment
+    const handleStartAppointment = async (appointmentId) => {
+        try {
+            setStartingAppointment(appointmentId);
+            setError("");
+
+            const response = await api.post(`/api/nurse/start-appointment/${appointmentId}`);
+
+            if (response.data && response.data.message) {
+                // Show success message (you can use a toast notification here)
+                alert(response.data.message);
+                
+                // Refresh the list to reflect the status change (from pending to confirmed)
+                fetchDonorRequests();
+            }
+        } catch (err) {
+            console.error("Error starting appointment:", err);
+            
+            let errorMessage = "Failed to start appointment";
+            if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            } else if (err.response?.status === 401) {
+                errorMessage = "Please log in to start appointments";
+            } else if (err.response?.status === 403) {
+                errorMessage = "You don't have permission to start this appointment";
+            } else if (err.response?.status === 404) {
+                errorMessage = "Appointment not found or not assigned to you";
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            setError(errorMessage);
+            alert(errorMessage);
+        } finally {
+            setStartingAppointment(null);
+        }
+    };
 
     if (loading) {
         return (
@@ -89,7 +128,7 @@ export default function DonorRequests(){
                         <h2>Donor Requests</h2>
                     </div>
                     <p style={{ fontSize: "14px", color: "#767676", margin: "5px 0 0 0", fontWeight: "normal" }}>
-                        Review and respond to blood donation requests from hospitals.
+                        Review and manage blood donation requests assigned to you by your hospital.
                     </p>
                 </div>
                 <p>Total Requests: {donorRequests.length}</p>
@@ -167,10 +206,26 @@ export default function DonorRequests(){
                             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                                 <button
                                     className="add-btn"
-                                    style={{ background: "linear-gradient(to right, #A7BBFC, #3257CD)", padding: "8px 16px", fontSize: "14px", borderRadius: "5px", color: "white", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}
+                                    onClick={() => handleStartAppointment(request.id)}
+                                    disabled={startingAppointment === request.id}
+                                    style={{ 
+                                        background: startingAppointment === request.id 
+                                            ? "linear-gradient(to right, #cccccc, #999999)" 
+                                            : "linear-gradient(to right, #A7BBFC, #3257CD)", 
+                                        padding: "8px 16px", 
+                                        fontSize: "14px", 
+                                        borderRadius: "5px", 
+                                        color: "white", 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        justifyContent: "center", 
+                                        gap: "5px",
+                                        cursor: startingAppointment === request.id ? "not-allowed" : "pointer",
+                                        opacity: startingAppointment === request.id ? 0.6 : 1
+                                    }}
                                 >
                                     <FaCheck className="text-white"/>
-                                    Accept Request
+                                    {startingAppointment === request.id ? "Starting..." : "Starting Appointment"}
                                 </button>
                                 <button
                                     className="add-btn"
@@ -199,8 +254,8 @@ export default function DonorRequests(){
                         <p className="text-gray-500 text-lg">No donor requests found</p>
                         <p className="text-gray-400 text-sm mt-2">
                             {bloodType !== "all-blood" 
-                                ? `No requests for blood type "${bloodType}"` 
-                                : "There are no pending donor requests at this time"}
+                                ? `No assigned requests for blood type "${bloodType}"` 
+                                : "You have no assigned donor requests at this time"}
                         </p>
                     </div>
                 )}

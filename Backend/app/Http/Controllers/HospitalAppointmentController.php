@@ -9,6 +9,7 @@ use App\Models\Donor;
 use App\Models\Appointment;
 use App\Models\User;
 use App\Models\BloodType;
+use App\Services\XpService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -153,26 +154,36 @@ class HospitalAppointmentController extends Controller
         // Build query for appointments
         $query = Appointment::where('hospital_id', $hospitalId)
             ->where('donation_type', 'Hospital Blood Donation')
-            ->where('state', 'pending')
-            ->whereDate('appointment_date', '>=', $today);
+            ->where('state', 'pending');
         
         // Filter by appointment_type if provided
         if ($appointmentType && in_array($appointmentType, ['urgent', 'regular'])) {
             $query->where('appointment_type', $appointmentType);
+            
+            // For urgent appointments, only show appointments for TODAY
+            if ($appointmentType === 'urgent') {
+                $query->whereDate('appointment_date', '=', $today);
+            } else {
+                // For regular appointments, show future appointments
+                $query->whereDate('appointment_date', '>=', $today);
+            }
+        } else {
+            // If no appointment type specified, show future appointments
+            $query->whereDate('appointment_date', '>=', $today);
         }
         
         $appointments = $query->with('hospital')
             ->orderBy('appointment_date', 'asc')
             ->get();
 
-        // Get all booked appointments to check slot availability
+        // Get all booked appointments to check slot availability (tracked by appointment_id and appointment_time)
         $bookedAppointments = HospitalAppointment::whereIn('appointment_id', $appointments->pluck('id'))
-            ->where('state', 'pending')
-            ->select('appointment_id')
+            ->where('state', 'pending') // Only count pending bookings, not cancelled/completed
+            ->select('appointment_id', 'appointment_time')
             ->get()
             ->groupBy('appointment_id')
             ->map(function ($group) {
-                return $group->count();
+                return $group->groupBy('appointment_time')->map->count();
             });
 
         // Transform appointments into time slots format
@@ -181,6 +192,7 @@ class HospitalAppointmentController extends Controller
         $totalBookedSlots = 0;
         
         foreach ($appointments as $appointment) {
+            // Format date to YYYY-MM-DD string for consistency
             $date = $appointment->appointment_date instanceof \Carbon\Carbon 
                 ? $appointment->appointment_date->toDateString() 
                 : (is_string($appointment->appointment_date) 
@@ -189,31 +201,67 @@ class HospitalAppointmentController extends Controller
             
             $slots = $appointment->time_slots ?? [];
             
-            foreach ($slots as $time) {
-                $timeSlotValue = is_array($time) ? ($time['start'] ?? $time) : $time;
-                $currentBookings = $bookedAppointments[$appointment->id] ?? 0;
+            foreach ($slots as $slotIndex => $slot) {
+                // Handle time slot format: could be object with start/end or string
+                $timeDisplay = '';
+                $timeKey = ''; // For checking bookings
                 
+                if (is_array($slot) || is_object($slot)) {
+                    // Handle object format: {start: "09:00", end: "10:00", is_available: true}
+                    $slotArray = (array) $slot;
+                    $startTime = $slotArray['start'] ?? '';
+                    $endTime = $slotArray['end'] ?? '';
+                    
+                    if ($startTime && $endTime) {
+                        $timeDisplay = $startTime . ' - ' . $endTime;
+                        $timeKey = $startTime; // Use start time as key for booking lookup
+                    } elseif ($startTime) {
+                        $timeDisplay = $startTime;
+                        $timeKey = $startTime;
+                    }
+                } else {
+                    // Handle string format (fallback for backward compatibility)
+                    $timeDisplay = (string) $slot;
+                    $timeKey = $timeDisplay;
+                }
+                
+                if (!$timeDisplay || !$timeKey) {
+                    continue; // Skip invalid slots
+                }
+                
+                // Check if this specific time slot is booked
+                $currentBookings = $bookedAppointments[$appointment->id][$timeKey] ?? 0;
+                
+                // Check against max_capacity if it exists
                 $maxCapacity = $appointment->max_capacity ?? null;
                 
+                // Determine if slot is fully booked
                 $status = 'available';
                 if ($maxCapacity !== null && $currentBookings >= $maxCapacity) {
+                    // Fully booked based on capacity
                     $status = 'booked';
                     $totalBookedSlots++;
                 } elseif ($maxCapacity === null && $currentBookings > 0) {
+                    // No capacity limit set, but there are bookings
+                    // Mark as booked once someone has booked it
                     $status = 'booked';
                     $totalBookedSlots++;
                 } else {
+                    // Slot is available
                     $totalAvailableSlots++;
                 }
                 
                 $timeSlots[] = [
-                    'id' => $appointment->id . '_' . $timeSlotValue,
+                    'id' => $appointment->id . '_' . $slotIndex . '_' . $timeKey,
                     'date' => $date,
-                    'time' => $timeSlotValue,
+                    'time' => $timeDisplay,
+                    'time_key' => $timeKey, // Store the key for booking reference
                     'status' => $status,
                     'appointment_id' => $appointment->id,
                     'bookings_count' => $currentBookings,
-                    'max_capacity' => $maxCapacity
+                    'max_capacity' => $maxCapacity,
+                    'start' => is_array($slot) || is_object($slot) ? ((array)$slot)['start'] ?? $timeKey : $timeKey,
+                    'end' => is_array($slot) || is_object($slot) ? ((array)$slot)['end'] ?? null : null
                 ];
             }
         }
@@ -577,6 +625,173 @@ class HospitalAppointmentController extends Controller
     }
 
     /**
+     * Get hospital appointments for a specific hospital (similar to getHospitalHomeVisitAppointments)
+     */
+    public function getHospitalAppointmentsForHospital(Request $request, $hospitalId = null)
+    {
+        try {
+            if (!$hospitalId) {
+                return response()->json([
+                    'hospital' => null,
+                    'urgent_appointments' => [],
+                    'regular_appointments' => [],
+                    'message' => 'Hospital ID is required'
+                ], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            if (!$hospital) {
+                return response()->json([
+                    'hospital' => null,
+                    'urgent_appointments' => [],
+                    'regular_appointments' => [],
+                    'message' => 'Hospital not found'
+                ], 404);
+            }
+
+            // Get all appointments for this hospital with donation_type = 'Hospital Blood Donation'
+            $appointments = Appointment::where('donation_type', 'Hospital Blood Donation')
+                ->where('hospital_id', $hospitalId)
+                ->orderBy('appointment_date', 'desc')
+                ->get();
+
+            // Separate urgent and regular appointments
+            $urgentAppointments = $appointments->where('appointment_type', 'urgent');
+            $regularAppointments = $appointments->where('appointment_type', 'regular');
+
+            // Process urgent appointments (group by due_date)
+            $urgentSlots = $this->processHospitalAppointmentsByDate($urgentAppointments, true);
+
+            // Process regular appointments (group by appointment_date)
+            $regularSlots = $this->processHospitalAppointmentsByDate($regularAppointments, false);
+
+            return response()->json([
+                'hospital' => [
+                    'id' => $hospital->id,
+                    'name' => $hospital->name,
+                    'location' => $hospital->address,
+                ],
+                'urgent_appointments' => $urgentSlots,
+                'regular_appointments' => $regularSlots,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital appointments for hospital:', [
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'hospital' => null,
+                'urgent_appointments' => [],
+                'regular_appointments' => [],
+                'message' => 'Failed to fetch appointments: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Process hospital appointments and group by date
+     */
+    private function processHospitalAppointmentsByDate($appointments, $isUrgent = false)
+    {
+        if ($appointments->isEmpty()) {
+            return [];
+        }
+
+        // For urgent appointments, group by due_date instead of appointment_date
+        // For regular appointments, group by appointment_date
+        $groupByField = $isUrgent ? 'due_date' : 'appointment_date';
+        
+        // Filter out null dates for grouping, especially for urgent appointments where due_date might be null
+        $filteredAppointments = $appointments->filter(function ($apt) use ($groupByField) {
+            return !is_null($apt->{$groupByField});
+        });
+
+        $dateGroups = $filteredAppointments->groupBy($groupByField);
+        
+        // Sort dates (latest first)
+        $sortedDates = $dateGroups->keys()->sort(function($a, $b) {
+            try {
+                $dateA = Carbon::parse($a)->timestamp;
+                $dateB = Carbon::parse($b)->timestamp;
+                return $dateB - $dateA;
+            } catch (\Exception $e) {
+                return strcmp($b, $a);
+            }
+        })->values();
+
+        return $sortedDates->map(function ($date) use ($dateGroups) {
+            $dateAppointments = $dateGroups->get($date);
+            $appointmentIds = $dateAppointments->pluck('id')->toArray();
+            $allTimeSlots = [];
+            
+            foreach ($dateAppointments as $apt) {
+                $timeSlots = $apt->time_slots ?? [];
+                if (is_array($timeSlots)) {
+                    foreach ($timeSlots as $timeSlot) {
+                        $timeSlotValue = null;
+                        
+                        if (is_string($timeSlot)) {
+                            $timeSlotValue = $timeSlot;
+                        } elseif (is_array($timeSlot) && isset($timeSlot['start'])) {
+                            $timeSlotValue = $timeSlot['start'];
+                            // Ensure the time slot's date matches the current grouped date
+                            if (isset($timeSlot['date']) && $timeSlot['date'] !== $date) {
+                                continue;
+                            }
+                            if (isset($timeSlot['is_available']) && !$timeSlot['is_available']) {
+                                $allTimeSlots[] = [
+                                    'time' => $this->formatTime($timeSlotValue),
+                                    'available' => false
+                                ];
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                        
+                        // Check if booked
+                        $bookingsCount = HospitalAppointment::where('appointment_id', $apt->id)
+                            ->where('appointment_time', $timeSlotValue)
+                            ->where('state', '!=', 'canceled')
+                            ->count();
+                        
+                        $maxCapacity = $apt->max_capacity ?? null;
+                        $isBooked = ($maxCapacity && $bookingsCount >= $maxCapacity) || $bookingsCount > 0;
+                        
+                        $allTimeSlots[] = [
+                            'time' => $this->formatTime($timeSlotValue),
+                            'available' => !$isBooked
+                        ];
+                    }
+                }
+            }
+
+            // Remove duplicates
+            $uniqueSlots = [];
+            $seen = [];
+            foreach ($allTimeSlots as $slot) {
+                if (!in_array($slot['time'], $seen)) {
+                    $seen[] = $slot['time'];
+                    $uniqueSlots[] = $slot;
+                }
+            }
+
+            // Sort by time
+            usort($uniqueSlots, function($a, $b) {
+                return strcmp($a['time'], $b['time']);
+            });
+
+            return [
+                'date' => $date,
+                'times' => $uniqueSlots,
+                'appointment_ids' => $appointmentIds
+            ];
+        })->values()->toArray();
+    }
+
+    /**
      * Get a single hospital appointment by code (for admin dashboard)
      */
     public function showHospitalAppointment($code)
@@ -682,11 +897,21 @@ class HospitalAppointmentController extends Controller
 
             // Award XP if donation was just completed
             if ($willBeCompleted && $hospitalAppointment->donor_id) {
-                XpService::awardBloodDonationXp(
-                    $hospitalAppointment->donor_id,
-                    \App\Models\HospitalAppointment::class,
-                    $hospitalAppointment->id
-                );
+                try {
+                    XpService::awardBloodDonationXp(
+                        $hospitalAppointment->donor_id,
+                        \App\Models\HospitalAppointment::class,
+                        $hospitalAppointment->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to award XP for hospital appointment:', [
+                        'appointment_code' => $code,
+                        'appointment_id' => $hospitalAppointment->id,
+                        'donor_id' => $hospitalAppointment->donor_id,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue even if XP award fails - don't fail the update
+                }
             }
 
             return response()->json([
@@ -984,11 +1209,78 @@ class HospitalAppointmentController extends Controller
                 ], 404);
             }
 
+            // Check if the time slot is still available
+            $existingBookings = HospitalAppointment::where('appointment_id', $appointment->id)
+                ->where('appointment_time', $requestedStartTime)
+                ->where('state', 'pending')
+                ->count();
+            
+            $maxCapacity = $appointment->max_capacity ?? null;
+            
+            // Check if slot is fully booked
+            if ($maxCapacity !== null && $existingBookings >= $maxCapacity) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'This time slot is fully booked. Please select another time.'
+                ], 422);
+            } elseif ($maxCapacity === null && $existingBookings > 0) {
+                // If no capacity limit but someone already booked, don't allow more bookings
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'This time slot is already booked. Please select another time.'
+                ], 422);
+            }
+
+            // Validate urgent appointment constraints
+            if ($appointment->appointment_type === 'urgent') {
+                $appointmentDate = Carbon::parse($appointment->appointment_date);
+                $today = Carbon::today();
+                
+                // Check if appointment date is today (urgent appointments must be for today)
+                if (!$appointmentDate->isSameDay($today)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Urgent appointments can only be scheduled for today'
+                    ], 422);
+                }
+                
+                // For urgent appointments, always use today's date with the selected time
+                // Parse the time and combine with today's date
+                try {
+                    $appointmentDateTime = Carbon::createFromFormat('Y-m-d H:i', $today->format('Y-m-d') . ' ' . $requestedStartTime);
+                } catch (\Exception $e) {
+                    // Fallback: try parsing with Carbon::parse
+                    $appointmentDateTime = Carbon::parse($today->format('Y-m-d') . ' ' . $requestedStartTime);
+                }
+                
+                $now = Carbon::now();
+                
+                // Check if appointment time is in the past
+                if ($appointmentDateTime->lte($now)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Urgent appointment time must be in the future. Please select a time slot that has not yet passed.'
+                    ], 422);
+                }
+                
+                // Calculate hours difference from now
+                $hoursDiff = $now->diffInHours($appointmentDateTime, false);
+                
+                // Check if appointment time is within 24 hours
+                if ($hoursDiff > 24) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Urgent appointments can only be scheduled within 24 hours from now'
+                    ], 422);
+                }
+            }
+
             // Create Hospital Appointment
             $hospitalAppointmentData = [
                 'donor_id' => $donor->id,
                 'hospital_Id' => $validated['hospital_id'],
                 'appointment_id' => $appointment->id,
+                'appointment_time' => $requestedStartTime,
                 'state' => 'pending',
                 'note' => $validated['note'] ?? null,
             ];

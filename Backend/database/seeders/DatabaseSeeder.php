@@ -22,6 +22,9 @@ class DatabaseSeeder extends Seeder
         // Seed articles
         $this->call(ArticleSeeder::class);
 
+        // Seed quiz levels and questions
+        $this->call(QuizLevelsSeeder::class);
+
         // User::factory(10)->create();
 
     }

@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import profile from "../../../assets/imgs/profile.svg";
 import "../../../styles/Dashboard.css";
 import api from "../../../api/axios";
 import { useAuth } from "../../../context/AuthContext";
+import { IoClose } from "react-icons/io5";
 
 export default function ProfileSetting({ initialData, bloodTypes: initialBloodTypes, onUpdate }) {
-    const { fetchUser } = useAuth();
+    const navigate = useNavigate();
+    const { fetchUser, setUser } = useAuth();
     const [profilePicture, setProfilePicture] = useState(null);
     const [formData, setFormData] = useState({
         firstName: "",
@@ -21,6 +24,12 @@ export default function ProfileSetting({ initialData, bloodTypes: initialBloodTy
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
     const [bloodTypes, setBloodTypes] = useState([]);
+
+    // Delete account (danger zone)
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState("");
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     // Initialize form data from props
     useEffect(() => {
@@ -330,6 +339,127 @@ export default function ProfileSetting({ initialData, bloodTypes: initialBloodTy
                     </div>
                 </form>
             </div>
+
+            {/* Danger zone */}
+            <div className="personal-information-section" style={{ padding: "15px", borderRadius: "10px", border: "1px solid #FCA5A5", background: "#FFF5F5" }}>
+                <h3 className="personal-information-title" style={{ color: "#B91C1C" }}>Delete My Account</h3>
+                <p className="muted" style={{ marginTop: "-6px", marginBottom: "14px" }}>
+                    Deleting your account is permanent. This will remove your profile and related data.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setDeleteError("");
+                        setDeleteConfirmText("");
+                        setDeleteModalOpen(true);
+                    }}
+                    style={{
+                        padding: "10px 14px",
+                        borderRadius: "5px",
+                        border: "none",
+                        background: "#F12C31",
+                        color: "#fff",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        width: "fit-content"
+                    }}
+                >
+                    Delete Account
+                </button>
+                {deleteError && (
+                    <div style={{ marginTop: "12px", padding: "10px", backgroundColor: "#fee", color: "#c33", borderRadius: "5px" }}>
+                        {deleteError}
+                    </div>
+                )}
+            </div>
+
+            {/* Delete confirmation modal */}
+            {deleteModalOpen && (
+                <div className="modal-overlay" onClick={() => !deleteLoading && setDeleteModalOpen(false)}>
+                    <div className="modal-container modal-modern" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-modern-header">
+                            <div className="modal-modern-title">
+                                <h2>Delete Account</h2>
+                                <div className="modal-modern-subtitle">
+                                    <span style={{ color: "#B91C1C", fontWeight: 700 }}>
+                                        This action cannot be undone.
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                className="modal-icon-btn"
+                                onClick={() => !deleteLoading && setDeleteModalOpen(false)}
+                                aria-label="Close"
+                                disabled={deleteLoading}
+                            >
+                                <IoClose />
+                            </button>
+                        </div>
+
+                        <div className="modal-modern-body">
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Confirm deletion</h3>
+                                <p className="muted" style={{ marginTop: 0 }}>
+                                    Type <strong>DELETE</strong> to confirm.
+                                </p>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmText}
+                                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                    placeholder="Type DELETE"
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px 12px",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: "10px",
+                                        outline: "none"
+                                    }}
+                                />
+                                {deleteError && (
+                                    <div className="error-message modal-error-container" style={{ marginTop: "12px" }}>
+                                        {deleteError}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="modal-modern-footer">
+                            <button
+                                type="button"
+                                className="btn-cancel"
+                                onClick={() => setDeleteModalOpen(false)}
+                                disabled={deleteLoading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="submit-btn btn-delete-submit"
+                                disabled={deleteLoading || deleteConfirmText.trim().toUpperCase() !== "DELETE"}
+                                onClick={async () => {
+                                    setDeleteLoading(true);
+                                    setDeleteError("");
+                                    try {
+                                        await api.get("/sanctum/csrf-cookie");
+                                        await api.delete("/api/settings/account");
+                                        // Clear auth state and redirect
+                                        if (setUser) setUser(null);
+                                        window.dispatchEvent(new Event("auth-change"));
+                                        navigate("/login", { replace: true });
+                                    } catch (err) {
+                                        console.error("Error deleting account:", err);
+                                        setDeleteError(err.response?.data?.message || err.response?.data?.error || err.message || "Failed to delete account");
+                                    } finally {
+                                        setDeleteLoading(false);
+                                    }
+                                }}
+                            >
+                                {deleteLoading ? "Deleting..." : "Delete Permanently"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

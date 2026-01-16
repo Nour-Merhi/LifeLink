@@ -68,8 +68,8 @@ export default function MyAppointments(){
         if (!status) return "";
         const statusLower = status.toLowerCase();
         if (statusLower === "completed") return "status-completed";
+        if (statusLower === "confirmed") return "status-confirmed"; // Confirmed appointments (phlebotomist started)
         if (statusLower === "pending") return "status-pending";
-        if (statusLower === "confirmed") return "status-completed"; // Confirmed uses green background like completed
         if (statusLower === "cancelled" || statusLower === "canceled") return "status-canceled";
         return "";
     };
@@ -157,14 +157,19 @@ export default function MyAppointments(){
                                 </div>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                                {appointment.status?.toLowerCase() !== "completed" && (
-                                    <button
-                                        className="add-btn"
-                                        style={{ background: "linear-gradient(to right, #A7BBFC, #3257CD)", padding: "8px 16px", fontSize: "14px", borderRadius: "5px", color: "white" }}
-                                    >
-                                        Mark Complete
-                                    </button>
-                                )}
+                                {(() => {
+                                    const statusLower = appointment.status?.toLowerCase() || "";
+                                    // Show "Mark Complete" for both "pending" and "confirmed" statuses, but not for "completed" or "canceled"
+                                    const canMarkComplete = statusLower === "pending" || statusLower === "confirmed";
+                                    return canMarkComplete && (
+                                        <button
+                                            className="add-btn"
+                                            style={{ background: "linear-gradient(to right, #A7BBFC, #3257CD)", padding: "8px 16px", fontSize: "14px", borderRadius: "5px", color: "white" }}
+                                        >
+                                            Mark Complete
+                                        </button>
+                                    );
+                                })()}
                                 <button
                                     className="add-btn"
                                     style={{ background: "linear-gradient(to right, #FF9D9D, #EE2A2A)", padding: "8px 16px", fontSize: "14px", borderRadius: "5px", display: "flex", alignItems: "center", gap: "5px", color: "white" }}

@@ -43,10 +43,18 @@ class RewardsController extends Controller
             $totalXp = XpService::getTotalXp($donor->id);
             $currentLevel = XpService::calculateLevel($totalXp);
             
-            // Calculate XP progress
-            $currentLevelXp = ($currentLevel - 1) * 1000;
-            $nextLevelXp = $currentLevel * 1000;
-            $xpUntilNextLevel = max(0, $nextLevelXp - $totalXp);
+            // Calculate XP progress using the same formula as calculateLevel
+            // Formula: XP required to REACH level N = 50 * N^2 + 50 * N
+            // The XP needed to REACH the current level (minimum XP for current level)
+            $currentLevelMinXp = $currentLevel > 1 
+                ? (50 * pow($currentLevel - 1, 2) + 50 * ($currentLevel - 1))
+                : 0;
+            
+            // The XP needed to REACH the next level (maximum XP for current level)
+            $nextLevelMinXp = 50 * pow($currentLevel, 2) + 50 * $currentLevel;
+            
+            // XP needed to reach next level from current total
+            $xpUntilNextLevel = max(0, $nextLevelMinXp - $totalXp);
 
             // XP earning rules (matching the actual XP amounts from XpService)
             $xpRules = [

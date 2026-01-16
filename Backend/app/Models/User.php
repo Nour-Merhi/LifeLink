@@ -13,6 +13,7 @@ use App\Models\Donor;
 use App\Models\MobilePhlebotomists;
 use App\Models\SupportTicket;
 use App\Models\Message;
+use App\Models\HealthCenterManager;
 
 class User extends Authenticatable
 {
@@ -66,6 +67,9 @@ class User extends Authenticatable
     }
     public function mobilePhlebotomists(){
         return $this->hasOne(MobilePhlebotomist::class, 'id');
+    }
+    public function healthCenterManager(){
+        return $this->hasOne(HealthCenterManager::class, 'user_id');
     }
 
     public function settings(){

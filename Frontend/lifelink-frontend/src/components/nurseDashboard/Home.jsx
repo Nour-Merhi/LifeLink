@@ -79,23 +79,47 @@ export default function Home(){
     // Get appointments from API response
     const appointments = dashboardData?.appointments || [];
 
+    // Helper function to parse date string (format: "M d, Y" or "M d, Y H:i")
+    const parseDate = (dateString) => {
+        if (!dateString || dateString === 'N/A') return new Date(0); // Return epoch for invalid dates
+        
+        // Try to parse the date string
+        // Format could be "Jan 15, 2024" or "Jan 15, 2024 10:30 AM"
+        try {
+            const date = new Date(dateString);
+            return isNaN(date.getTime()) ? new Date(0) : date;
+        } catch (e) {
+            return new Date(0);
+        }
+    };
+
     // Filter appointments based on search and blood type
-    const filteredAppointments = appointments.filter((appointment) => {
-        const matchesSearch = !searchTerm || 
-            appointment.donor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            appointment.address?.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesBloodType = bloodType === "all-blood" || 
-            appointment.bloodType === bloodType;
-        
-        return matchesSearch && matchesBloodType;
-    });
+    const filteredAppointments = appointments
+        .filter((appointment) => {
+            const matchesSearch = !searchTerm || 
+                appointment.donor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                appointment.address?.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const matchesBloodType = bloodType === "all-blood" || 
+                appointment.bloodType === bloodType;
+            
+            return matchesSearch && matchesBloodType;
+        })
+        // Sort by date (most recent first)
+        .sort((a, b) => {
+            const dateA = parseDate(a.date);
+            const dateB = parseDate(b.date);
+            return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+        })
+        // Limit to 5 most recent appointments
+        .slice(0, 5);
 
     const getStatusClass = (status) => {
         if (!status) return "";
         const statusLower = status.toLowerCase();
         if (statusLower === "completed") return "status-completed";
-        if (statusLower === "canceled") return "status-canceled";
+        if (statusLower === "confirmed") return "status-completed"; // Confirmed uses green background like completed
+        if (statusLower === "canceled" || statusLower === "cancelled") return "status-canceled";
         if (statusLower === "pending") return "status-pending";
         return "";
     };
@@ -136,14 +160,14 @@ export default function Home(){
                     <div key={index} className={`metric-card ${index === 0 ? "linear-light-blue" : ""}`}>
                         <div className="metric-content">
                             <div className="metric-info">
-                                <p className="metric-title">{metric.title}</p>
-                                <h3 className="metric-value">{metric.value}</h3>
+                                <p className={`metric-title ${index === 0 ? "!text-white" : ""}`}>{metric.title}</p>
+                                <h3 className={`metric-value ${index === 0 ? "!text-white" : ""}`}>{metric.value}</h3>
                                 {index === 3 ? (
                                     <button style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "5px", background: "none", border: "none", color: "#2196F3", cursor: "pointer", fontSize: "12px", fontWeight: "500", padding: 0 }}>
                                         {metric.change} <IoMdArrowForward />
                                     </button>
                                 ) : (
-                                    <span className="metric-change">{metric.change}</span>
+                                    <span className={`metric-change ${index === 0 ? "!text-white" : ""}`}>{metric.change}</span>
                                 )}
                             </div>
                             <div className="metric-icon" style={{ backgroundColor: metric.bgColor, color: metric.iconColor }}>
@@ -161,7 +185,7 @@ export default function Home(){
                     <div className="dashboard-title">
                         <div className="icon-title">
                             <FaHome style={{ fontSize: "24px", color: "#252E32" }} />
-                            <h2 className="control-panel-title">Home Donation Appointments</h2>
+                            <h2 className="control-panel-title !m-0">Home Donation Appointments</h2>
                         </div>
                     </div>
                     <div className="control-panel-layout">

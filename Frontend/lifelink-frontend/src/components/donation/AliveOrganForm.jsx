@@ -4,13 +4,29 @@ import { PiHeartbeatFill } from "react-icons/pi";
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AliveOragnForm(){
     const navigate = useNavigate();
     const { user } = useAuth();
     const [isChecked, setIsChecked] = useState([]);
+    const [hospitals, setHospitals] = useState([]);
+    const [loadingHospitals, setLoadingHospitals] = useState(false);
+    const [recipientData, setRecipientData] = useState({
+        full_name: "",
+        age: "",
+        contact: "",
+        contact_type: "phone", // "phone" or "email"
+        blood_type: "",
+        hospital_id: ""
+    });
+    const [nonDirectDonation, setNonDirectDonation] = useState({
+        hospital_selection: "general", // "general" or "specific"
+        hospital_id: ""
+    });
+    const [idPicture, setIdPicture] = useState(null);
+    const [idPicturePreview, setIdPicturePreview] = useState(null);
     
     // Initialize form data with user data if available
     const getInitialFormData = () => {
@@ -109,6 +125,91 @@ export default function AliveOragnForm(){
             }));
         }
     }, [user]);
+
+    // Fetch hospitals when component mounts
+    useEffect(() => {
+        fetchHospitals();
+    }, []);
+
+    const fetchHospitals = async () => {
+        setLoadingHospitals(true);
+        try {
+            const response = await api.get("/api/hospital");
+            if (response.data && Array.isArray(response.data)) {
+                setHospitals(response.data);
+            } else if (response.data.hospitals && Array.isArray(response.data.hospitals)) {
+                setHospitals(response.data.hospitals);
+            }
+        } catch (err) {
+            console.error("Error fetching hospitals:", err);
+            // Try alternative endpoint
+            try {
+                const altResponse = await api.get("/api/admin/dashboard/get-hospitals");
+                if (altResponse.data && altResponse.data.hospitals) {
+                    setHospitals(altResponse.data.hospitals);
+                }
+            } catch (altErr) {
+                console.error("Error fetching hospitals from alternative endpoint:", altErr);
+            }
+        } finally {
+            setLoadingHospitals(false);
+        }
+    };
+
+    const handleRecipientChange = (e) => {
+        const { name, value } = e.target;
+        setRecipientData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleNonDirectChange = (e) => {
+        const { name, value } = e.target;
+        setNonDirectDonation(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleIdPictureChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                setError("Please upload a valid image file (JPEG, PNG, or WebP).");
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            if (file.size > maxSize) {
+                setError("Image file size must be less than 5MB.");
+                return;
+            }
+
+            setIdPicture(file);
+
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setIdPicturePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const removeIdPicture = () => {
+        setIdPicture(null);
+        setIdPicturePreview(null);
+        // Reset file input
+        const fileInput = document.getElementById('id-picture');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    };
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
@@ -164,31 +265,128 @@ export default function AliveOragnForm(){
         setError("");
         setSuccess(false);
 
+        // Validate recipient data for direct donation
+        if (formData.donationType === 'direct-donation') {
+            if (!recipientData.full_name || !recipientData.age || !recipientData.contact || !recipientData.blood_type || !recipientData.hospital_id) {
+                setError("Please fill in all recipient information fields for direct donation.");
+                setLoading(false);
+                return;
+            }
+        }
+
+        // Validate hospital selection for non-direct donation with specific hospital
+        if (formData.donationType === 'non-direct-donation' && nonDirectDonation.hospital_selection === 'specific') {
+            if (!nonDirectDonation.hospital_id) {
+                setError("Please select a hospital for non-directed donation.");
+                setLoading(false);
+                return;
+            }
+        }
+
         try {
-            // Prepare submission data
-            const submissionData = {
-                ...formData,
-                medical_conditions: isChecked.length > 0 ? isChecked : null,
-                organ: formData.living_organ,
-                donation_type: formData.donationType === 'direct-donation' ? 'directed' : 'non-directed',
-                agree_interest: formData.agree_intrest
-            };
+            // If ID picture is uploaded, use FormData, otherwise use JSON
+            if (idPicture) {
+                const formDataToSend = new FormData();
+                
+                // Add form data fields
+                Object.keys(formData).forEach(key => {
+                    if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
+                        formDataToSend.append(key, formData[key]);
+                    }
+                });
 
-            const response = await axios.post(
-                "http://localhost:8000/api/organ/living-donor",
-                submissionData,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
+                // Add medical conditions
+                if (isChecked.length > 0) {
+                    formDataToSend.append('medical_conditions', JSON.stringify(isChecked));
                 }
-            );
 
-            setSuccess(true);
-            setTimeout(() => {
-                navigate("/donation");
-            }, 2000);
+                formDataToSend.append('organ', formData.living_organ);
+                formDataToSend.append('donation_type', formData.donationType === 'direct-donation' ? 'directed' : 'non-directed');
+                formDataToSend.append('agree_interest', formData.agree_intrest);
+
+                // Add recipient data for direct donation
+                if (formData.donationType === 'direct-donation') {
+                    formDataToSend.append('recipient[full_name]', recipientData.full_name);
+                    formDataToSend.append('recipient[age]', recipientData.age);
+                    formDataToSend.append('recipient[contact]', recipientData.contact);
+                    formDataToSend.append('recipient[contact_type]', recipientData.contact_type);
+                    formDataToSend.append('recipient[blood_type]', recipientData.blood_type);
+                    formDataToSend.append('recipient[hospital_id]', recipientData.hospital_id);
+                }
+
+                // Add hospital selection for non-direct donation
+                if (formData.donationType === 'non-direct-donation') {
+                    formDataToSend.append('hospital_selection', nonDirectDonation.hospital_selection);
+                    if (nonDirectDonation.hospital_selection === 'specific') {
+                        formDataToSend.append('hospital_id', nonDirectDonation.hospital_id);
+                    }
+                }
+
+                // Add ID picture file
+                formDataToSend.append('id_picture', idPicture);
+
+                const response = await api.post(
+                    "/api/organ/living-donor",
+                    formDataToSend,
+                    {
+                        headers: {
+                            "Content-Type": "multipart/form-data",
+                            "Accept": "application/json",
+                        },
+                    }
+                );
+
+                setSuccess(true);
+                setTimeout(() => {
+                    navigate("/donation");
+                }, 2000);
+            } else {
+                // Prepare submission data without file
+                const submissionData = {
+                    ...formData,
+                    medical_conditions: isChecked.length > 0 ? isChecked : null,
+                    organ: formData.living_organ,
+                    donation_type: formData.donationType === 'direct-donation' ? 'directed' : 'non-directed',
+                    agree_interest: formData.agree_intrest
+                };
+
+                // Add recipient data for direct donation
+                if (formData.donationType === 'direct-donation') {
+                    submissionData.recipient = {
+                        full_name: recipientData.full_name,
+                        age: recipientData.age,
+                        contact: recipientData.contact,
+                        contact_type: recipientData.contact_type,
+                        blood_type: recipientData.blood_type,
+                        hospital_id: recipientData.hospital_id
+                    };
+                }
+
+                // Add hospital selection for non-direct donation
+                if (formData.donationType === 'non-direct-donation') {
+                    submissionData.hospital_selection = nonDirectDonation.hospital_selection;
+                    if (nonDirectDonation.hospital_selection === 'specific') {
+                        submissionData.hospital_id = nonDirectDonation.hospital_id;
+                    }
+                }
+
+                const response = await api.post(
+                    "/api/organ/living-donor",
+                    submissionData,
+                    {
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                        },
+                    }
+                );
+
+                setSuccess(true);
+                setTimeout(() => {
+                    navigate("/donation");
+                }, 2000);
+            }
+
         } catch (err) {
             console.error("Error submitting form:", err);
             if (err.response?.data?.errors) {
@@ -319,6 +517,61 @@ export default function AliveOragnForm(){
                                             placeholder="Enter your address in detials.."
                                             required 
                                         />
+                                    </div>
+                                </div>
+                                <div className="organ-form-group">
+                                    <div>
+                                        <label htmlFor="id-picture">Personal ID Picture</label>
+                                        <input 
+                                            type="file" 
+                                            id="id-picture" 
+                                            name="id_picture"
+                                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                                            onChange={handleIdPictureChange}
+                                            style={{  
+                                                padding: '12px'   
+                                            }}
+                                        />
+                                        <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                                            Upload a clear picture of your ID (Max 5MB, JPEG/PNG/WebP)
+                                        </small>
+                                        {idPicturePreview && (
+                                            <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
+                                                <img 
+                                                    src={idPicturePreview} 
+                                                    alt="ID Preview" 
+                                                    style={{ 
+                                                        maxWidth: '200px', 
+                                                        maxHeight: '150px', 
+                                                        border: '1px solid #ddd',
+                                                        borderRadius: '4px',
+                                                        padding: '4px'
+                                                    }} 
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={removeIdPicture}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '4px',
+                                                        right: '4px',
+                                                        background: '#f44336',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '50%',
+                                                        width: '24px',
+                                                        height: '24px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '14px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -467,6 +720,181 @@ export default function AliveOragnForm(){
                                 </div>
                             </div>
 
+                            {/* Recipient Information Form (for Direct Donation) */}
+                            {formData.donationType === 'direct-donation' && (
+                                <div className="personal-info">
+                                    <div className="info-title">
+                                        <FaUser className="text-blue-500 text-xl"/>
+                                        <h3 className="text-xl font-semibold">Recipient Information</h3>
+                                    </div>
+                                    <div className="organ-form-group">
+                                        <div>
+                                            <label htmlFor="recipient-full-name">Recipient Full Name</label>
+                                            <input 
+                                                type="text" 
+                                                id="recipient-full-name" 
+                                                name="full_name"
+                                                value={recipientData.full_name}
+                                                onChange={handleRecipientChange}
+                                                placeholder="Enter recipient's full name" 
+                                                required
+                                                style={{ fontSize: '14px', padding: '8px' }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="recipient-age">Age</label>
+                                            <input 
+                                                type="number" 
+                                                id="recipient-age" 
+                                                name="age"
+                                                value={recipientData.age}
+                                                onChange={handleRecipientChange}
+                                                placeholder="Enter age" 
+                                                min="1"
+                                                max="120"
+                                                required
+                                                style={{ fontSize: '14px', padding: '8px' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="organ-form-group">
+                                        <div>
+                                            <label htmlFor="recipient-contact-type">Contact Type</label>
+                                            <select 
+                                                id="recipient-contact-type" 
+                                                name="contact_type"
+                                                value={recipientData.contact_type}
+                                                onChange={handleRecipientChange}
+                                                style={{ fontSize: '14px', padding: '8px' }}
+                                            >
+                                                <option value="phone">Phone Number</option>
+                                                <option value="email">Email</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="recipient-contact">{recipientData.contact_type === 'email' ? 'Email' : 'Phone Number'}</label>
+                                            <input 
+                                                type={recipientData.contact_type === 'email' ? 'email' : 'text'} 
+                                                id="recipient-contact" 
+                                                name="contact"
+                                                value={recipientData.contact}
+                                                onChange={handleRecipientChange}
+                                                placeholder={recipientData.contact_type === 'email' ? 'Enter email' : 'Enter phone number'} 
+                                                required
+                                                style={{ fontSize: '14px', padding: '8px' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="organ-form-group">
+                                        <div>
+                                            <label htmlFor="recipient-blood-type">Recipient Blood Type</label>
+                                            <select 
+                                                id="recipient-blood-type" 
+                                                name="blood_type"
+                                                value={recipientData.blood_type}
+                                                onChange={handleRecipientChange}
+                                                required
+                                                style={{ fontSize: '14px', padding: '8px' }}
+                                            >
+                                                <option value="" disabled>Select Blood Type</option>
+                                                <option value="A+">A+</option>
+                                                <option value="A-">A-</option>
+                                                <option value="B+">B+</option>
+                                                <option value="B-">B-</option>
+                                                <option value="O+">O+</option>
+                                                <option value="O-">O-</option>
+                                                <option value="AB+">AB+</option>
+                                                <option value="AB-">AB-</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="recipient-hospital">Hospital</label>
+                                            <select 
+                                                id="recipient-hospital" 
+                                                name="hospital_id"
+                                                value={recipientData.hospital_id}
+                                                onChange={handleRecipientChange}
+                                                required
+                                                disabled={loadingHospitals}
+                                                style={{ fontSize: '14px', padding: '8px' }}
+                                            >
+                                                <option value="" disabled>
+                                                    {loadingHospitals ? 'Loading hospitals...' : 'Select Hospital'}
+                                                </option>
+                                                {hospitals.map(hospital => (
+                                                    <option key={hospital.id} value={hospital.id}>
+                                                        {hospital.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Hospital Selection (for Non-Direct Donation) */}
+                            {formData.donationType === 'non-direct-donation' && (
+                                <div className="personal-info">
+                                    <div className="info-title">
+                                        <PiHeartbeatFill className="text-blue-500 text-xl"/>
+                                        <h3 className="text-xl font-semibold">Hospital Selection</h3>
+                                    </div>
+                                    <div className="organ-form-group">
+                                        <div style={{ width: '100%' }}>
+                                            <label>
+                                                <input
+                                                    type="radio"
+                                                    name="hospital_selection"
+                                                    value="general"
+                                                    checked={nonDirectDonation.hospital_selection === 'general'}
+                                                    onChange={handleNonDirectChange}
+                                                    style={{ marginRight: '8px' }}
+                                                />
+                                                General Donation (not specific to a hospital)
+                                            </label>
+                                        </div>
+                                        <div style={{ width: '100%'}}>
+                                            <label>
+                                                <input
+                                                    type="radio"
+                                                    name="hospital_selection"
+                                                    value="specific"
+                                                    checked={nonDirectDonation.hospital_selection === 'specific'}
+                                                    onChange={handleNonDirectChange}
+                                                    style={{ marginRight: '8px' }}
+                                                />
+                                                Select Specific Hospital
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {nonDirectDonation.hospital_selection === 'specific' && (
+                                        <div className="organ-form-group">
+                                            <div>
+                                                <label htmlFor="non-direct-hospital">Hospital</label>
+                                                <select 
+                                                    id="non-direct-hospital" 
+                                                    name="hospital_id"
+                                                    value={nonDirectDonation.hospital_id}
+                                                    onChange={handleNonDirectChange}
+                                                    required
+                                                    disabled={loadingHospitals}
+                                                    style={{ fontSize: '14px', padding: '8px', width: '100%' }}
+                                                >
+                                                    <option value="" disabled>
+                                                        {loadingHospitals ? 'Loading hospitals...' : 'Select Hospital'}
+                                                    </option>
+                                                    {hospitals.map(hospital => (
+                                                        <option key={hospital.id} value={hospital.id}>
+                                                            {hospital.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="agreement">
                                 <label >
                                 <input 
@@ -478,7 +906,7 @@ export default function AliveOragnForm(){
                                 />
                                 <div>
                                     <h3 className="text-bold">I understand this is an expression of interest only. Final approval is done by hospital doctors and legal authorities.</h3>
-                                    <h3 className="text-[13px] text-light">By checking this box, I consent to being contacted by partner hospitals for further evaluation.</h3>
+                                    <h3 className="text-bold">By checking this box, I consent to being contacted by partner hospitals for further evaluation.</h3>
                                 </div>
                                 </label>
                             </div>

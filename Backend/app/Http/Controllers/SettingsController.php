@@ -9,6 +9,7 @@ use App\Models\BloodType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
 {
@@ -264,6 +265,59 @@ class SettingsController extends Controller
     }
 
     /**
+     * Permanently delete the authenticated user's account.
+     * This will cascade-delete related records (donor/phlebotomist/manager/settings/messages, etc.)
+     * based on existing FK constraints.
+     */
+    public function deleteAccount(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthenticated. Please log in to access this endpoint.'
+            ], 401);
+        }
+
+        try {
+            DB::transaction(function () use ($request, $user) {
+                // Revoke tokens if Sanctum personal tokens are in use
+                if (method_exists($user, 'tokens')) {
+                    try {
+                        $user->tokens()->delete();
+                    } catch (\Throwable $e) {
+                        // ignore if tokens table isn't used in this project
+                    }
+                }
+
+                // Logout session (if any)
+                Auth::guard('web')->logout();
+                if ($request->hasSession()) {
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+                }
+
+                // Deleting the user cascades to donor/mobile_phlebotomist/health_center_manager/etc.
+                $user->delete();
+            });
+
+            return response()->json([
+                'message' => 'Account deleted successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting account:', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete account',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
      * Get medical information
      */
     public function getMedicalInfo(Request $request)
@@ -397,7 +451,18 @@ class SettingsController extends Controller
 
             $validated = $request->validate([
                 'current_password' => 'required|string',
-                'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+                'new_password' => [
+                    'required',
+                    'string',
+                    'min:8',
+                    'regex:/[A-Z]/',       // uppercase
+                    'regex:/[a-z]/',       // lowercase
+                    'regex:/[0-9]/',       // number
+                    'regex:/[^A-Za-z0-9]/', // special character
+                    'confirmed'
+                ],
+            ], [
+                'new_password.regex' => 'The password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
             ]);
 
             // Verify current password

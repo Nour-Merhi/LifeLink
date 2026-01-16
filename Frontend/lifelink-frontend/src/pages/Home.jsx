@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useRef } from "react";
 import { FaArrowRight, FaRegistered, FaTint } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 
@@ -8,13 +9,24 @@ import Articles from "../components/home/Articles";
 import RegisteredHospitals from "../components/home/RegisteredHospitals";
 import QuestionSection from "../components/home/QuestionSection";
 import GameSection from "../components/home/GameSection";
+import BloodHeroes from "../components/home/BloodHeroes";
 
 import bloodIllustration from "../assets/illustrations/blood_home.svg";
+import humanBodyIllustration from "../assets/imgs/HumanBodySvg/HumanBody.svg";
 import "../styles/HumanBodySection.css";
 
 export default function Home() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const footerRef = useRef(null);
+
+  const handleHumanBodyClick = () => {
+    navigate("/human-body");
+  };
+
+  const handleContactUsClick = () => {
+    footerRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   if (loading) return null;
 
@@ -35,7 +47,7 @@ export default function Home() {
     <>
       {/* ================= HERO SECTION ================= */}
       <section id="hero" className="min-h-screen">
-      <Navbar />
+      <Navbar handleContactUsClick={handleContactUsClick} />
         <div id="text-img">
           <div className="hero-info">
             <h1>BE THE</h1>
@@ -86,6 +98,66 @@ export default function Home() {
         </div>
       </section>
 
+      {/*=================TOP Blood Donors ================= */}
+      <section className="mt-12 min-h-screen">
+      <div className="text-center">
+       <h2 className="text-[48px] font-bold  mb-2">
+          Top Donor Players
+        </h2>
+        <p className="max-w-3xl mx-auto text-gray-600">
+            Honoring our champions who make a difference through their learning process and inspire others to learn
+        </p>
+      </div>
+      <BloodHeroes />
+      <div className="bg-gradient-to-r from-red-900 to-red-700 text-white rounded-2xl p-8 max-w-[760px] mx-auto text-center my-10">
+          <h3 className="font-semibold text-2xl mb-2">Join our Heroes</h3>
+          <p className="mb-6 text-[16px]">
+            Every donation can save up to 3 lives. Be the hero someone needs
+            today.
+          </p>
+          <button
+            onClick={handleScheduleClick}
+            className="bg-white text-red-600 text-[14px] font-semibold rounded-full px-6 py-2 hover:bg-red-100 transition"
+          >
+            Schedule your Donation
+          </button>
+        </div>
+      </section>
+
+      {/*==================Humamn Body Section ================= */}
+      <section className="mt-12 min-h-screen">
+        {/* ================= DISCOVER THE HUMAN BODY ================= */}
+        <div className="flex flex-row items-center justify-around px-10 py-20 mx-auto ">
+          <div className="flex flex-col max-w-2xl">
+            <span className="text-gray-400 mb-8 text-left">Explore</span>
+            <h2 className="!text-5xl font-extrabold text-left text-gray-900 !mb-5">
+              Discover the Human Body <br /> Like Never Before
+            </h2>
+            <p className="text-gray-600 mb-10 text-left"> Dive into our interactive human body feature that brings anatomy to life.<br/> Learn how your donations can make a real difference in saving lives.</p>
+            
+            <div className="flex gap-2">
+              <button onClick={handleHumanBodyClick} className="bg-red-500 text-white px-5 py-2 rounded hover:bg-red-700 transition flex items-center gap-2">
+                Start
+              </button>
+              <button className="text-gray-700 px-5 py-2 rounded transition flex items-center gap-2">
+                Learn More
+                <FaArrowRight />
+              </button>
+            </div>
+          </div>
+
+          {/* Human Body Illustration */}
+          <div className="flex-shrink-0 w-full md:w-auto">
+              <div className="human-body-container">
+                <img 
+                  src={humanBodyIllustration} 
+                  alt="Human body anatomy illustration" 
+                  className="human-body-image"
+                />
+              </div>
+          </div>
+        </div>
+      </section>
 
       {/* ================= ARTICLES ================= */}
       <section className="mt-12 min-h-screen">
@@ -103,7 +175,7 @@ export default function Home() {
       <RegisteredHospitals  />
 
       {/* ================= FOOTER ================= */}
-      <Footer />
+      <Footer ref={footerRef} />
       </div>
     </>
   );

@@ -27,7 +27,6 @@ class FinancialDonationController extends Controller
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            'preference' => 'nullable|in:anonymous,stay_updated',
             'patient_case_id' => 'nullable|integer|exists:patient_cases,id', // Will work when patient_cases table exists
         ]);
 
@@ -62,7 +61,6 @@ class FinancialDonationController extends Controller
                 'recipient_chosen' => $request->recipient_chosen ?? 'general patient',
                 'patient_case_id' => $request->patient_case_id,
                 'payment_method' => $request->payment_method,
-                'preference' => $request->preference,
                 'status' => 'pending', // Will be updated when payment is processed
             ]);
 

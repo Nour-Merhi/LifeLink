@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\MobilePhlebotomist;
 use App\Models\HomeAppointment;
+use App\Models\HomeAppointmentRating;
 use App\Models\Message;
 use App\Models\Hospital;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class NurseDashboardController extends Controller
 {
@@ -422,7 +424,7 @@ class NurseDashboardController extends Controller
     }
 
     /**
-     * Get donor requests (unassigned home appointments) for phlebotomists
+     * Get donor requests (assigned home appointments) for phlebotomists
      */
     public function donorRequests(Request $request)
     {
@@ -449,8 +451,8 @@ class NurseDashboardController extends Controller
                 ], 403);
             }
 
-            // Get mobile phlebotomist record for phlebotomists to get their hospital_id
-            $hospitalId = null;
+            // Get mobile phlebotomist record for phlebotomists to get their phlebotomist_id
+            $phlebotomistId = null;
             
             if ($userRole === 'phlebotomist') {
                 $phlebotomist = MobilePhlebotomist::where('user_id', $user->id)->first();
@@ -462,22 +464,23 @@ class NurseDashboardController extends Controller
                     ], 404);
                 }
                 
-                $hospitalId = $phlebotomist->hospital_id;
+                $phlebotomistId = $phlebotomist->id;
             }
-            // For admins, they can see all requests (hospitalId remains null)
+            // For admins, they can see all assigned requests (phlebotomistId remains null)
 
-            // Get unassigned home appointments (phlebotomist_id is NULL and state is pending)
+            // Get assigned home appointments (phlebotomist_id is NOT NULL and state is pending)
             $appointmentsQuery = HomeAppointment::with([
                 'donor.user',
                 'donor.bloodType',
-                'appointment'
+                'appointment',
+                'hospital'
             ])
-            ->whereNull('phlebotomist_id')
+            ->whereNotNull('phlebotomist_id')
             ->where('state', 'pending');
             
-            // Filter by hospital_id for phlebotomists (only show requests from their assigned hospital)
-            if ($hospitalId !== null) {
-                $appointmentsQuery->where('hospital_id', $hospitalId);
+            // Filter by phlebotomist_id for phlebotomists (only show requests assigned to them)
+            if ($phlebotomistId !== null) {
+                $appointmentsQuery->where('phlebotomist_id', $phlebotomistId);
             }
             
             // Order by appointment date (earliest first - so urgent requests appear first)
@@ -679,7 +682,7 @@ class NurseDashboardController extends Controller
                 'address' => $hospital->address ?? 'N/A',
                 'latitude' => $hospital->latitude ?? null,
                 'longitude' => $hospital->longitude ?? null,
-                'status' => $hospital->status ?? 'unverified',
+                'status' => $hospital->status ?? 'verified',
                 'created_at' => $hospital->created_at ? $hospital->created_at->toISOString() : null,
             ];
 
@@ -1107,6 +1110,305 @@ class NurseDashboardController extends Controller
 
             return response()->json([
                 'message' => 'Failed to send message',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update phlebotomist status to onDuty when starting an appointment
+     */
+    public function startAppointment(Request $request, $appointmentId)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Unauthenticated. Please log in to access this endpoint.'
+                ], 401);
+            }
+            
+            // Check if user is a Phlebotomist
+            $userRole = strtolower($user->role ?? '');
+            if ($userRole !== 'phlebotomist') {
+                Log::warning('Unauthorized access attempt to start appointment', [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                    'user_role' => $user->role
+                ]);
+                return response()->json([
+                    'message' => 'Unauthorized. Only phlebotomists can access this endpoint.',
+                    'user_role' => $user->role
+                ], 403);
+            }
+
+            // Get mobile phlebotomist record
+            $phlebotomist = MobilePhlebotomist::where('user_id', $user->id)->first();
+            
+            if (!$phlebotomist) {
+                return response()->json([
+                    'message' => 'Phlebotomist record not found. Please complete your profile registration.',
+                    'error' => 'phlebotomist_not_found'
+                ], 404);
+            }
+
+            // Verify the appointment is assigned to this phlebotomist
+            $homeAppointment = HomeAppointment::where('id', $appointmentId)
+                ->where('phlebotomist_id', $phlebotomist->id)
+                ->first();
+
+            if (!$homeAppointment) {
+                return response()->json([
+                    'message' => 'Appointment not found or not assigned to you.',
+                    'error' => 'appointment_not_found'
+                ], 404);
+            }
+
+            // Update phlebotomist status to onDuty
+            $phlebotomist->availability = 'onDuty';
+            $phlebotomist->save();
+
+            // Update appointment status to confirmed
+            $homeAppointment->state = 'confirmed';
+            $homeAppointment->save();
+
+            return response()->json([
+                'message' => 'Appointment started successfully. Your status has been set to on duty and the appointment is now confirmed.',
+                'phlebotomist' => [
+                    'id' => $phlebotomist->id,
+                    'availability' => $phlebotomist->availability
+                ],
+                'appointment' => [
+                    'id' => $homeAppointment->id,
+                    'code' => $homeAppointment->code,
+                    'state' => $homeAppointment->state
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error starting appointment:', [
+                'user_id' => Auth::id(),
+                'appointment_id' => $appointmentId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to start appointment',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * Leaderboard: top rated phlebotomists based on donor ratings of completed home appointments.
+     */
+    public function leaderboard(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
+
+            $userRole = strtolower($user->role ?? '');
+            if ($userRole !== 'phlebotomist' && $userRole !== 'admin') {
+                return response()->json([
+                    'message' => 'Unauthorized. Only admins and phlebotomists can access this endpoint.',
+                    'user_role' => $user->role
+                ], 403);
+            }
+
+            // ----------------
+            // Top Raters
+            // ----------------
+            $topRatersRows = DB::table('home_appointment_ratings as r')
+                ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
+                ->join('mobile_phlebotomists as mp', 'mp.id', '=', 'ha.phlebotomist_id')
+                ->join('users as u', 'u.id', '=', 'mp.user_id')
+                ->leftJoin('hospitals as h', 'h.id', '=', 'mp.hospital_id')
+                ->whereNotNull('ha.phlebotomist_id')
+                ->where('ha.state', '=', 'completed')
+                ->selectRaw('
+                    mp.id as phlebotomist_id,
+                    mp.code as phlebotomist_code,
+                    u.email as email,
+                    CONCAT_WS(" ", u.first_name, u.middle_name, u.last_name) as name,
+                    h.name as hospital_name,
+                    ROUND(AVG(r.rating), 2) as avg_rating,
+                    COUNT(r.id) as ratings_count,
+                    COUNT(DISTINCT ha.id) as completed_rated_count
+                ')
+                ->groupBy('mp.id', 'mp.code', 'u.email', 'u.first_name', 'u.middle_name', 'u.last_name', 'h.name')
+                ->orderByDesc('avg_rating')
+                ->orderByDesc('ratings_count')
+                ->orderByDesc('completed_rated_count')
+                ->limit(25)
+                ->get();
+
+            $top_raters = collect($topRatersRows)->values()->map(function ($row, $idx) {
+                return [
+                    'rank' => $idx + 1,
+                    'phlebotomist_id' => (int) $row->phlebotomist_id,
+                    'code' => $row->phlebotomist_code ?? null,
+                    'name' => trim($row->name ?: '') ?: ($row->email ?? 'N/A'),
+                    'hospital' => $row->hospital_name ?? 'N/A',
+                    'avg_rating' => (float) ($row->avg_rating ?? 0),
+                    'ratings_count' => (int) ($row->ratings_count ?? 0),
+                    'completed_rated_count' => (int) ($row->completed_rated_count ?? 0),
+                ];
+            });
+
+            // ----------------
+            // Top Workers (most completed home appointments)
+            // ----------------
+            $topWorkersRows = DB::table('home_appointments as ha')
+                ->join('mobile_phlebotomists as mp', 'mp.id', '=', 'ha.phlebotomist_id')
+                ->join('users as u', 'u.id', '=', 'mp.user_id')
+                ->leftJoin('hospitals as h', 'h.id', '=', 'mp.hospital_id')
+                ->leftJoin('home_appointment_ratings as r', 'r.home_appointment_id', '=', 'ha.id')
+                ->whereNotNull('ha.phlebotomist_id')
+                ->where('ha.state', '=', 'completed')
+                ->selectRaw('
+                    mp.id as phlebotomist_id,
+                    mp.code as phlebotomist_code,
+                    u.email as email,
+                    CONCAT_WS(" ", u.first_name, u.middle_name, u.last_name) as name,
+                    h.name as hospital_name,
+                    COUNT(ha.id) as completed_count,
+                    COUNT(r.id) as ratings_count,
+                    ROUND(AVG(r.rating), 2) as avg_rating
+                ')
+                ->groupBy('mp.id', 'mp.code', 'u.email', 'u.first_name', 'u.middle_name', 'u.last_name', 'h.name')
+                ->orderByDesc('completed_count')
+                ->orderByDesc('ratings_count')
+                ->orderByDesc('avg_rating')
+                ->limit(25)
+                ->get();
+
+            $top_workers = collect($topWorkersRows)->values()->map(function ($row, $idx) {
+                return [
+                    'rank' => $idx + 1,
+                    'phlebotomist_id' => (int) $row->phlebotomist_id,
+                    'code' => $row->phlebotomist_code ?? null,
+                    'name' => trim($row->name ?: '') ?: ($row->email ?? 'N/A'),
+                    'hospital' => $row->hospital_name ?? 'N/A',
+                    'completed_count' => (int) ($row->completed_count ?? 0),
+                    'ratings_count' => (int) ($row->ratings_count ?? 0),
+                    'avg_rating' => (float) ($row->avg_rating ?? 0),
+                ];
+            });
+
+            // My stats (phlebotomists only)
+            $myStats = null;
+            if ($userRole === 'phlebotomist') {
+                $me = MobilePhlebotomist::where('user_id', $user->id)->first();
+                if ($me) {
+                    // My Top-Raters stats + rank
+                    $myRatersAgg = DB::table('home_appointment_ratings as r')
+                        ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
+                        ->where('ha.phlebotomist_id', '=', $me->id)
+                        ->where('ha.state', '=', 'completed')
+                        ->selectRaw('ROUND(AVG(r.rating), 2) as avg_rating, COUNT(r.id) as ratings_count')
+                        ->first();
+
+                    $myAvg = (float) ($myRatersAgg->avg_rating ?? 0);
+                    $myCnt = (int) ($myRatersAgg->ratings_count ?? 0);
+                    $myRankRaters = null;
+                    if ($myCnt > 0) {
+                        $ratersAgg = DB::table('home_appointment_ratings as r')
+                            ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
+                            ->whereNotNull('ha.phlebotomist_id')
+                            ->where('ha.state', '=', 'completed')
+                            ->groupBy('ha.phlebotomist_id')
+                            ->selectRaw('ha.phlebotomist_id as phlebotomist_id, ROUND(AVG(r.rating), 2) as avg_rating, COUNT(r.id) as ratings_count');
+
+                        $better = DB::query()->fromSub($ratersAgg, 't')
+                            ->where(function ($q) use ($myAvg, $myCnt) {
+                                $q->where('t.avg_rating', '>', $myAvg)
+                                  ->orWhere(function ($q2) use ($myAvg, $myCnt) {
+                                      $q2->where('t.avg_rating', '=', $myAvg)
+                                         ->where('t.ratings_count', '>', $myCnt);
+                                  });
+                            })
+                            ->count();
+                        $myRankRaters = $better + 1;
+                    }
+
+                    // My Top-Workers stats + rank
+                    $myWorkersAgg = DB::table('home_appointments as ha')
+                        ->leftJoin('home_appointment_ratings as r', 'r.home_appointment_id', '=', 'ha.id')
+                        ->where('ha.phlebotomist_id', '=', $me->id)
+                        ->where('ha.state', '=', 'completed')
+                        ->selectRaw('COUNT(ha.id) as completed_count, COUNT(r.id) as ratings_count, ROUND(AVG(r.rating), 2) as avg_rating')
+                        ->first();
+
+                    $myCompleted = (int) ($myWorkersAgg->completed_count ?? 0);
+                    $myWorkersRatings = (int) ($myWorkersAgg->ratings_count ?? 0);
+                    $myWorkersAvg = (float) ($myWorkersAgg->avg_rating ?? 0);
+
+                    $myRankWorkers = null;
+                    if ($myCompleted > 0) {
+                        $workersAgg = DB::table('home_appointments as ha')
+                            ->leftJoin('home_appointment_ratings as r', 'r.home_appointment_id', '=', 'ha.id')
+                            ->whereNotNull('ha.phlebotomist_id')
+                            ->where('ha.state', '=', 'completed')
+                            ->groupBy('ha.phlebotomist_id')
+                            ->selectRaw('ha.phlebotomist_id as phlebotomist_id, COUNT(ha.id) as completed_count, COUNT(r.id) as ratings_count, ROUND(AVG(r.rating), 2) as avg_rating');
+
+                        $betterW = DB::query()->fromSub($workersAgg, 't')
+                            ->where(function ($q) use ($myCompleted, $myWorkersRatings, $myWorkersAvg) {
+                                $q->where('t.completed_count', '>', $myCompleted)
+                                  ->orWhere(function ($q2) use ($myCompleted, $myWorkersRatings, $myWorkersAvg) {
+                                      $q2->where('t.completed_count', '=', $myCompleted)
+                                         ->where('t.ratings_count', '>', $myWorkersRatings);
+                                  })
+                                  ->orWhere(function ($q3) use ($myCompleted, $myWorkersRatings, $myWorkersAvg) {
+                                      $q3->where('t.completed_count', '=', $myCompleted)
+                                         ->where('t.ratings_count', '=', $myWorkersRatings)
+                                         ->where('t.avg_rating', '>', $myWorkersAvg);
+                                  });
+                            })
+                            ->count();
+                        $myRankWorkers = $betterW + 1;
+                    }
+
+                    $myStats = [
+                        'phlebotomist_id' => $me->id,
+                        'top_raters' => [
+                            'avg_rating' => $myAvg,
+                            'ratings_count' => $myCnt,
+                            'rank' => $myRankRaters,
+                        ],
+                        'top_workers' => [
+                            'completed_count' => $myCompleted,
+                            'ratings_count' => $myWorkersRatings,
+                            'avg_rating' => $myWorkersAvg,
+                            'rank' => $myRankWorkers,
+                        ],
+                    ];
+                }
+            }
+
+            return response()->json([
+                'top_raters' => $top_raters,
+                'top_workers' => $top_workers,
+                'my_stats' => $myStats,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error fetching nurse leaderboard:', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch leaderboard',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
             ], 500);
         }

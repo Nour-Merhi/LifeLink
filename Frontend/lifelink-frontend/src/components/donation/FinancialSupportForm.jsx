@@ -10,7 +10,6 @@ import { FaMoneyCheck } from "react-icons/fa";
 import { FaPaypal } from "react-icons/fa6";
 import { BsFillCreditCard2FrontFill } from "react-icons/bs";
 import WishIcon from "../../assets/imgs/wish.svg";
-import { RiSettings4Fill } from "react-icons/ri";
 import { BiSolidBadgeDollar } from "react-icons/bi";
 
 import { useState, useEffect } from "react"
@@ -32,7 +31,6 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
         recipient_chosen: "",
         patient_case_id: null,
         payment_method: "",
-        preference: "",
     })
 
     // Auto-select specific patient when a patient is selected from slider
@@ -46,6 +44,29 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
         }
         // Don't reset to general when no patient selected - let user's manual choice stand
     }, [selectedPatientCaseId, selectedPatientName]);
+
+    // Handle recipient selection changes
+    const handleRecipientChange = (recipientType) => {
+        if (recipientType === "specific patient") {
+            // Scroll to patient cases section
+            const patientSection = document.querySelector('.support-patient');
+            if (patientSection) {
+                patientSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            setFormData(prev => ({
+                ...prev,
+                recipient_chosen: "specific patient",
+                // Keep patient_case_id if already selected, otherwise null
+            }));
+        } else if (recipientType === "general patient") {
+            // Deselect patient when general is selected
+            setFormData(prev => ({
+                ...prev,
+                recipient_chosen: "general patient",
+                patient_case_id: null
+            }));
+        }
+    };
 
     const handleChange = (e) => {
         const {name, value} = e.target 
@@ -82,7 +103,6 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
                 recipient_chosen: formData.recipient_chosen || 'general patient',
                 patient_case_id: formData.patient_case_id || null,
                 payment_method: formData.payment_method,
-                preference: formData.preference || null,
             });
 
             // Reset form
@@ -96,7 +116,6 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
                 recipient_chosen: selectedPatientCaseId ? "specific patient" : "general patient",
                 patient_case_id: selectedPatientCaseId || null,
                 payment_method: "",
-                preference: "",
             })
 
             setModal(true)
@@ -237,7 +256,7 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
                                 <div className="rec-chose">
                                     <button 
                                         type="button"
-                                        onClick={ ()=> setFormData (prev => ({...prev, recipient_chosen: "general patient", patient_case_id: null})) } 
+                                        onClick={() => handleRecipientChange("general patient")} 
                                     >
                                         <div 
                                             className={`rec-type ${formData.recipient_chosen === "general patient" ? "selected-dn-btn" : ""}`}
@@ -251,7 +270,7 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
                                     </button>
                                     <button 
                                         type="button"
-                                        onClick={ ()=> setFormData (prev => ({...prev, recipient_chosen: "specific patient"})) } 
+                                        onClick={() => handleRecipientChange("specific patient")} 
                                     >
                                         <div 
                                             className={`rec-type ${formData.recipient_chosen === "specific patient" ? "selected-dn-btn" : ""}`}
@@ -359,47 +378,6 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
                                 </div>
                               
                                 <div className="organ-form-group">
-                                </div>
-                            </div>
-
-                            {/*Donation Preference*/}
-                            <div className="personal-info">
-                                <div className="info-title">
-                                    <RiSettings4Fill  className="green-color"/>
-                                    <h3 className="text-2xl font-semibold">Preference</h3>
-                                </div>
-                                <div className="organ-form-group">
-                                    <div className="donation-type">
-                                        <label>
-                                            <input
-                                            className="checked"
-                                            type="radio"
-                                            name="preference"
-                                            value="anonymous"
-                                            onChange={ handleChange }
-                                            required
-                                            />
-                                            <div>
-                                                <p>Make this donation anonymous</p>
-                                                <p>Your name will not be shared with patients or publicly</p>
-                                            </div>
-                                        </label>
-
-                                        <label>
-                                            <input
-                                            className="checked"
-                                            type="radio"
-                                            name="preference"
-                                            value="stay_updated"
-                                            onChange={ handleChange }
-                                            required
-                                            />
-                                            <div>
-                                                <p>I want to stay updated on the patient's progress</p>
-                                                <p>Receive updates on how your donation is helping</p>
-                                            </div>
-                                        </label>
-                                    </div>
                                 </div>
                             </div>
 

@@ -5,12 +5,61 @@ import { FaHandHoldingHeart } from "react-icons/fa";
 import { IoMdArrowForward } from "react-icons/io";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
+import { IoClose } from "react-icons/io5";
 
 export default function Home(){
     const navigate = useNavigate();
     const [dashboardData, setDashboardData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    // Rating modal state (home appointments only)
+    const [ratingModalOpen, setRatingModalOpen] = useState(false);
+    const [ratingTarget, setRatingTarget] = useState(null); // donation_history row
+    const [ratingValue, setRatingValue] = useState(0);
+    const [ratingComment, setRatingComment] = useState("");
+    const [ratingSaving, setRatingSaving] = useState(false);
+    const [ratingError, setRatingError] = useState("");
+
+    const openRatingModal = (donationRow) => {
+        setRatingTarget(donationRow);
+        setRatingValue(donationRow?.rating?.rating || 0);
+        setRatingComment(donationRow?.rating?.comment || "");
+        setRatingError("");
+        setRatingModalOpen(true);
+    };
+
+    const closeRatingModal = () => {
+        setRatingModalOpen(false);
+        setRatingTarget(null);
+        setRatingValue(0);
+        setRatingComment("");
+        setRatingSaving(false);
+        setRatingError("");
+    };
+
+    const renderStars = (value) => {
+        const v = Number(value) || 0;
+        return (
+            <span style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                {Array.from({ length: 5 }, (_, i) => {
+                    const filled = i < v;
+                    return (
+                        <span
+                            key={i}
+                            style={{
+                                fontSize: '14px',
+                                lineHeight: 1,
+                                color: filled ? '#F5B301' : '#D1D5DB'
+                            }}
+                        >
+                            ★
+                        </span>
+                    );
+                })}
+            </span>
+        );
+    };
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -188,6 +237,7 @@ export default function Home(){
                                 <th className="col-status">Status</th>
                                 <th className="col-date">Date</th>
                                 <th className="col-reward">Reward</th>
+                                <th className="col-actions">Rating</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -200,11 +250,54 @@ export default function Home(){
                                 </td>
                                         <td className="col-date">{donation.date}</td>
                                         <td className="col-reward">{donation.reward}</td>
+                                        <td className="col-actions">
+                                            {donation?.appointment_kind === 'home' && donation?.can_rate ? (
+                                                donation?.rating?.rating ? (
+                                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                                        {renderStars(donation.rating.rating)}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openRatingModal(donation)}
+                                                            style={{
+                                                                padding: '6px 10px',
+                                                                borderRadius: '8px',
+                                                                border: '1px solid #e5e7eb',
+                                                                background: '#fff',
+                                                                fontSize: '12px',
+                                                                fontWeight: 600,
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openRatingModal(donation)}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            borderRadius: '8px',
+                                                            border: 'none',
+                                                            background: '#3257CD',
+                                                            color: '#fff',
+                                                            fontSize: '12px',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        Rate
+                                                    </button>
+                                                )
+                                            ) : (
+                                                <span className="text-gray-400">—</span>
+                                            )}
+                                        </td>
                             </tr>
                                 ))
                             ) : (
                             <tr>
-                                    <td colSpan="4" className="text-center text-gray-500">No donation history</td>
+                                    <td colSpan="5" className="text-center text-gray-500">No donation history</td>
                             </tr>
                             )}
                         </tbody>
@@ -212,6 +305,132 @@ export default function Home(){
                 </div>
             </div>
         </div>
+
+        {/* Rate Home Appointment Modal */}
+        {ratingModalOpen && (
+            <div className="modal-overlay" onClick={closeRatingModal}>
+                <div className="modal-container modal-modern" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-modern-header">
+                        <div className="modal-modern-title">
+                            <h2>Rate your Home Donation</h2>
+                            <div className="modal-modern-subtitle">
+                                <span>Appointment: {ratingTarget?.code || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <button className="modal-icon-btn" onClick={closeRatingModal} aria-label="Close">
+                            <IoClose />
+                        </button>
+                    </div>
+
+                    <div className="modal-modern-body">
+                        {ratingError && (
+                            <div className="error-message modal-error-container">
+                                {ratingError}
+                            </div>
+                        )}
+
+                        <div className="modal-section">
+                            <h3 className="modal-section-title">Your Rating</h3>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {Array.from({ length: 5 }, (_, i) => {
+                                    const star = i + 1;
+                                    const active = star <= ratingValue;
+                                    return (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setRatingValue(star)}
+                                            style={{
+                                                border: 'none',
+                                                background: 'transparent',
+                                                cursor: 'pointer',
+                                                fontSize: '26px',
+                                                lineHeight: 1,
+                                                color: active ? '#F5B301' : '#D1D5DB'
+                                            }}
+                                            aria-label={`Rate ${star} star`}
+                                        >
+                                            ★
+                                        </button>
+                                    );
+                                })}
+                                <span className="muted">({ratingValue || 0}/5)</span>
+                            </div>
+                        </div>
+
+                        <div className="modal-section">
+                            <h3 className="modal-section-title">Comment (optional)</h3>
+                            <textarea
+                                value={ratingComment}
+                                onChange={(e) => setRatingComment(e.target.value)}
+                                placeholder="Tell us about your experience..."
+                                style={{
+                                    width: '100%',
+                                    minHeight: '110px',
+                                    padding: '10px 12px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '10px',
+                                    outline: 'none',
+                                    resize: 'vertical'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="modal-modern-footer">
+                        <button type="button" className="btn-cancel" onClick={closeRatingModal} disabled={ratingSaving}>
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="submit-btn"
+                            disabled={ratingSaving || !ratingTarget?.id || ratingValue < 1}
+                            onClick={async () => {
+                                if (!ratingTarget?.id) return;
+                                if (ratingValue < 1) {
+                                    setRatingError("Please select a rating (1 to 5 stars).");
+                                    return;
+                                }
+                                setRatingSaving(true);
+                                setRatingError("");
+                                try {
+                                    await api.get("/sanctum/csrf-cookie");
+                                    const res = await api.put(
+                                        `/api/donor/home-appointments/${ratingTarget.id}/rating`,
+                                        { rating: ratingValue, comment: ratingComment || null }
+                                    );
+
+                                    const saved = res.data?.rating || null;
+                                    // Update local dashboardData donation_history
+                                    setDashboardData((prev) => {
+                                        if (!prev) return prev;
+                                        const next = { ...prev };
+                                        next.donation_history = (next.donation_history || []).map((row) => {
+                                            if (row?.appointment_kind === 'home' && String(row?.id) === String(ratingTarget.id)) {
+                                                return {
+                                                    ...row,
+                                                    rating: saved ? { rating: saved.rating, comment: saved.comment } : null,
+                                                };
+                                            }
+                                            return row;
+                                        });
+                                        return next;
+                                    });
+                                    closeRatingModal();
+                                } catch (err) {
+                                    console.error("Error saving rating:", err);
+                                    setRatingError(err.response?.data?.message || err.response?.data?.error || err.message || "Failed to save rating");
+                                } finally {
+                                    setRatingSaving(false);
+                                }
+                            }}
+                        >
+                            {ratingSaving ? "Saving..." : "Save Rating"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         </>
     )
 }

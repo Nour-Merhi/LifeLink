@@ -6,17 +6,48 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Expose setLoading so components can control loading state
+  const setLoadingState = (value) => setLoading(value);
 
-  const fetchUser = async () => {
+  const fetchUser = async (skipLoadingReset = false) => {
     try {
       const { data } = await api.get("/api/user");
-      setUser(data?.id ? data : null);
-      return data;
-    } catch {
+      if (data?.id) {
+        console.log('AuthContext: User fetched', { 
+          id: data.id, 
+          email: data.email, 
+          role: data.role 
+        });
+        setUser(data);
+        if (!skipLoadingReset) {
+          setLoading(false);
+        }
+        return data;
+      } else {
+        console.warn('AuthContext: No user data returned', data);
+        setUser(null);
+        if (!skipLoadingReset) {
+          setLoading(false);
+        }
+        return null;
+      }
+    } catch (error) {
+      // 401 is expected when user is not authenticated - don't log as error
+      if (error.response?.status === 401) {
+        setUser(null);
+        if (!skipLoadingReset) {
+          setLoading(false);
+        }
+        return null;
+      }
+      // Only log actual errors (network errors, 500s, etc.)
+      console.error('AuthContext: Error fetching user', error);
       setUser(null);
+      if (!skipLoadingReset) {
+        setLoading(false);
+      }
       return null;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -36,7 +67,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, fetchUser }}>
+    <AuthContext.Provider value={{ user, loading, setUser, fetchUser, setLoading: setLoadingState }}>
       {children}
     </AuthContext.Provider>
   );

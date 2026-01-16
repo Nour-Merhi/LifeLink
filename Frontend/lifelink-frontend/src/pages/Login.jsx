@@ -1,11 +1,14 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import loginImg from "../assets/illustrations/login.svg";
+import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { setUser, fetchUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -34,19 +37,71 @@ const Login = () => {
         password: formData.password,
       });
 
-      // Login successful - trigger window event to refresh navbar
+      // Update user state directly from login response for immediate availability
+      const userData = response.data?.user;
+      if (!userData) {
+        setError("Login successful but user data not received. Please try again.");
+        return;
+      }
+      
+      // Set user state immediately
+      if (setUser) {
+        setUser(userData);
+      }
+      
+      // Set loading to false to allow navigation
+      if (setLoading) {
+        setLoading(false);
+      }
+      
+      // Fetch user from API to ensure all relationships are loaded properly
+      // This ensures the AuthContext has the complete user object with all relationships
+      // Do this asynchronously so it doesn't block navigation
+      if (fetchUser) {
+        fetchUser(true).catch(err => {
+          console.warn('Error fetching user after login:', err);
+          // Non-critical error - we already have userData from login response
+        });
+      }
+      
+      // Also trigger window event to refresh navbar components that listen to it
       window.dispatchEvent(new Event('auth-change'));
       
-      // Redirect based on user role
-      const userRole = response.data?.user?.role?.toLowerCase();
+      // Small delay to ensure React has processed state updates before navigation
+      // This ensures the dashboard layouts see the user state as set
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Check if there's a redirect path from location state
+      const from = location.state?.from;
+      const userRole = userData?.role?.toLowerCase();
+      
+      // If redirecting from quiz game interface, check if user is a donor
+      if (from === "/quizlit/game-interface") {
+        if (userRole === 'donor') {
+          navigate("/quizlit/game-interface", { replace: true });
+        } else {
+          // User is not a donor, redirect to welcome page with message
+          navigate("/quizlit/welcome", { 
+            replace: true,
+            state: { 
+              message: "Quiz game is only available for donors. Please log in with a donor account."
+            } 
+          });
+        }
+        return;
+      }
+      
+      // Redirect based on user role (default behavior)
       if (userRole === 'admin') {
-        navigate("/admin/dashboard");
-      } else if (userRole === 'phlebotomist') {
-        navigate("/nurse/home");
+        navigate("/admin/dashboard", { replace: true });
+      } else if (userRole === 'phlebotomist' || userRole === 'nurse') {
+        navigate("/nurse/home", { replace: true });
+      } else if (userRole === 'manager') {
+        navigate("/hospital/dashboard", { replace: true });
       } else if (userRole === 'donor') {
-        navigate("/home");
+        navigate(from || "/home", { replace: true });
       } else {
-        navigate("/home");
+        navigate(from || "/home", { replace: true });
       }
     } catch (err) {
       console.error('Login error:', err);

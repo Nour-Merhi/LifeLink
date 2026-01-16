@@ -155,6 +155,173 @@ class HomeVisitController extends Controller
     }
 
     /**
+     * Get home visit appointments for a specific hospital, separated by urgent/regular
+     */
+    public function getHospitalHomeVisitAppointments(Request $request, $hospitalId = null)
+    {
+        try {
+            // If hospitalId is provided in URL, use it; otherwise check query parameter
+            $hospitalId = $hospitalId ?? $request->query('hospital_id');
+            
+            if (!$hospitalId) {
+                return response()->json([
+                    'hospital' => null,
+                    'urgent_appointments' => [],
+                    'regular_appointments' => [],
+                    'error' => 'Hospital ID is required'
+                ], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            if (!$hospital) {
+                return response()->json([
+                    'hospital' => null,
+                    'urgent_appointments' => [],
+                    'regular_appointments' => [],
+                    'error' => 'Hospital not found'
+                ], 404);
+            }
+
+            // Get all appointments for this hospital with donation_type = 'Home Blood Donation'
+            // Don't filter by state - show all appointments (pending, completed, etc.)
+            $appointments = Appointment::where('donation_type', 'Home Blood Donation')
+                ->where('hospital_id', $hospitalId)
+                ->orderBy('appointment_date', 'desc')
+                ->get();
+
+            // Separate urgent and regular appointments
+            // For urgent appointments, filter out those without due_date
+            $urgentAppointments = $appointments->where('appointment_type', 'urgent')->filter(function($apt) {
+                return !empty($apt->due_date);
+            });
+            $regularAppointments = $appointments->where('appointment_type', 'regular');
+
+            // Process urgent appointments (group by due_date)
+            $urgentSlots = $this->processAppointmentsByDate($urgentAppointments, true);
+
+            // Process regular appointments (group by appointment_date)
+            $regularSlots = $this->processAppointmentsByDate($regularAppointments, false);
+
+            return response()->json([
+                'hospital' => [
+                    'id' => $hospital->id,
+                    'name' => $hospital->name,
+                    'location' => $hospital->address,
+                ],
+                'urgent_appointments' => $urgentSlots,
+                'regular_appointments' => $regularSlots,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital home visit appointments:', [
+                'hospital_id' => $hospitalId ?? 'not provided',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'hospital' => null,
+                'urgent_appointments' => [],
+                'regular_appointments' => [],
+                'error' => 'Failed to fetch hospital appointments'
+            ], 500);
+        }
+    }
+
+    /**
+     * Process appointments and group by date
+     */
+    private function processAppointmentsByDate($appointments, $isUrgent = false)
+    {
+        if ($appointments->isEmpty()) {
+            return [];
+        }
+
+        // For urgent appointments, group by due_date instead of appointment_date
+        // For regular appointments, group by appointment_date
+        $groupByField = $isUrgent ? 'due_date' : 'appointment_date';
+        $dateGroups = $appointments->groupBy($groupByField);
+        
+        // Sort dates (latest first)
+        $sortedDates = $dateGroups->keys()->sort(function($a, $b) {
+            try {
+                $dateA = Carbon::parse($a)->timestamp;
+                $dateB = Carbon::parse($b)->timestamp;
+                return $dateB - $dateA;
+            } catch (\Exception $e) {
+                return strcmp($b, $a);
+            }
+        })->values();
+
+        return $sortedDates->map(function ($date) use ($dateGroups) {
+            $dateAppointments = $dateGroups->get($date);
+            $appointmentIds = $dateAppointments->pluck('id')->toArray();
+            $allTimeSlots = [];
+            
+            foreach ($dateAppointments as $apt) {
+                $timeSlots = $apt->time_slots ?? [];
+                if (is_array($timeSlots)) {
+                    foreach ($timeSlots as $timeSlot) {
+                        $timeSlotValue = null;
+                        
+                        if (is_string($timeSlot)) {
+                            $timeSlotValue = $timeSlot;
+                        } elseif (is_array($timeSlot) && isset($timeSlot['start'])) {
+                            $timeSlotValue = $timeSlot['start'];
+                            if (isset($timeSlot['date']) && $timeSlot['date'] !== $date) {
+                                continue;
+                            }
+                            if (isset($timeSlot['is_available']) && !$timeSlot['is_available']) {
+                                $allTimeSlots[] = [
+                                    'time' => $this->formatTime($timeSlotValue),
+                                    'available' => false
+                                ];
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                        
+                        // Check if booked
+                        $bookingsCount = HomeAppointment::where('appointment_id', $apt->id)
+                            ->where('appointment_time', $timeSlotValue)
+                            ->where('state', '!=', 'canceled')
+                            ->count();
+                        
+                        $maxCapacity = $apt->max_capacity ?? null;
+                        $isBooked = ($maxCapacity && $bookingsCount >= $maxCapacity) || $bookingsCount > 0;
+                        
+                        $allTimeSlots[] = [
+                            'time' => $this->formatTime($timeSlotValue),
+                            'available' => !$isBooked
+                        ];
+                    }
+                }
+            }
+
+            // Remove duplicates
+            $uniqueSlots = [];
+            $seen = [];
+            foreach ($allTimeSlots as $slot) {
+                if (!in_array($slot['time'], $seen)) {
+                    $seen[] = $slot['time'];
+                    $uniqueSlots[] = $slot;
+                }
+            }
+
+            // Sort by time
+            usort($uniqueSlots, function($a, $b) {
+                return strcmp($a['time'], $b['time']);
+            });
+
+            return [
+                'date' => $date,
+                'times' => $uniqueSlots,
+                'appointment_ids' => $appointmentIds
+            ];
+        })->values()->toArray();
+    }
+
+    /**
      * Get all home visit appointments (hospital appointment slots)
      */
     public function getHomeVisitAppointments(Request $request)

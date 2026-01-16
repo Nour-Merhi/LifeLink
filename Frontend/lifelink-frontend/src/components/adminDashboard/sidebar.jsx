@@ -12,9 +12,24 @@ import { RiArticleLine } from "react-icons/ri";
 import { FiLogOut } from "react-icons/fi";
 
 import { NavLink, useNavigate } from "react-router-dom";
+import api from "../../api/axios";
 
 export default function Sidebar(){
     const navigate = useNavigate();
+    const handleLogout = async () => {
+        try {
+          await api.post("/api/logout");
+          // Trigger auth change to update context
+          window.dispatchEvent(new Event('auth-change'));
+          navigate("/home");
+        } catch (error) {
+          console.error('Logout error:', error);
+          // Trigger auth change anyway
+          window.dispatchEvent(new Event('auth-change'));
+          navigate("/home");
+        }
+      };
+
     return (
         <>
         <div className="sidebar linear-red layout admin-sidebar ">
@@ -36,6 +51,10 @@ export default function Sidebar(){
                     <NavLink to="/admin/hospitals">Hospitals</NavLink>
                 </div>
                 <div className="link-item">
+                    <img src={nurse} alt="nurse" width="23px" height="23px"/>
+                    <NavLink to="/admin/phlebotomists">Phlebotomists</NavLink>
+                </div>
+                <div className="link-item">
                     <BiSolidBuildingHouse className="icon-size text-white"/>
                     <NavLink to="/admin/home-visits">Home Visits</NavLink>
                 </div>
@@ -44,12 +63,8 @@ export default function Sidebar(){
                     <NavLink to="/admin/hospital-appointments">Hospital Appointments</NavLink>
                 </div>
                 <div className="link-item">
-                    <img src={nurse} alt="nurse" width="23px" height="23px"/>
-                    <NavLink to="/admin/phlebotomists">Phlebotomists</NavLink>
-                </div>
-                <div className="link-item">
                     <PiHeartbeatFill className="icon-size text-white"/>
-                    <NavLink to="/admin/organ-pledges">Organ Pledges</NavLink>
+                    <NavLink to="/admin/organ-pledges">Organ Coordination</NavLink>
                 </div>
                 <div className="link-item">
                     <BiSolidBadgeDollar className="icon-size text-white"/>
@@ -75,7 +90,7 @@ export default function Sidebar(){
 
             <div className="logout">
                 <FiLogOut className="icon-size text-white"/>
-                <button className="logout-button">Logout</button>
+                <button className="logout-button" onClick={handleLogout}>Logout</button>
             </div>
         </div>
         </>

@@ -36,32 +36,33 @@ import Login from "./pages/Login";
 import Register from "./pages/Register"
 import axios from "axios";
 
-
+/* Articles */
 import ArticlePage from "./pages/articlePage.jsx";
 import ArticleDetail from "./pages/ArticleDetail.jsx";
-import HospitalDashboardLayout from "./pages/HospitalDashboard/HospitalDashboardLayout";
-import HospitalDashboard from "./pages/HospitalDashboard/HospitalDashboard";
-import DonorManagement from "./pages/HospitalDashboard/DonorManagement";
-import Appointments from "./pages/HospitalDashboard/Appointments";
-import UrgentRequests from "./pages/HospitalDashboard/UrgentRequests";
-import HomeVisits from "./pages/HospitalDashboard/HomeVisits";
-import Phlebotomists from "./pages/HospitalDashboard/Phlebotomists";
-import OrganCoordination from "./pages/HospitalDashboard/OrganCoordination";
-import Inventory from "./pages/HospitalDashboard/Inventory";
-import AnalyticsReports from "./pages/HospitalDashboard/AnalyticsReports";
-import NotificationsCenter from "./pages/HospitalDashboard/NotificationsCenter";
-import HospitalSettings from "./pages/HospitalDashboard/HospitalSettings";
-import QuizHome from "./pages/Quiz/QuizHome";
-import QuizQuestion from "./pages/Quiz/QuizQuestion";
-import QuizResults from "./pages/Quiz/QuizResults";
 
-/* Donor Dashboard */
+/* Hospital Dashboard */
+import HospitalDashboardLayout from "./pages/Dashboards/HospitalDashboardLayout.jsx";
+import HospitalDashboard from "./components/HospitalDashboard/HospitalDashboard.jsx";
+import DonorManagement from "./components/HospitalDashboard/DonorManagement.jsx";
+import Appointments from "./components/HospitalDashboard/Appointments.jsx";
+import UrgentRequests from "./components/HospitalDashboard/UrgentRequests.jsx";
+import HomeVisits from "./components/HospitalDashboard/HomeVisits.jsx";
+import Phlebotomists from "./components/HospitalDashboard/Phlebotomists.jsx";
+import OrganCoordination from "./components/HospitalDashboard/OrganCoordination.jsx";
+import Inventory from "./components/HospitalDashboard/Inventory.jsx";
+import AnalyticsReports from "./components/HospitalDashboard/AnalyticsReports.jsx";
+import NotificationsCenter from "./components/HospitalDashboard/NotificationsCenter.jsx";
+import HospitalSettings from "./components/HospitalDashboard/HospitalSettings.jsx";
+import HospitalApp from "./components/HospitalDashboard/HospitalApp.jsx";
+
+/* Donor Dashboard layout */
 import DonorDashboard from "./pages/Dashboards/DonorDashboard";
 import DonorHome from "./components/donorDashboard/home.jsx";
 import MyDonations from "./components/donorDashboard/myDonatioins.jsx";
 import MyAppointments from "./components/donorDashboard/myAppointments.jsx";
 import Settings from "./components/donorDashboard/Settings.jsx";
 import Rewards from "./components/donorDashboard/Rewards.jsx";
+import Quiz from "./components/donorDashboard/Quiz.jsx";
 /* Support */
 import Support from "./pages/Support";
 import AskQuestion from "./pages/AskQuestion";
@@ -74,11 +75,13 @@ import NurseAppointments from "./components/nurseDashboard/myAppointments.jsx";
 import DonorRequests from "./components/nurseDashboard/DonorRequests.jsx";
 import HospitalInfo from "./components/nurseDashboard/HospitalInfo.jsx";
 import ManagerContact from "./components/nurseDashboard/ManagerContact.jsx";
+import NurseLeaderboard from "./components/nurseDashboard/Leaderboard.jsx";
 /* End of Nurse Dashboard */
 
 /* Quizzlit */
 import QuizzlitWelcome from "./pages/QuizzlitWelcome";
 import QuizReady from "./pages/QuizReady";
+import QuizSummary from "./components/Quizzlit/QuizSummary.jsx";
 import GameInterface from "./components/Quizzlit/GameInterface.jsx";
 /* End of Quizzlit */
 
@@ -88,7 +91,7 @@ import HospitalDetailHome from "./pages/HospitalDetail";
 /* End of Find More Hospitals */
 
 import "leaflet/dist/leaflet.css";
-
+import HumanBody from "./pages/HumanBody.jsx";
 
 function App() {
   useEffect(() => {
@@ -113,6 +116,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/human-body" element={<HumanBody />} />
         
         {/* Donation layout */}
         <Route path="/donation" element={<Donation />}>
@@ -125,7 +129,8 @@ function App() {
           <Route path="alive-organ-form" element={<ProtectedRoute><AliveOrganForm /></ProtectedRoute>} />
           <Route path="after-death-organ-form/stepTwo" element={<ProtectedRoute><AfterDeathStepTwo /></ProtectedRoute>} />
           <Route path="after-death-organ-form/stepThree" element={<ProtectedRoute><AfterDeathStepThree /></ProtectedRoute>} />
-          <Route path="home-blood-from" element={<ProtectedRoute><HomeBookForm /></ProtectedRoute>} />
+          <Route path="home-blood-form" element={<ProtectedRoute><HomeBookForm pageType="home" /></ProtectedRoute>} />
+          <Route path="hospital-blood-form" element={<ProtectedRoute><HomeBookForm pageType="hospital" /></ProtectedRoute>} />
         </Route>
         
         {/* Articles Pages */}
@@ -134,6 +139,8 @@ function App() {
         
         {/* Admin Dashboard layout */}
         <Route path="/admin" element={<AdminDashboard />}>
+          <Route index element={<div className="admin-content"><h1>Admin Dashboard</h1><p>Select an option from the sidebar</p></div>} />
+          <Route path="dashboard" element={<div className="admin-content"><h1>Admin Dashboard</h1><p>Select an option from the sidebar</p></div>} />
           <Route path="donors" element={<Donors />} />
           <Route path="donors/:donorCode" element={<DonorDetail />} />
           <Route path="hospitals" element={<Hospitals/>} />
@@ -148,11 +155,11 @@ function App() {
           <Route path="articles" element={<Articles />} />
           <Route path="platform-settings" element={<AdminSettings />} />
           <Route path="profile" element={<AdminProfile />} />
-          <Route path="dashboard" element={<div><h1>Dashboard</h1></div>} />
         </Route>
         
         {/* Hospital Dashboard layout */}
         <Route path="/hospital" element={<HospitalDashboardLayout />}>
+          <Route index element={<HospitalDashboard />} />
           <Route path="dashboard" element={<HospitalDashboard />} />
           <Route path="donors" element={<DonorManagement />} />
           <Route path="appointments" element={<Appointments />} />
@@ -164,37 +171,38 @@ function App() {
           <Route path="analytics" element={<AnalyticsReports />} />
           <Route path="notifications" element={<NotificationsCenter />} />
           <Route path="settings" element={<HospitalSettings />} />
+          <Route path="hospital-app" element={<HospitalApp />} />
         </Route>
         
         {/* Donor Dashboard layout */}
         <Route path="/donor" element={<DonorDashboard />}>
+          <Route index element={<DonorHome />} />
           <Route path="home" element={<DonorHome />} />
           <Route path="my-donations" element={<MyDonations />} />
           <Route path="my-appointments" element={<MyAppointments />} />
           <Route path="rewards" element={<Rewards />} />
+          <Route path="quiz" element={<Quiz />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* Nurse Dashboard layout */}
         <Route path="/nurse" element={<NurseDashboard />}>
+          <Route index element={<NurseHome />} />
           <Route path="home" element={<NurseHome />} />
           <Route path="my-appointments" element={<NurseAppointments />} />
           <Route path="donor-requests" element={<DonorRequests />} />
           <Route path="hospital-info" element={<HospitalInfo />} />
           <Route path="manager-contact" element={<ManagerContact />} />
+          <Route path="leaderboard" element={<NurseLeaderboard />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 
-        {/* Quiz Routes */}
-        <Route path="/quiz" element={<QuizHome />} />
-        <Route path="/quiz/results" element={<QuizResults />} />
-        <Route path="/quiz/:category/question" element={<QuizQuestion />} />
 
-
-        {/* Quizzlit Routes */}
+        {/* Quizlet Routes */}
         <Route path="/quizlit/ready" element={<QuizReady />} />
         <Route path="/quizlit/welcome" element={<QuizzlitWelcome />} />
         <Route path="/quizlit/game-interface" element={<GameInterface />} />
+        <Route path="/quizlit/summary" element={<QuizSummary />} />
         
         {/* Support Page */}
         <Route path="/support" element={<Support />} />
@@ -207,7 +215,7 @@ function App() {
         <Route path="/hospitals/:id" element={<HospitalDetailHome />} />
         
         {/* Default redirect */}
-        <Route path="/" element={<div>Welcome to LifeLink</div>} />
+        <Route path="/" element={<Home />} />
       </Routes>
     </Router>
     </QuizProvider>

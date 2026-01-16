@@ -238,35 +238,6 @@ export default function HospitalAppointmentTable({ appointments = [], loading = 
                         </div>
                     </div>
 
-                    <div className="filter-gap">
-                        <div className="filters">
-                            <select
-                                value = { bloodType } 
-                                onChange = { (e) => setBloodType (e.target.value) }
-                            >
-                                <option value = "all-blood" >All blood types</option>
-                                <option value = "AB+" >AB+</option>
-                                <option value = "A+" >A+</option>
-                                <option value = "B+" >B+</option>
-                                <option value = "O+" >O+</option>
-                                <option value = "O-" >O-</option>
-                                <option value = "B-" >B-</option>
-                                <option value = "A-" >A-</option>
-                                <option value = "AB-" >AB-</option>
-                            </select>
-                        </div>
-                        <div className="filters">
-                            <select 
-                                value = { visitState } 
-                                onChange = { (e) => setVisitState (e.target.value) }
-                            >
-                                <option value = "all-states" >All states</option>
-                                <option value = "completed" >Completed</option>
-                                <option value = "pending" >Pending</option>
-                                <option value = "cancelled" >Cancelled</option>
-                            </select>
-                        </div>
-                    </div>
                 </div>
             </div>
 

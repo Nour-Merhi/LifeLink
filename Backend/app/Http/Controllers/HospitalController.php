@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Hospital;
 use App\Models\User;
 use App\Models\HealthCenterManager;
+use App\Models\BloodInventory;
+use App\Models\Appointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,7 +22,58 @@ class HospitalController extends Controller
     {
         $hospitals = Hospital::with(['healthCenterManager.user'])
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($hospital) {
+                // Count requests (appointments created by this hospital)
+                $requestsCount = Appointment::where('hospital_id', $hospital->id)->count();
+                
+                // Get blood stocks grouped by blood type
+                $bloodStocks = BloodInventory::where('hospital_id', $hospital->id)
+                    ->where('status', 'available')
+                    ->with('bloodType')
+                    ->get()
+                    ->groupBy(function ($item) {
+                        return $item->bloodType ? $item->bloodType->type . $item->bloodType->rh_factor : 'Unknown';
+                    })
+                    ->map(function ($items, $bloodType) {
+                        return $items->sum('quantity');
+                    })
+                    ->toArray();
+                
+                // Calculate shortage state for each blood type
+                $shortageStates = [];
+                foreach ($bloodStocks as $bloodType => $quantity) {
+                    if ($quantity < 5) {
+                        $shortageStates[$bloodType] = 'critical';
+                    } elseif ($quantity >= 5 && $quantity <= 10) {
+                        $shortageStates[$bloodType] = 'low stock';
+                    } else {
+                        $shortageStates[$bloodType] = 'sufficient';
+                    }
+                }
+                
+                // Get all blood types and set default values for missing ones
+                $allBloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+                $completeBloodStocks = [];
+                $completeShortageStates = [];
+                
+                foreach ($allBloodTypes as $bt) {
+                    $completeBloodStocks[$bt] = $bloodStocks[$bt] ?? 0;
+                    if (!isset($shortageStates[$bt])) {
+                        $completeShortageStates[$bt] = 'critical'; // No stock = critical
+                    } else {
+                        $completeShortageStates[$bt] = $shortageStates[$bt];
+                    }
+                }
+                
+                // Add the computed data to hospital
+                $hospitalArray = $hospital->toArray();
+                $hospitalArray['requests'] = $requestsCount;
+                $hospitalArray['blood_stock'] = $completeBloodStocks;
+                $hospitalArray['shortage_states'] = $completeShortageStates;
+                
+                return $hospitalArray;
+            });
         
         return response()->json([
             'hospitals' => $hospitals,
@@ -49,6 +102,48 @@ class HospitalController extends Controller
                 ])
                 ->firstOrFail();
             
+            // Count requests (appointments created by this hospital)
+            $requestsCount = Appointment::where('hospital_id', $hospital->id)->count();
+            
+            // Get blood stocks grouped by blood type
+            $bloodStocks = BloodInventory::where('hospital_id', $hospital->id)
+                ->where('status', 'available')
+                ->with('bloodType')
+                ->get()
+                ->groupBy(function ($item) {
+                    return $item->bloodType ? $item->bloodType->type . $item->bloodType->rh_factor : 'Unknown';
+                })
+                ->map(function ($items, $bloodType) {
+                    return $items->sum('quantity');
+                })
+                ->toArray();
+            
+            // Calculate shortage state for each blood type
+            $shortageStates = [];
+            foreach ($bloodStocks as $bloodType => $quantity) {
+                if ($quantity < 5) {
+                    $shortageStates[$bloodType] = 'critical';
+                } elseif ($quantity >= 5 && $quantity <= 10) {
+                    $shortageStates[$bloodType] = 'low stock';
+                } else {
+                    $shortageStates[$bloodType] = 'sufficient';
+                }
+            }
+            
+            // Get all blood types and set default values for missing ones
+            $allBloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+            $completeBloodStocks = [];
+            $completeShortageStates = [];
+            
+            foreach ($allBloodTypes as $bt) {
+                $completeBloodStocks[$bt] = $bloodStocks[$bt] ?? 0;
+                if (!isset($shortageStates[$bt])) {
+                    $completeShortageStates[$bt] = 'critical'; // No stock = critical
+                } else {
+                    $completeShortageStates[$bt] = $shortageStates[$bt];
+                }
+            }
+            
             // Calculate statistics
             $stats = [
                 'total_appointments' => $hospital->appointments()->count(),
@@ -58,6 +153,7 @@ class HospitalController extends Controller
                 'emergency_requests' => $hospital->emergencyRequests()->count(),
                 'pending_appointments' => $hospital->appointments()->where('state', 'pending')->count(),
                 'completed_appointments' => $hospital->appointments()->where('state', 'completed')->count(),
+                'requests' => $requestsCount,
             ];
             
             // Get manager additional info
@@ -74,6 +170,9 @@ class HospitalController extends Controller
             $hospitalData = $hospital->toArray();
             $hospitalData['stats'] = $stats;
             $hospitalData['manager_additional_info'] = $managerInfo;
+            $hospitalData['requests'] = $requestsCount;
+            $hospitalData['blood_stock'] = $completeBloodStocks;
+            $hospitalData['shortage_states'] = $completeShortageStates;
             
             return response()->json([
                 'hospital' => $hospitalData
@@ -150,6 +249,7 @@ class HospitalController extends Controller
                     'longitude' => $validated['longitude'] ?? null,
                     'phone_nb' => $validated['phone_nb'],
                     'email' => $validated['email'],
+                    'status' => 'verified', // Set default status to verified
                     'image' => $validated['image'] ?? null,
                     'description' => $validated['description'] ?? null,
                     'services' => $validated['services'] ?? null,

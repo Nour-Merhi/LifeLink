@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Donor;
 use App\Models\User;
 use App\Models\BloodType;
+use App\Models\HomeAppointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -16,11 +17,49 @@ class DonorController extends Controller
      */
     public function index()
     {
-        $donors = Donor::with('user')->get();
+        // Get all donors with user relationship, ordered by newest first
+        $donors = Donor::with('user')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        // Get donor IDs
+        $donorIds = $donors->pluck('id')->toArray();
+        
+        // Get the most recent home appointment with coordinates for each donor (optimized query)
+        $latestHomeAppointments = HomeAppointment::whereIn('donor_id', $donorIds)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->select('donor_id', 'latitude', 'longitude', 'address', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy('donor_id')
+            ->map(function ($appointments) {
+                return $appointments->first(); // Get the most recent one
+            });
+        
+        $formattedDonors = $donors->map(function ($donor) use ($latestHomeAppointments) {
+            $donorArray = $donor->toArray();
+            
+            // Add latitude and longitude from the most recent home appointment if available
+            if ($latestHomeAppointments->has($donor->id)) {
+                $latestAppointment = $latestHomeAppointments->get($donor->id);
+                $donorArray['latitude'] = $latestAppointment->latitude;
+                $donorArray['longitude'] = $latestAppointment->longitude;
+                // Also update address if it's not set or if home appointment has a more recent address
+                if (empty($donorArray['address']) || !$donorArray['address']) {
+                    $donorArray['address'] = $latestAppointment->address;
+                }
+            } else {
+                $donorArray['latitude'] = null;
+                $donorArray['longitude'] = null;
+            }
+            
+            return $donorArray;
+        });
         
         return response()->json([
-            'donors' => $donors,
-            'total' => $donors->count()
+            'donors' => $formattedDonors,
+            'total' => $formattedDonors->count()
         ], 200);
     }
 

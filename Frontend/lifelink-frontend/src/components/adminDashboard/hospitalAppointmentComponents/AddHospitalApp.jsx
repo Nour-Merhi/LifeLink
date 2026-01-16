@@ -68,7 +68,7 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                     ...prev,
                     appointment_type: value,
                     appointment_date: today,
-                    due_date: today,
+                    due_date: today, // Always today for urgent
                     due_time: '',
                     start_time: '',
                     end_time: '',
@@ -326,7 +326,7 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                                     <>
                                         <div className="form-group">
                                             <div>
-                                                <label htmlFor="due_date">Due Date (Within 24 hours)</label>
+                                                <label htmlFor="due_date">Due Date (Today Only - Within 24 hours)</label>
                                                 <input
                                                     id="due_date"
                                                     type="date"
@@ -334,12 +334,14 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                                                     value={appointmentData.due_date}
                                                     onChange={handleChange}
                                                     min={getTodayDate()}
-                                                    max={getTomorrowDate()}
+                                                    max={getTodayDate()}
                                                     required
+                                                    readOnly
+                                                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
                                                 />
                                                 {errors.due_date && <small className="error-text">{errors.due_date}</small>}
                                                 <small className="info-text" style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                                                    Urgent appointments must be within 24 hours from release time
+                                                    Urgent appointments can only be scheduled for today within 24 hours
                                                 </small>
                                             </div>
                                             <div>

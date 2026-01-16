@@ -84,7 +84,7 @@ class AppointmentsController extends Controller
         return $slots;
     }
 
-    public function createHomeAppointments(Request $request)
+    public function createHomeAppointments(Request $request, $hospitalId = null)
     {
         try {
             // Clean the request data - convert empty strings to null and ensure arrays are handled
@@ -115,9 +115,15 @@ class AppointmentsController extends Controller
             $rules = [
                 'appointment_type' => 'required|in:urgent,regular',
                 'appointment_date' => 'required|date',
-                'hospital_id'      => 'required|exists:hospitals,id',
                 'gap_hours'        => 'required|numeric|min:0|max:4',
             ];
+
+            if ($hospitalId) {
+                $rules['hospital_id'] = 'required|exists:hospitals,id|in:' . $hospitalId;
+            }
+            else {
+                $rules['hospital_id'] = 'required|exists:hospitals,id';
+            }
 
             // Conditional validation based on appointment type
             if ($request->appointment_type === 'regular') {
@@ -174,12 +180,12 @@ class AppointmentsController extends Controller
         $appointmentDate = Carbon::parse($validated['appointment_date'], $timezone)->startOfDay();
 
         // ----------------------------
-        // 3. URGENT LOGIC (24-hour window)
+        // 3. URGENT LOGIC (24-hour window, today only)
         // ----------------------------
         if ($validated['appointment_type'] === 'urgent') {
-
             // Always treat incoming due date/time as LOCAL USER TIME
             $now = Carbon::now();
+            $today = Carbon::today();
 
             // Parse due datetime WITHOUT forcing timezone
             $dueDateTime = Carbon::createFromFormat(
@@ -187,29 +193,21 @@ class AppointmentsController extends Controller
                 $validated['due_date'] . ' ' . $validated['due_time']
             );
 
-            // Rule 1: must be in the future
+            // Rule 1: due date must be today
+            if (!$dueDateTime->isSameDay($today)) {
+                return response()->json([
+                    'message' => 'Urgent appointments can only be scheduled for today.'
+                ], 422);
+            }
+
+            // Rule 2: must be in the future
             if ($dueDateTime->lessThanOrEqualTo($now)) {
                 return response()->json([
                     'message' => 'Urgent due time must be after the current time.'
                 ], 422);
             }
 
-            // Rule 2: must be within 24 hours
-            if ($dueDateTime->greaterThan($now->copy()->addHours(24))) {
-                return response()->json([
-                    'message' => 'Urgent appointment must be within 24 hours from now.'
-                ], 422);
-            }
-
-        
-            // Rule 1: must be in the future
-            if ($dueDateTime->lessThanOrEqualTo($now)) {
-                return response()->json([
-                    'message' => 'Urgent due time must be after the current time.'
-                ], 422);
-            }
-        
-            // Rule 2: must be within 24 hours (the REAL rule)
+            // Rule 3: must be within 24 hours
             if ($dueDateTime->greaterThan($now->copy()->addHours(24))) {
                 return response()->json([
                     'message' => 'Urgent appointment must be within 24 hours from now.'
@@ -226,8 +224,8 @@ class AppointmentsController extends Controller
                 $validated['gap_hours']
             );
         
-            // Appointment date = date of first slot
-            $appointmentDate = $startTime->copy()->startOfDay();
+            // Appointment date = today (always)
+            $appointmentDate = $today;
         }
         
         
@@ -336,9 +334,27 @@ class AppointmentsController extends Controller
         //
     }
 
-    public function createHospitalAppointments(Request $request)
+    public function createHospitalAppointments(Request $request, $hospitalId = null)
     {
         try {
+            // Get hospital ID from route parameter or request
+            if (!$hospitalId) {
+                $hospitalId = $request->input('hospital_id');
+            }
+            
+            // If still no hospital ID, try to get from authenticated user (for hospital managers)
+            if (!$hospitalId) {
+                $user = $request->user();
+                if ($user && strtolower($user->role) === 'manager') {
+                    if (!$user->relationLoaded('healthCenterManager')) {
+                        $user->load('healthCenterManager');
+                    }
+                    if ($user->healthCenterManager && $user->healthCenterManager->hospital_id) {
+                        $hospitalId = $user->healthCenterManager->hospital_id;
+                    }
+                }
+            }
+            
             // Clean the request data - convert empty strings to null and ensure arrays are handled
             $input = $request->all();
             foreach ($input as $key => $value) {
@@ -359,6 +375,12 @@ class AppointmentsController extends Controller
                     $input[$key] = null;
                 }
             }
+            
+            // Set hospital_id if provided via route
+            if ($hospitalId) {
+                $input['hospital_id'] = $hospitalId;
+            }
+            
             $request->merge($input);
             
             // ----------------------------
@@ -426,11 +448,12 @@ class AppointmentsController extends Controller
         $appointmentDate = Carbon::parse($validated['appointment_date'], $timezone)->startOfDay();
 
         // ----------------------------
-        // 3. URGENT LOGIC (24-hour window)
+        // 3. URGENT LOGIC (24-hour window, today only)
         // ----------------------------
         if ($validated['appointment_type'] === 'urgent') {
             // Always treat incoming due date/time as LOCAL USER TIME
             $now = Carbon::now();
+            $today = Carbon::today();
 
             // Parse due datetime WITHOUT forcing timezone
             $dueDateTime = Carbon::createFromFormat(
@@ -438,14 +461,21 @@ class AppointmentsController extends Controller
                 $validated['due_date'] . ' ' . $validated['due_time']
             );
 
-            // Rule 1: must be in the future
+            // Rule 1: due date must be today
+            if (!$dueDateTime->isSameDay($today)) {
+                return response()->json([
+                    'message' => 'Urgent appointments can only be scheduled for today.'
+                ], 422);
+            }
+
+            // Rule 2: must be in the future
             if ($dueDateTime->lessThanOrEqualTo($now)) {
                 return response()->json([
                     'message' => 'Urgent due time must be after the current time.'
                 ], 422);
             }
 
-            // Rule 2: must be within 24 hours
+            // Rule 3: must be within 24 hours
             if ($dueDateTime->greaterThan($now->copy()->addHours(24))) {
                 return response()->json([
                     'message' => 'Urgent appointment must be within 24 hours from now.'
@@ -462,8 +492,8 @@ class AppointmentsController extends Controller
                 $validated['gap_hours']
             );
 
-            // Appointment date = date of first slot
-            $appointmentDate = $startTime->copy()->startOfDay();
+            // Appointment date = today (always)
+            $appointmentDate = $today;
         }
         
         

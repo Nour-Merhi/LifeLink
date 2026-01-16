@@ -81,40 +81,37 @@ export default function HomeVisit(){
                             <h3>Total Orders: {totalOrders}</h3>
                         }
                         {app && 
-                            <h3>Total Registered Hospitals: {totalAppointments}</h3>
+                            <h3>Total Hospitals: {hospitals.length}</h3>
                         }
                 </div>
             </div>
 
-            <div className="scroll-btn"> 
-                <div className="chose-page">
-                    <div className={`sliding-indicator ${orders ? 'slide-left' : 'slide-right'}`}></div>
-                    <button 
-                        className={orders ? 'active-btn' : 'inactive-btn'}
-                        onClick = {()=>{
-                            setApp(false)
-                            setOrders(true)
-                        }}
-                    >
-                        Home Visit Orders
-                    </button>
-                    <button 
-                        className={app ? 'active-btn' : 'inactive-btn'}
-                        onClick = { () => {
-                            setOrders(false)
-                            setApp(true)
-                        }}
-                    >
-                        Appointments Management
-                    </button>
+            <div className="financial-tabs">
+                <button
+                    className={orders ? "tab-active-admin" : "tab-inactive"}
+                    onClick={() => {
+                        setApp(false);
+                        setOrders(true);
+                    }}
+                >
+                    Home Visit Orders
+                </button>
+                <button
+                    className={app ? "tab-active-admin" : "tab-inactive"}
+                    onClick={() => {
+                        setOrders(false);
+                        setApp(true);
+                    }}
+                >
+                    Appointments Management
+                </button>
+            {app && 
+                <div className="add-btn" style={{ marginLeft: 'auto' }}>
+                    <button type="button" onClick={() => setOpenModal(true)}>+ Add New Home Appointment</button>
                 </div>
-                
-                {app && 
-                    <div className="add-btn">
-                        <button type="button" onClick={() => setOpenModal(true)}>+ Add New Home Appointment</button>
-                    </div>
-                }
+            }
             </div>
+
 
             {orders &&
                 <HomeOrderTable 
@@ -126,7 +123,7 @@ export default function HomeVisit(){
             }
             {app &&
                 <HomeAppTable 
-                    appointments={appointmentData} 
+                    hospitals={hospitals}
                     loading={loading} 
                     error={error}
                     onAppointmentsUpdate={fetchData}

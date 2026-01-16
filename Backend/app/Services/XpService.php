@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\XpTransaction;
 use App\Models\Donor;
+use App\Models\QuizLevel;
+use App\Models\MiniGameUnlock;
+
 use Illuminate\Support\Facades\DB;
 
 class XpService
@@ -53,7 +56,7 @@ class XpService
     {
         return self::awardXp(
             $donorId,
-            500,
+            150,
             'blood',
             $referenceType,
             $referenceId,
@@ -107,6 +110,99 @@ class XpService
     }
 
     /**
+     * Award XP for a correct quiz answer
+     *
+     * @param int $donorId
+     * @param int $quizLevel Level of the quiz (1-10)
+     * @param int $questionId ID of the question (used for reference)
+     * @return XpTransaction
+     */
+    public static function awardQuizAnswerXp($donorId, $quizLevel, $questionId){
+        // Define XP bonus per answer depending on the quiz level
+        // level 1 each answer is worth 10 XP, etc..
+        $xpMap = [
+            1 => 10, 2 => 10, 
+            3 => 15, 4 => 15, 5 => 15,
+            6 => 20, 7 => 20, 
+            8 => 25, 9 => 25, 10 => 25,
+        ];
+
+        $xpAmount = $xpMap[$quizLevel] ?? 10;
+
+        return self::awardXp(
+            $donorId,
+            $xpAmount,
+            'quiz_correct_answer',
+            'App\Models\QuizQuestion',
+            $questionId,
+            "Correct answer for quiz level {$quizLevel}, question {$questionId}"
+        );
+    }
+
+    
+    /**
+     * Award XP for completing a quiz level
+     *
+     * @param int $donorId
+     * @param int $quizLevel
+     * @return XpTransaction
+     */
+    public static function awardQuizLevelCompletionXp($donorId, $levelNumber)
+    {
+         // Look up XP for the level in DB
+        $level = QuizLevel::where('number', $levelNumber)->first();
+        if (!$level) {
+            throw new \Exception("Quiz level $levelNumber not found.");
+        }
+
+        return self::awardXp(
+            $donorId,
+            $level->xp_amount,
+            'quiz-level',
+            QuizLevel::class,
+            $level->id, // Use level ID instead of level number for reference_id
+            "Completed quiz level {$levelNumber}"
+        );
+    }
+    
+    /**
+     * Award XP for mini-games (breaks)
+     *
+     * @param int $donorId
+     * @param string $gameType 'tictactoe', 'hangman', 'memory'
+     * @param string $outcome 'win' or 'played'
+     * @return XpTransaction
+     */
+    public static function awardMiniGameXp($donorId, $gameType, $outcome)
+    {
+        // Define XP amounts based on outcome
+        $xpMap = [
+            'played' => 10,
+            'win' => 50
+        ];
+
+        $xpAmount = $xpMap[$outcome] ?? 0;
+
+        // Prevent duplicate XP for same mini-game and outcome
+        $existing = XpTransaction::where('donor_id', $donorId)
+            ->where('reference_type', 'App\Models\MiniGame')
+            ->where('reference_id', $gameType)
+            ->where('donation_type', "mini_game_{$outcome}")
+            ->first();
+
+        if ($existing) return $existing;
+
+        return self::awardXp(
+            $donorId,
+            $xpAmount,
+            "mini_game",
+            'App\Models\MiniGame',
+            $gameType,
+            "Mini-game {$gameType} ({$outcome})"
+        );
+    }
+
+    /**
      * Get total XP for a donor
      */
     public static function getTotalXp($donorId)
@@ -115,11 +211,24 @@ class XpService
     }
 
     /**
-     * Calculate level from total XP (Level 1 = 0-999, Level 2 = 1000-1999, etc.)
+     * Calculate level from total XP (Level 1 = 100, Level 2 = 300, 3 = 600, etc.)
      */
     public static function calculateLevel($totalXp)
     {
-        return floor($totalXp / 1000) + 1;
+        $level = 1;
+
+        while (true) {
+
+            // XP required to REACH the next level
+            $requiredXp = 50 * pow($level, 2) + 50 * $level;
+
+            if ($totalXp < $requiredXp) {
+                return $level; // current level
+            }
+
+            $level++;
+        }
     }
+
 }
 

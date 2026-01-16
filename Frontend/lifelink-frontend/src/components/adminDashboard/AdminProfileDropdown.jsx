@@ -15,9 +15,7 @@ export default function AdminProfileDropdown() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Get profile picture or fallback to default
-  // Construct full URL if profile_picture is a relative path
-  // Use useMemo to recalculate when user changes
+
   const profileImageSrc = useMemo(() => {
     if (!user?.profile_picture) {
       return profile;

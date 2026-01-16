@@ -3,7 +3,7 @@ import ScrollToTop from "../../ScrollToTop";
 
 import { useState, useEffect } from "react";
 
-export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setHomeBloodFormData }){
+export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setHomeBloodFormData, pageType = "home" }){
     const navigate = useNavigate();
     const [bloodType, setBloodType] = useState(homeBloodFormData.blood_type || "");
     const [lastDonation, setLastDonation] = useState(homeBloodFormData.last_donation || "");
@@ -42,7 +42,12 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
             blood_type: bloodType,
             last_donation: lastDonation,
         };
-        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+        // Ensure email is always included (for user verification)
+        if (!updatedData.email && homeBloodFormData.email) {
+            updatedData.email = homeBloodFormData.email;
+        }
+        const formDataKey = pageType === "home" ? 'home_blood_form_data' : 'hospital_blood_form_data';
+        localStorage.setItem(formDataKey, JSON.stringify(updatedData));
     };
 
     // Validate last donation date (must be at least 56 days ago)
@@ -81,7 +86,12 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
             blood_type: bloodType,
             last_donation: value,
         };
-        localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
+        // Ensure email is always included (for user verification)
+        if (!updatedData.email && homeBloodFormData.email) {
+            updatedData.email = homeBloodFormData.email;
+        }
+        const formDataKey = pageType === "home" ? 'home_blood_form_data' : 'hospital_blood_form_data';
+        localStorage.setItem(formDataKey, JSON.stringify(updatedData));
     };
 
     const handleSubmit = (e) => {
@@ -104,6 +114,10 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
             blood_type: bloodType,
             last_donation: lastDonation,
         };
+        // Ensure email is always included (for user verification)
+        if (!updatedData.email && homeBloodFormData.email) {
+            updatedData.email = homeBloodFormData.email;
+        }
         
         setHomeBloodFormData(updatedData);
         
@@ -115,7 +129,8 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
 
     // Initialize from localStorage or homeBloodFormData on mount
     useEffect(() => {
-        const savedData = localStorage.getItem('home_blood_form_data');
+        const formDataKey = pageType === "home" ? 'home_blood_form_data' : 'hospital_blood_form_data';
+        const savedData = localStorage.getItem(formDataKey);
         if (savedData) {
             try {
                 const parsed = JSON.parse(savedData);
@@ -188,6 +203,10 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 medical_conditions: { ...medicalConditions },
                                                 last_donation: lastDonation,
                                             };
+                                            // Ensure email is always included (for user verification)
+                                            if (!updatedData.email && homeBloodFormData.email) {
+                                                updatedData.email = homeBloodFormData.email;
+                                            }
                                             localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
                                         }}
                                     required>
@@ -231,7 +250,7 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
 
                             <div className="yes-no-questions">
                                 <div className="questions">
-                                    <p>Are you feeling healthy today (no fever, cough, or flu symptoms)?</p>
+                                    <p>Are you feeling unhealthy today (fever, cough, or flu symptoms)?</p>
                                     <div className="yes-no">
                                         <label htmlFor="healthy-yes">
                                             <input 
@@ -384,6 +403,10 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                                 blood_type: bloodType,
                                                 last_donation: lastDonation,
                                             };
+                                            // Ensure email is always included (for user verification)
+                                            if (!updatedData.email && homeBloodFormData.email) {
+                                                updatedData.email = homeBloodFormData.email;
+                                            }
                                             setHomeBloodFormData(updatedData);
                                             localStorage.setItem('home_blood_form_data', JSON.stringify(updatedData));
                                             prevStep();
@@ -393,7 +416,7 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                 <div>
                                     <button type="button" className="cancel-btn"
                                         onClick={
-                                            ()=> navigate("/donation/home-blood-donation")
+                                            ()=> navigate(pageType === "home" ? "/donation/home-blood-donation" : "/donation/hospital-blood-donation")
                                         }
                                     >Cancel</button>
                                     <button 

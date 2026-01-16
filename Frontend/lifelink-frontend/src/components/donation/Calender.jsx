@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Timeslots from "./Timeslots";
 import timeslots from "../../../timeSlots";
 
@@ -13,6 +13,7 @@ export default function CalendarStep({
     hospitalAppt,
     hospital,
     appointments = [],
+    timeSlots = [],
     availableSlots = 0
 }) {
   // Get current date info
@@ -25,16 +26,56 @@ export default function CalendarStep({
   const firstDay = new Date(year, month, 1).getDay(); // weekday of 1st
   const currentDay = new Date().getDate();
 
-  const [selected, setSelected] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(null);
+  // Check if this is an urgent appointment
+  const isUrgent = hospital?.appointment_type === 'urgent';
+
+  // For urgent appointments, auto-select today's date
+  const getTodayDateString = () => {
+    const pad = (n) => n.toString().padStart(2, "0");
+    return `${year}-${pad(month + 1)}-${pad(currentDay)}`;
+  };
+
+  // Initialize state based on urgent status
+  // For urgent appointments, always start with today selected
+  const initialSelected = isUrgent ? currentDay : null;
+  const initialSelectedDate = isUrgent ? getTodayDateString() : null;
+  
+  const [selected, setSelected] = useState(initialSelected);
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  
+  // Use a ref to track if we've already auto-selected for urgent appointments
+  const urgentDateInitialized = useRef(false);
+
+  // Helper function to normalize dates
+  const normalizeDate = (dateStr) => {
+    if (!dateStr) return '';
+    if (typeof dateStr === 'string') {
+      return dateStr.split('T')[0].split(' ')[0];
+    }
+    return dateStr.toString().split('T')[0].split(' ')[0];
+  };
 
   // Get all dates that have appointments for this hospital
   const getAvailableDates = () => {
+    // Prioritize timeSlots if available (has booking status), otherwise use appointments
+    if ((pageType === "home" || pageType === "hospital") && timeSlots && timeSlots.length > 0) {
+      const dateSet = new Set();
+      timeSlots.forEach(slot => {
+        if (slot.date) {
+          const dateStr = normalizeDate(slot.date);
+          if (dateStr) {
+            dateSet.add(dateStr);
+          }
+        }
+      });
+      return dateSet;
+    }
+    
     if ((pageType !== "home" && pageType !== "hospital") || !appointments || appointments.length === 0) {
       return new Set();
     }
     
-    // Extract unique dates from appointments
+    // Extract unique dates from appointments (fallback)
     const dateSet = new Set();
     appointments.forEach(apt => {
       if (apt.appointment_date) {
@@ -78,18 +119,88 @@ export default function CalendarStep({
   // Check if a date has appointments
   const hasAppointments = (day) => {
     if (!day || day < currentDay) return false;
+    
+    // For urgent appointments, only today is allowed
+    // For urgent, always allow today even if appointments haven't loaded yet
+    if (isUrgent) {
+      if (day !== currentDay) return false;
+      // If appointments are loaded, check if today has appointments
+      if (appointments && appointments.length > 0) {
+        const pad = (n) => n.toString().padStart(2, "0");
+        const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+        return availableDates.has(dateStr);
+      }
+      // If appointments haven't loaded yet, still allow today for urgent
+      return true;
+    }
+    
     const pad = (n) => n.toString().padStart(2, "0");
     const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
     return availableDates.has(dateStr);
   };
 
-  // Reset selection when appointments change (hospital changes)
+  // Auto-select today when urgent hospital is selected (only once per hospital)
+  useEffect(() => {
+    if ((pageType === "home" || pageType === "hospital") && isUrgent && hospital?.id) {
+      // Only initialize once per hospital
+      if (urgentDateInitialized.current !== hospital.id) {
+        const todayStr = getTodayDateString();
+        
+        // Set the date
+        setSelected(currentDay);
+        setSelectedDate(todayStr);
+        if (onSelectDate) {
+          onSelectDate(todayStr);
+        }
+        
+        // Mark as initialized for this hospital
+        urgentDateInitialized.current = hospital.id;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUrgent, hospital?.id]);
+
+  // Reset selection when appointments change (for regular appointments)
   useEffect(() => {
     if (pageType === "home" || pageType === "hospital") {
-      setSelected(null);
-      setSelectedDate(null);
+      // Skip if urgent - handled by previous useEffect
+      if (isUrgent) return;
+      
+      // For regular appointments, check if there's a date in localStorage
+      const prefix = pageType === "home" ? "home_" : "hospital_";
+      const storedDate = localStorage.getItem(prefix + "date");
+      if (storedDate) {
+        try {
+          const storedDateObj = new Date(storedDate);
+          const storedDay = storedDateObj.getDate();
+          const storedMonth = storedDateObj.getMonth();
+          const storedYear = storedDateObj.getFullYear();
+          
+          // Check if stored date is in current month and has appointments
+          if (storedMonth === month && storedYear === year) {
+            const storedDateStr = storedDate.split('T')[0].split(' ')[0];
+            if (availableDates.has(storedDateStr) && hasAppointments(storedDay)) {
+              setSelected(storedDay);
+              setSelectedDate(storedDateStr);
+            } else {
+              setSelected(null);
+              setSelectedDate(null);
+            }
+          } else {
+            setSelected(null);
+            setSelectedDate(null);
+          }
+        } catch (e) {
+          setSelected(null);
+          setSelectedDate(null);
+        }
+      } else {
+        setSelected(null);
+        setSelectedDate(null);
+      }
     }
-  }, [appointments, pageType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointments, pageType, isUrgent]);
 
   const days = [];
   for (let i = 0; i < firstDay; i++) days.push(null); // empty slots
@@ -99,8 +210,22 @@ return (
     <div className="calendar-container">
             <div className="calendar-step">
                     <div className="select-date">
-                            <h2 className="font-semibold text-xl">Select Date</h2>
-                            <h2 className="font-light">{today.toLocaleString("default", { month: "long" })} {year}</h2>
+                            <h2 className="font-semibold text-xl">
+                                {isUrgent ? "Urgent Appointment - Today Only" : "Select Date"}
+                            </h2>
+                            {!isUrgent && (
+                                <h2 className="font-light">{today.toLocaleString("default", { month: "long" })} {year}</h2>
+                            )}
+                            {isUrgent && (
+                                <h2 className="font-light">
+                                    {today.toLocaleString("default", { 
+                                        weekday: "long", 
+                                        month: "long", 
+                                        day: "numeric", 
+                                        year: "numeric" 
+                                    })}
+                                </h2>
+                            )}
                     </div>
 
         <div className="text-center grid grid-cols-7 gap-3">
@@ -114,16 +239,19 @@ return (
                 const isSelected = d === selected;
                 const isToday = d === currentDay;
                 
+                // For urgent appointments, disable all dates except today
+                const isDisabledForUrgent = isUrgent && d !== currentDay;
+                
                 return (
                     <div id="dates"
                         key={i}
                         className={`p-2 m-1 text-center rounded ${
                             !d
                                 ? ""
-                                : isPastDate
-                                ? "text-gray-300 cursor-not-allowed opacity-40"
+                                : isPastDate || isDisabledForUrgent
+                                ? "text-gray-400 cursor-not-allowed opacity-40"
                                 : !dateHasAppointments && d >= currentDay
-                                ? "text-gray-400 cursor-not-allowed opacity-50 muted-date"
+                                ? "text-gray-500 cursor-not-allowed opacity-50 muted-date"
                                 : isSelected
                                 ? "bg-gradient-to-r from-red-500 to-red-800 font-bold text-white cursor-pointer"
                                 : isToday && dateHasAppointments
@@ -134,12 +262,12 @@ return (
                         }`}
                         style={{
                             background:
-                                d && !isSelected && d >= currentDay && dateHasAppointments
+                                d && !isSelected && d >= currentDay && dateHasAppointments && !isDisabledForUrgent
                                     ? "transparent"
                                     : undefined
                         }}
                         onClick={() => {
-                            if (!d || d < currentDay || !dateHasAppointments) return;
+                            if (!d || d < currentDay || !dateHasAppointments || isDisabledForUrgent) return;
                             setSelected(d);
 
                             const pad = (n) => n.toString().padStart(2, "0");
@@ -154,6 +282,8 @@ return (
                         title={
                             !d || isPastDate 
                                 ? "" 
+                                : isDisabledForUrgent
+                                ? "Urgent appointments can only be scheduled for today"
                                 : !dateHasAppointments 
                                 ? "No appointments available for this date" 
                                 : `Select ${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
@@ -168,12 +298,21 @@ return (
 
             {/*time slots here */}
         <div className="timeslot-panel">
-            {selected ? (
+            {selected && selectedDate ? (
                     <>
                         <p>Available Time Slots</p>
+                        
                         <Timeslots 
-                            timeslots={((pageType === "home" || pageType === "hospital") && appointments.length > 0 
-                                ? appointments.flatMap(apt => {
+                            timeslots={(pageType === "home" || pageType === "hospital") && timeSlots && timeSlots.length > 0
+                                ? timeSlots.filter(slot => {
+                                    // Filter slots for the selected date
+                                    if (!slot.date || !selectedDate) return false;
+                                    const slotDate = normalizeDate(slot.date);
+                                    const selectedDateNormalized = normalizeDate(selectedDate);
+                                    return slotDate === selectedDateNormalized;
+                                })
+                                : (appointments.length > 0 
+                                    ? appointments.flatMap(apt => {
                                         const slots = apt.time_slots || [];
                                         // Format date to YYYY-MM-DD to match selectedDate format
                                         let dateStr;
@@ -188,8 +327,41 @@ return (
                                             }
                                         }
                                         
+                                        // Debug logging for urgent appointments
+                                        if (isUrgent) {
+                                          console.log('Calendar - Processing appointment:', {
+                                            appointmentId: apt.id,
+                                            appointmentDate: apt.appointment_date,
+                                            dateStr,
+                                            selectedDate,
+                                            match: dateStr === selectedDate,
+                                            slotsCount: slots.length,
+                                            rawSlots: slots
+                                          });
+                                        }
+                                        
                                         // Only include slots for the selected date
-                                        if (!dateStr || dateStr !== selectedDate || slots.length === 0) return [];
+                                        // For urgent appointments, be more lenient with date matching
+                                        const dateMatches = dateStr && selectedDate && dateStr === selectedDate;
+                                        
+                                        if (!dateMatches || slots.length === 0) {
+                                          if (isUrgent) {
+                                            console.log('Calendar - Filtering out appointment (date mismatch or no slots):', {
+                                              dateStr,
+                                              selectedDate,
+                                              slotsCount: slots.length,
+                                              matches: dateMatches
+                                            });
+                                          }
+                                          return [];
+                                        }
+                                        
+                                        if (isUrgent) {
+                                          console.log('Calendar - Including appointment slots:', {
+                                            appointmentId: apt.id,
+                                            slotsCount: slots.length
+                                          });
+                                        }
                                         
                                         return slots.map((slot, slotIndex) => {
                                             // Handle time slot format: could be object with start/end or string
@@ -216,7 +388,7 @@ return (
                                             
                                             if (!timeDisplay) return null;
                                             
-                                            return {
+                                            const slotObj = {
                                                 id: `${apt.id}_${slotIndex}_${timeKey}`,
                                                 date: dateStr,
                                                 time: timeDisplay,
@@ -226,9 +398,16 @@ return (
                                                 start: typeof slot === 'object' ? (slot.start || timeKey) : timeKey,
                                                 end: typeof slot === 'object' ? (slot.end || null) : null
                                             };
+                                            
+                                            if (isUrgent && slotIndex < 3) { // Log first 3 slots for debugging
+                                              console.log('Calendar - Created slot object:', slotObj);
+                                            }
+                                            
+                                            return slotObj;
                                         }).filter(slot => slot !== null);
                                     }).filter(slot => slot && slot.date)
-                                    : timeslots)}
+                                    : timeslots
+                                )}
                             selectedDate={selectedDate}
                             pageType={pageType}
                             setStep={setStep}
@@ -237,11 +416,12 @@ return (
                             thankMessHospital={thankMessHospital}
                             setThankMessHospital={setThankMessHospital}
                             hospital={hospital}
+                            isUrgent={isUrgent}
                         />
 
                     </>
             ) : (
-                <p>Select Date First</p>
+                <p>Select Date First {isUrgent && !selectedDate && '(Auto-selecting today...)'}</p>
             )}
         </div>
     </div>

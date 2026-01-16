@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Donor;
 use App\Models\HomeAppointment;
 use App\Models\HospitalAppointment;
+use App\Models\HomeAppointmentRating;
 use App\Models\LivingDonor;
 use App\Models\AfterDeathPledge;
 use App\Models\XpTransaction;
@@ -51,14 +52,27 @@ class DonorDashboardController extends Controller
             $totalXp = XpService::getTotalXp($donor->id);
             $currentLevel = XpService::calculateLevel($totalXp);
             
-            // Calculate XP progress
-            $currentLevelXp = ($currentLevel - 1) * 1000;
-            $nextLevelXp = $currentLevel * 1000;
-            $xpUntilNextLevel = max(0, $nextLevelXp - $totalXp);
-            $currentLevelProgress = $totalXp - $currentLevelXp;
-            $currentLevelMaxXp = $nextLevelXp - $currentLevelXp;
+            // Calculate XP progress using the same formula as calculateLevel
+            // Formula: XP required to REACH level N = 50 * N^2 + 50 * N
+            // The XP needed to REACH the current level (minimum XP for current level)
+            $currentLevelMinXp = $currentLevel > 1 
+                ? (50 * pow($currentLevel - 1, 2) + 50 * ($currentLevel - 1))
+                : 0;
+            
+            // The XP needed to REACH the next level (maximum XP for current level)
+            $nextLevelMinXp = 50 * pow($currentLevel, 2) + 50 * $currentLevel;
+            
+            // XP needed to reach next level from current total
+            $xpUntilNextLevel = max(0, $nextLevelMinXp - $totalXp);
+            
+            // Progress within current level (how much XP earned in this level range)
+            $currentLevelProgress = $totalXp - $currentLevelMinXp;
+            // Total XP range for this level
+            $currentLevelMaxXp = $nextLevelMinXp - $currentLevelMinXp;
+            
+            // Calculate percentage (clamp between 0 and 100)
             $progressPercentage = $currentLevelMaxXp > 0 
-                ? round(($currentLevelProgress / $currentLevelMaxXp) * 100, 0) 
+                ? max(0, min(100, round(($currentLevelProgress / $currentLevelMaxXp) * 100, 2))) 
                 : 0;
 
             // Count completed donations
@@ -241,7 +255,7 @@ class DonorDashboardController extends Controller
 
         // Home appointments history
         $homeAppointments = HomeAppointment::where('donor_id', $donor->id)
-            ->with(['appointment.hospital', 'hospital'])
+            ->with(['appointment.hospital', 'hospital', 'rating'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -255,12 +269,19 @@ class DonorDashboardController extends Controller
                 }
                 
                 $donationHistory->push([
+                    'id' => $appt->id,
                     'code' => $appt->code ?? 'N/A',
-                    'donation_type' => 'Blood Donation',
+                    'donation_type' => 'Home Donation',
+                    'appointment_kind' => 'home',
                     'status' => ucfirst($appt->state ?? 'pending'),
                     'status_color' => $this->getStatusColor($appt->state ?? 'pending'),
                     'date' => $appointmentDate ? $appointmentDate->format('M d') : 'N/A',
-                    'reward' => $appt->state === 'completed' ? '+100 XP' : ($appt->state === 'canceled' ? '+0 XP' : 'loading...')
+                    'reward' => $appt->state === 'completed' ? '+100 XP' : ($appt->state === 'canceled' ? '+0 XP' : 'loading...'),
+                    'can_rate' => ($appt->state ?? '') === 'completed',
+                    'rating' => $appt->rating ? [
+                        'rating' => $appt->rating->rating,
+                        'comment' => $appt->rating->comment,
+                    ] : null,
                 ]);
             } catch (\Exception $e) {
                 \Log::warning('Error processing home appointment history:', [
@@ -287,8 +308,10 @@ class DonorDashboardController extends Controller
                 }
                 
                 $donationHistory->push([
+                    'id' => $appt->id + 100000,
                     'code' => $appt->code ?? 'N/A',
-                    'donation_type' => 'Blood Donation',
+                    'donation_type' => 'Hospital Donation',
+                    'appointment_kind' => 'hospital',
                     'status' => ucfirst($appt->state ?? 'pending'),
                     'status_color' => $this->getStatusColor($appt->state ?? 'pending'),
                     'date' => $appointmentDate ? $appointmentDate->format('M d') : 'N/A',
@@ -372,7 +395,7 @@ class DonorDashboardController extends Controller
 
             // Home Appointments
             $homeAppointments = HomeAppointment::where('donor_id', $donor->id)
-                ->with(['appointment.hospital', 'hospital'])
+                ->with(['appointment.hospital', 'hospital', 'rating'])
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -399,10 +422,16 @@ class DonorDashboardController extends Controller
                         ->where('reference_id', $appt->id)
                         ->first();
 
-                    $xpEarned = 'loading...';
-                    if ($appt->state === 'completed' && $xpTransaction) {
-                        $xpEarned = '+' . $xpTransaction->xp_amount . ' xp';
-                    } elseif ($appt->state === 'canceled') {
+                    $xpEarned = '-';
+                    if ($appt->state === 'completed') {
+                        if ($xpTransaction) {
+                            $xpEarned = '+' . $xpTransaction->xp_amount . ' xp';
+                        } else {
+                            // If completed but no XP transaction, check if it should have earned XP
+                            // Blood donations earn 500 XP, but let's show 0 if no transaction exists
+                            $xpEarned = '+0 xp';
+                        }
+                    } elseif ($appt->state === 'canceled' || $appt->state === 'cancelled') {
                         $xpEarned = '+0 xp';
                     }
 
@@ -413,6 +442,11 @@ class DonorDashboardController extends Controller
                         'date' => $appointmentDate->format('M d, Y'),
                         'xpEarned' => $xpEarned,
                         'status' => ucfirst($appt->state ?? 'pending'),
+                        'canRate' => ($appt->state ?? '') === 'completed',
+                        'rating' => $appt->rating ? [
+                            'rating' => $appt->rating->rating,
+                            'comment' => $appt->rating->comment,
+                        ] : null,
                     ]);
                 } catch (\Exception $e) {
                     \Log::warning('Error processing home appointment for my donations:', [
@@ -452,10 +486,16 @@ class DonorDashboardController extends Controller
                         ->where('reference_id', $appt->id)
                         ->first();
 
-                    $xpEarned = 'loading...';
-                    if ($appt->state === 'completed' && $xpTransaction) {
-                        $xpEarned = '+' . $xpTransaction->xp_amount . ' xp';
-                    } elseif ($appt->state === 'canceled') {
+                    $xpEarned = '-';
+                    if ($appt->state === 'completed') {
+                        if ($xpTransaction) {
+                            $xpEarned = '+' . $xpTransaction->xp_amount . ' xp';
+                        } else {
+                            // If completed but no XP transaction, check if it should have earned XP
+                            // Blood donations earn 500 XP, but let's show 0 if no transaction exists
+                            $xpEarned = '+0 xp';
+                        }
+                    } elseif ($appt->state === 'canceled' || $appt->state === 'cancelled') {
                         $xpEarned = '+0 xp';
                     }
 
@@ -490,7 +530,7 @@ class DonorDashboardController extends Controller
                             ->where('reference_id', $livingDonor->id)
                             ->first();
 
-                        $xpEarned = 'loading...';
+                        $xpEarned = '-';
                         if ($xpTransaction) {
                             $xpEarned = '+' . $xpTransaction->xp_amount . ' xp';
                         }
@@ -621,9 +661,10 @@ class DonorDashboardController extends Controller
 
             $appointments = collect([]);
 
-            // Home appointments (all states)
+            // Home appointments (only pending)
             try {
                 $homeAppointments = HomeAppointment::where('donor_id', $donor->id)
+                    ->where('state', 'pending')
                     ->with(['appointment.hospital', 'hospital'])
                     ->orderBy('created_at', 'desc')
                     ->get();
@@ -678,9 +719,10 @@ class DonorDashboardController extends Controller
                 ]);
             }
 
-            // Hospital appointments (all states)
+            // Hospital appointments (only pending)
             try {
                 $hospitalAppointments = HospitalAppointment::where('donor_id', $donor->id)
+                    ->where('state', 'pending')
                     ->with(['appointments.hospital', 'hospital'])
                     ->orderBy('created_at', 'desc')
                     ->get();

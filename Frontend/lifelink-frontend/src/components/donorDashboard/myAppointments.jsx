@@ -4,6 +4,7 @@ import { IoChevronDown } from "react-icons/io5";
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
+import { IoCalendar } from "react-icons/io5";
 import "../../styles/Dashboard.css";
 import api from "../../api/axios";
 
@@ -146,9 +147,6 @@ export default function MyAppointments(){
     if (loading) {
         return (
             <section className="donor-section">
-                <div className="dashboard-title">
-                    <h2 className="text-2xl font-bold">Appointments</h2>
-                </div>
                 <div className="flex items-center justify-center h-64">
                     <p className="text-gray-500">Loading appointments...</p>
                 </div>
@@ -159,9 +157,6 @@ export default function MyAppointments(){
     if (error) {
         return (
             <section className="donor-section">
-                <div className="dashboard-title">
-                    <h2 className="text-2xl font-bold">Appointments</h2>
-                </div>
                 <div className="flex items-center justify-center h-64">
                     <p className="text-red-500">Error: {error}</p>
                 </div>
@@ -173,7 +168,11 @@ export default function MyAppointments(){
         <section className="donor-section">
             <div className="dashboard-title">
                 <div>
-                    <h2 className="text-2xl font-bold">Appointments</h2>
+                    <div className="icon-title">
+                        <IoCalendar />
+                        <h2 className="text-2xl !font-bold">Pending Appointments</h2>
+                    </div>
+                    <p className="text-gray-500 !text-lg">Manage your upcoming appointments and stay informed</p>
                 </div>
                 <p className="text-gray-500 !text-lg">Total Appointments: {appointments.length}</p>
             </div>

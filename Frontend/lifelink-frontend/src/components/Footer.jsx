@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { FaPhoneAlt } from "react-icons/fa";
 import { MdEmail } from "react-icons/md";
 import { MdLocationPin } from "react-icons/md";
@@ -15,7 +16,7 @@ import "../styles/footer.css";
 import { useState } from "react";
 
 
-export default function Footer() {
+const Footer = forwardRef(function Footer(props, ref) {
     const [messageData, setMessageData] = useState({
         firstName: "",
         lastName: "",
@@ -31,7 +32,7 @@ export default function Footer() {
     };
 
     return (
-        <footer className="footer text-white p-20">
+        <footer className="footer text-white p-20" ref={ref}>
             <div className="footer-content text-center">
                 <h2 className="text-4xl font-bold mb-2">Get In Touch</h2>
                 <p className="text-gray-400 max-w-2xl mx-auto !text-[16px]">
@@ -59,7 +60,8 @@ export default function Footer() {
                     </div>
                     <h2 className="text-lg font-bold mt-3">Email Support</h2>
                     <div className="footer-contact-item-text">
-                        <span className="text-sm">lifelinkemailcenter@gmail.com</span>
+                        <span className="text-sm">lifelink.org.team@gmail.com</span>
+                        <span className="text-sm">lifelink.org.team@gmail.com</span>
                         <span className="font-light mt-1 text-sm">Response within 24 hours</span>
                     </div>
                 </div>
@@ -234,5 +236,7 @@ export default function Footer() {
                 </div>
             </div>
         </footer>
-    )
-}
+    );
+});
+
+export default Footer;

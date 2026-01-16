@@ -11,6 +11,7 @@ use App\Models\Hospital;
 use App\Models\MobilePhlebotomist;
 use App\Models\Donor;
 use App\Models\Appointment;
+use App\Models\HomeAppointmentRating;
 
 
 class HomeAppointment extends Model
@@ -59,5 +60,10 @@ class HomeAppointment extends Model
     }
     public function appointment(){
         return $this->belongsTo(Appointment::class, 'appointment_id');
+    }
+
+    public function rating()
+    {
+        return $this->hasOne(HomeAppointmentRating::class, 'home_appointment_id');
     }
 }

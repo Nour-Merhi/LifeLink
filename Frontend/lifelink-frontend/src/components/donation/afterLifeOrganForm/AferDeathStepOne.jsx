@@ -1,9 +1,64 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "../../../context/AuthContext";
 import ScrollToTop from "../../ScrollToTop";
 
 export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAfterDeathFormData }){
-    const navigate = useNavigate()
-    
+    const navigate = useNavigate();
+    const { user } = useAuth();
+
+    // Pre-fill form with user data when component mounts or user loads
+    useEffect(() => {
+        if (user) {
+            const donor = user.donor || {};
+            const bloodType = donor.bloodType || donor.blood_type || null;
+            const bloodTypeString = bloodType 
+                ? `${bloodType.type || ''}${bloodType.rh_factor || ''}` 
+                : '';
+            
+            // Format date_of_birth for input field (YYYY-MM-DD)
+            let formattedDob = '';
+            if (donor.date_of_birth) {
+                const dobDate = new Date(donor.date_of_birth);
+                formattedDob = dobDate.toISOString().split('T')[0];
+            }
+
+            // Calculate age if date of birth is available
+            let age = null;
+            if (formattedDob) {
+                const birth = new Date(formattedDob);
+                const today = new Date();
+                age = today.getFullYear() - birth.getFullYear();
+                const monthDiff = today.getMonth() - birth.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                    age--;
+                }
+            }
+            
+            // Parse name for first, middle, last
+            const firstName = user.first_name || '';
+            const middleName = user.middle_name || '';
+            const lastName = user.last_name || '';
+            
+            // Check if phone_nb is a temporary value (starts with 'temp_')
+            const phoneNumber = user.phone_nb && !user.phone_nb.startsWith('temp_') ? user.phone_nb : '';
+            
+            // Only pre-fill empty fields, don't override user's entries
+            setAfterDeathFormData((prev) => ({
+                ...prev,
+                first_name: prev.first_name || firstName,
+                middle_name: prev.middle_name !== undefined ? prev.middle_name : (middleName || ""),
+                last_name: prev.last_name || lastName,
+                email: prev.email || user.email || "",
+                phone: prev.phone || phoneNumber,
+                birth_date: prev.birth_date || formattedDob,
+                age: prev.age || age,
+                gender: prev.gender || donor.gender || "",
+                address: prev.address || (user.city || ""),
+                blood_type: prev.blood_type || bloodTypeString,
+            }));
+        }
+    }, [user]); // Only depend on user, setAfterDeathFormData is stable
 
     const getAge = (e) => {
         const dob = e.target.value;
@@ -85,6 +140,41 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
                             />
                         </div>
                     </div>
+                    
+                    <div className="form-group">
+                        <div>
+                            <label htmlFor="blood-type">Blood Type</label>
+                            <select id="blood-type" name="blood-type" value={afterDeathFormData.blood_type || ""} onChange={(e) => setAfterDeathFormData(prev => ({...prev, blood_type: e.target.value}))} required>
+                                <option value="" disabled>Select Blood Type</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="birth-date">Date of Birth</label>
+                                <input 
+                                type="date" 
+                                id="birth-date" 
+                                name="birth_date"
+                                value = { afterDeathFormData.birth_date || "" }
+                                onChange={ getAge }
+                                required/>
+                        </div>
+                        <div>
+                            <label htmlFor="gender">Gender</label>
+                            <select id="gender" name="gender" value={afterDeathFormData.gender || ""} onChange={(e) => setAfterDeathFormData(prev => ({...prev, gender: e.target.value}))} required>
+                                <option value="" disabled>Select a Gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                    </div>
                     <div className="form-group">
                         <div>
                             <label htmlFor="email">Email Address</label>
@@ -109,42 +199,6 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
                                 placeholder="Enter your phone number" 
                                 required
                             />
-                        </div>
-                    </div>
-                    <div className="form-group">
-                        <div>
-                            <label htmlFor="birth-date">Date of Birth</label>
-                                <input 
-                                type="date" 
-                                id="birth-date" 
-                                name="birth_date"
-                                value = { afterDeathFormData.birth_date || "" }
-                                onChange={ getAge }
-                                required/>
-                        </div>
-                        <div>
-                            <label htmlFor="gender">Gender</label>
-                            <select id="gender" name="gender" value={afterDeathFormData.gender || ""} onChange={(e) => setAfterDeathFormData(prev => ({...prev, gender: e.target.value}))} required>
-                                <option value="" disabled>Select a Gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="form-group">
-                        <div>
-                            <label htmlFor="blood-type">Blood Type</label>
-                            <select id="blood-type" name="blood-type" value={afterDeathFormData.blood_type || ""} onChange={(e) => setAfterDeathFormData(prev => ({...prev, blood_type: e.target.value}))} required>
-                                <option value="" disabled>Select Blood Type</option>
-                                <option value="A+">A+</option>
-                                <option value="A-">A-</option>
-                                <option value="B+">B+</option>
-                                <option value="B-">B-</option>
-                                <option value="AB+">AB+</option>
-                                <option value="AB-">AB-</option>
-                                <option value="O+">O+</option>
-                                <option value="O-">O-</option>
-                            </select>
                         </div>
                     </div>
                     <div className="form-group">

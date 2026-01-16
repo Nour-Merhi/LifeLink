@@ -236,8 +236,8 @@
   opacity: 0.4;
   pointer-events: none;
   cursor: not-allowed;
-  color: #B3B3B3;
-  background-color: #F5F5F5 !important;
+  color: #9c9c9c;
+  background-color: #d6d6d6 !important;
 }
 
 #dates.muted-date:hover {

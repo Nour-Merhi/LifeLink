@@ -1,51 +1,56 @@
 import { FaExclamationTriangle, FaClock, FaHospital, FaTint } from "react-icons/fa";
 
 export default function CriticalAppointments({ appointments = [] }) {
-    // Filter urgent/critical appointments (within 24 hours or marked as urgent)
-    const getCriticalAppointments = () => {
-        const now = new Date();
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        
-        return appointments.filter(apt => {
-            if (!apt.date) return false;
-            
-            // Check if marked as urgent or high priority
-            const isUrgent = apt.urgency === 'urgent' || apt.priority === 'high' || apt.appointment_type === 'urgent';
-            
-            // Check if within 24 hours
-            const aptDate = new Date(apt.date + 'T00:00:00');
-            const isWithin24Hours = aptDate >= now && aptDate <= tomorrow;
-            
-            // Check if status is pending (not completed or cancelled)
-            const isPending = apt.status === 'pending' || apt.status === 'Pending';
-            
-            return (isUrgent || isWithin24Hours) && isPending;
-        }).sort((a, b) => {
-            // Sort by date (earliest first)
-            const dateA = new Date(a.date + 'T00:00:00');
-            const dateB = new Date(b.date + 'T00:00:00');
-            return dateA - dateB;
-        }).slice(0, 5); // Show only top 5
-    };
-
-    const criticalAppointments = getCriticalAppointments();
+    // Appointments are already filtered by backend (urgent appointments only)
+    // Just sort and limit to top 10 for display
+    const criticalAppointments = appointments
+        .sort((a, b) => {
+            // Sort by due_date first, then appointment_date
+            const dateA = a.due_date || a.appointment_date;
+            const dateB = b.due_date || b.appointment_date;
+            if (!dateA && !dateB) return 0;
+            if (!dateA) return 1;
+            if (!dateB) return -1;
+            return new Date(dateA) - new Date(dateB);
+        })
+        .slice(0, 10); // Show top 10
 
     const formatDateTime = (date, time) => {
         if (!date) return 'N/A';
         try {
-            const dateObj = new Date(date + (time ? `T${time}` : 'T00:00:00'));
-            const dateStr = dateObj.toLocaleDateString('en-US', { 
+            // Handle different date formats - extract just the date part
+            let dateStr = date;
+            if (typeof date === 'string') {
+                dateStr = date.split('T')[0].split(' ')[0]; // Get YYYY-MM-DD part
+            }
+            
+            // Format the date
+            const [year, month, day] = dateStr.split('-');
+            const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            const formattedDate = dateObj.toLocaleDateString('en-US', { 
                 month: 'short', 
                 day: 'numeric',
                 year: 'numeric'
             });
-            const timeStr = time ? dateObj.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: true 
-            }) : '';
-            return timeStr ? `${dateStr} at ${timeStr}` : dateStr;
-        } catch {
+            
+            // Format the time if provided
+            if (time) {
+                let formattedTime = time;
+                // Handle time format (could be "HH:MM" or "HH:MM:SS" or "HH:MM AM/PM")
+                if (!time.includes('AM') && !time.includes('PM')) {
+                    // Convert 24-hour to 12-hour format
+                    const timeParts = time.split(':');
+                    const hours = parseInt(timeParts[0]);
+                    const minutes = timeParts[1] || '00';
+                    const hour12 = hours % 12 || 12;
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    formattedTime = `${hour12}:${minutes} ${ampm}`;
+                }
+                return `${formattedDate} at ${formattedTime}`;
+            }
+            
+            return formattedDate;
+        } catch (e) {
             return `${date} ${time || ''}`.trim();
         }
     };
@@ -89,26 +94,40 @@ export default function CriticalAppointments({ appointments = [] }) {
                             <div className="critical-appointment-info">
                                 <FaHospital className="critical-icon" />
                                 <div>
-                                    <h4 className="critical-appointment-name">{apt.name || 'Unknown Donor'}</h4>
-                                    <small className="muted">Appointment ID: {apt.id}</small>
+                                    <h4 className="critical-appointment-name">{apt.donor?.name || 'Unknown Donor'}</h4>
+                                    <small className="muted">Code: {apt.code || apt.id}</small>
                                 </div>
                             </div>
-                            {getUrgencyBadge(apt.urgency, apt.appointment_type)}
+                            {getUrgencyBadge(null, 'urgent')}
                         </div>
                         
                         <div className="critical-appointment-details">
                             <div className="critical-detail-item">
                                 <FaHospital className="detail-icon" />
-                                <span>{apt.hospital_name || 'N/A'}</span>
+                                <span>{apt.hospital?.name || apt.hospital_name || 'N/A'}</span>
                             </div>
                             <div className="critical-detail-item">
                                 <FaClock className="detail-icon" />
-                                <span>{formatDateTime(apt.date, apt.time)}</span>
+                                <span>
+                                    {apt.due_date && apt.due_time 
+                                        ? formatDateTime(apt.due_date, apt.due_time) 
+                                        : formatDateTime(apt.appointment_date, apt.appointment_time)}
+                                    {apt.due_date && (
+                                        <span className="muted" style={{marginLeft: '8px'}}>
+                                            (Due)
+                                        </span>
+                                    )}
+                                </span>
                             </div>
                             <div className="critical-detail-item">
                                 <FaTint className="detail-icon" />
-                                <span>Blood Type: {apt.blood_type || 'N/A'}</span>
+                                <span>Blood Type: {apt.blood_type || apt.donor?.blood_type || 'N/A'}</span>
                             </div>
+                            {apt.type === 'home' && apt.address && (
+                                <div className="critical-detail-item" style={{marginTop: '4px'}}>
+                                    <small className="muted">📍 {apt.address}</small>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}

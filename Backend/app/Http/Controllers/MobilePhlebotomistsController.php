@@ -16,9 +16,16 @@ class MobilePhlebotomistsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $phlebotomists = MobilePhlebotomist::with(['user', 'hospital'])->get();
+        $query = MobilePhlebotomist::with(['user', 'hospital']);
+        
+        // Filter by hospital_id if provided
+        if ($request->has('hospital_id') && $request->hospital_id) {
+            $query->where('hospital_id', $request->hospital_id);
+        }
+        
+        $phlebotomists = $query->orderBy('created_at', 'desc')->get();
         
         // Calculate performance statistics for each phlebotomist
         $phlebotomists = $phlebotomists->map(function ($phlebotomist) {

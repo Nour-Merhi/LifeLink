@@ -6,6 +6,7 @@ use App\Models\LivingDonor;
 use App\Models\Hospital;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class LivingDonorController extends Controller
 {
@@ -15,23 +16,93 @@ class LivingDonorController extends Controller
     public function store(Request $request)
     {
         try {
-            $validated = $request->validate([
+            // Handle both FormData and JSON requests
+            // Get donation_type first to determine validation rules
+            $donationType = $request->input('donation_type');
+            
+            // If donation_type is not set, check for donationType (from frontend)
+            if (!$donationType) {
+                $donationTypeInput = $request->input('donationType');
+                if ($donationTypeInput === 'direct-donation') {
+                    $donationType = 'directed';
+                } elseif ($donationTypeInput === 'non-direct-donation') {
+                    $donationType = 'non-directed';
+                }
+            }
+
+            // Base validation rules - handle both snake_case and camelCase field names
+            $rules = [
                 'first_name' => 'required|string|max:100',
                 'middle_name' => 'nullable|string|max:100',
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|email',
                 'phone' => 'required|string|max:30',
-                'birth-date' => 'required|date|before:today',
+                'birth_date' => 'required|date|before:today',
                 'gender' => 'required|in:male,female',
                 'address' => 'required|string',
-                'blood-type' => 'required|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-                'living-organ' => 'required|in:kidney,liver-partial,bone-marrow',
-                'donationType' => 'required|in:direct-donation,non-direct-donation',
-                'health' => 'nullable|array',
-            ]);
+                'blood_type' => 'required|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+                'organ' => 'required|in:kidney,liver-partial,bone-marrow',
+                'donation_type' => 'required|in:directed,non-directed',
+                'medical_conditions' => 'nullable',
+                'agree_interest' => 'nullable|boolean',
+                'id_picture' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120', // 5MB max
+            ];
 
-            // Map donation type
-            $donationType = $validated['donationType'] === 'direct-donation' ? 'directed' : 'non-directed';
+            // Handle medical_conditions if it's a JSON string
+            if ($request->has('medical_conditions') && is_string($request->input('medical_conditions'))) {
+                try {
+                    $medicalConditions = json_decode($request->input('medical_conditions'), true);
+                    $request->merge(['medical_conditions' => $medicalConditions]);
+                } catch (\Exception $e) {
+                    // If JSON decode fails, continue with original value
+                }
+            }
+
+            // Conditional validation based on donation type
+            if ($donationType === 'directed') {
+                // For directed donations, require recipient fields
+                // Laravel automatically handles nested arrays from FormData
+                $rules['recipient'] = 'required|array';
+                $rules['recipient.full_name'] = 'required|string|max:255';
+                $rules['recipient.age'] = 'required|integer|min:1|max:120';
+                $rules['recipient.contact'] = 'required|string|max:255';
+                $rules['recipient.contact_type'] = 'required|in:phone,email';
+                $rules['recipient.blood_type'] = 'required|in:A+,A-,B+,B-,AB+,AB-,O+,O-';
+                $rules['recipient.hospital_id'] = 'required|exists:hospitals,id';
+            } elseif ($donationType === 'non-directed') {
+                // For non-directed donations
+                $rules['hospital_selection'] = 'required|in:general,specific';
+                if ($request->input('hospital_selection') === 'specific') {
+                    $rules['hospital_id'] = 'required|exists:hospitals,id';
+                }
+            }
+
+            $validated = $request->validate($rules);
+            
+            // Normalize donation_type
+            $validated['donation_type'] = $donationType;
+
+            // Handle ID picture upload
+            $idPicturePath = null;
+            if ($request->hasFile('id_picture')) {
+                $file = $request->file('id_picture');
+                $filename = 'id_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $idPicturePath = $file->storeAs('living_donors/id_pictures', $filename, 'public');
+            }
+
+            // Handle medical_conditions - can be array or JSON string
+            $medicalConditions = [];
+            if (isset($validated['medical_conditions'])) {
+                if (is_array($validated['medical_conditions'])) {
+                    $medicalConditions = $validated['medical_conditions'];
+                } elseif (is_string($validated['medical_conditions'])) {
+                    try {
+                        $medicalConditions = json_decode($validated['medical_conditions'], true) ?? [];
+                    } catch (\Exception $e) {
+                        $medicalConditions = [];
+                    }
+                }
+            }
 
             // Map organ value
             $organMap = [
@@ -39,39 +110,73 @@ class LivingDonorController extends Controller
                 'liver-partial' => 'Liver (Partial)',
                 'bone-marrow' => 'Bone Marrow'
             ];
-            $organ = $organMap[$validated['living-organ']] ?? $validated['living-organ'];
+            $organ = $organMap[$validated['organ']] ?? $validated['organ'];
 
-            // Create living donor
-            $livingDonor = LivingDonor::create([
+            // Prepare data for creation
+            $livingDonorData = [
                 'first_name' => $validated['first_name'],
                 'middle_name' => $validated['middle_name'] ?? null,
                 'last_name' => $validated['last_name'],
                 'email' => $validated['email'],
                 'phone_nb' => $validated['phone'],
-                'date_of_birth' => $validated['birth-date'],
+                'date_of_birth' => $validated['birth_date'],
                 'gender' => $validated['gender'],
                 'address' => $validated['address'],
-                'blood_type' => $validated['blood-type'],
+                'blood_type' => $validated['blood_type'],
                 'organ' => $organ,
-                'medical_conditions' => $validated['health'] ?? [],
-                'donation_type' => $donationType,
+                'medical_conditions' => $medicalConditions,
+                'donation_type' => $validated['donation_type'],
                 'medical_status' => 'not_started',
                 'ethics_status' => 'pending',
-            ]);
+                'id_picture' => $idPicturePath,
+            ];
+
+            // Add recipient data for directed donations
+            // Laravel automatically handles nested arrays from FormData (recipient[full_name] becomes recipient.full_name)
+            if ($validated['donation_type'] === 'directed' && isset($validated['recipient'])) {
+                $recipient = $validated['recipient'];
+                $livingDonorData['recipient_full_name'] = $recipient['full_name'] ?? null;
+                $livingDonorData['recipient_age'] = (int)($recipient['age'] ?? 0);
+                $livingDonorData['recipient_contact'] = $recipient['contact'] ?? null;
+                $livingDonorData['recipient_contact_type'] = $recipient['contact_type'] ?? null;
+                $livingDonorData['recipient_blood_type'] = $recipient['blood_type'] ?? null;
+                $livingDonorData['hospital_id'] = (int)($recipient['hospital_id'] ?? 0);
+            }
+
+            // Add hospital selection for non-directed donations
+            if ($validated['donation_type'] === 'non-directed') {
+                $livingDonorData['hospital_selection'] = $validated['hospital_selection'] ?? null;
+                if (($validated['hospital_selection'] ?? '') === 'specific' && isset($validated['hospital_id'])) {
+                    $livingDonorData['hospital_id'] = (int)$validated['hospital_id'];
+                }
+            }
+
+            // Create living donor
+            $livingDonor = LivingDonor::create($livingDonorData);
 
             return response()->json([
                 'message' => 'Living organ donation pledge submitted successfully.',
                 'living_donor' => $livingDonor
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            // Delete uploaded file if validation fails
+            if ($request->hasFile('id_picture')) {
+                Storage::disk('public')->delete($idPicturePath ?? '');
+            }
+            
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
+            // Delete uploaded file if creation fails
+            if (isset($idPicturePath) && $idPicturePath) {
+                Storage::disk('public')->delete($idPicturePath);
+            }
+
             \Log::error('Error creating living donor: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'request' => $request->all()
+                'request_data' => $request->except(['id_picture', 'password'])
             ]);
 
             return response()->json([

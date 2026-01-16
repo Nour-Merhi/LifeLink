@@ -86,8 +86,8 @@ export default function HomeBloodBooking({ pageType }) {
     if (date) localStorage.setItem(prefix + "date", date);
   }, [step, hospital, date, prefix]);
   
-  // Fetch appointments when hospital is selected
-  useEffect(() => {
+  // Function to fetch appointments (can be called from multiple places)
+  const fetchAppointments = () => {
     if (hospital && hospital.id && pageType === "home") {
       setLoading(true);
       
@@ -116,11 +116,25 @@ export default function HomeBloodBooking({ pageType }) {
         .catch(err => {
           console.error('Error fetching hospital appointments:', err);
           setAppointments([]);
+          setTimeSlots([]);
           setAvailableSlots(0);
         })
         .finally(() => setLoading(false));
     }
+  };
+
+  // Fetch appointments when hospital is selected
+  useEffect(() => {
+    fetchAppointments();
   }, [hospital, pageType]);
+
+  // Refresh appointments when returning to calendar step (to show updated booking status)
+  useEffect(() => {
+    if (step === "calendar" && hospital && hospital.id && pageType === "home") {
+      // Refresh appointments when calendar step is active (e.g., after booking)
+      fetchAppointments();
+    }
+  }, [step, pageType]);
 
   useEffect(() => {
     setHomeVisitData((prev) => ({

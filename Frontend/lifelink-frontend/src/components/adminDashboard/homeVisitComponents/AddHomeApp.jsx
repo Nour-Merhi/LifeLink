@@ -3,7 +3,7 @@ import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
 
-export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded }) {
+export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded, hideHospitalSelection = false, apiEndpoint = "/api/admin/dashboard/generate-appointments" }) {
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [errors, setErrors] = useState({});
@@ -68,7 +68,7 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
                     ...prev,
                     appointment_type: value,
                     appointment_date: today,
-                    due_date: today,
+                    due_date: today, // Always today for urgent
                     due_time: '',
                     start_time: '',
                     end_time: '',
@@ -144,7 +144,7 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
 
             await api.get("/sanctum/csrf-cookie");
             const response = await api.post(
-                "/api/admin/dashboard/generate-appointments",
+                apiEndpoint,
                 submitData
             );
             
@@ -211,33 +211,35 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
 
                     <div className="modal-form">
                         <form onSubmit={handleSubmit}>
-                            {/* Hospital Selection */}
-                            <div className="form-group">
-                                <div>
-                                    <label htmlFor="hospital_id">Hospital Name</label>
-                                    <div className="select-des">
-                                        <select
-                                            id="hospital_id"
-                                            name="hospital_id"
-                                            value={appointmentData.hospital_id}
-                                            onChange={handleChange}
-                                            required
-                                        >
-                                            <option value="" disabled>Select hospital</option>
-                                            {hospitals && hospitals.length > 0 ? (
-                                                hospitals.map(hospital => (
-                                                    <option key={hospital.id} value={hospital.id}>
-                                                        {hospital.name} - {hospital.address || 'No address'}
-                                                    </option>
-                                                ))
-                                            ) : (
-                                                <option value="" disabled>No hospitals available</option>
-                                            )}
-                                        </select>
+                            {/* Hospital Selection - Only show if not hidden */}
+                            {!hideHospitalSelection && (
+                                <div className="form-group">
+                                    <div>
+                                        <label htmlFor="hospital_id">Hospital Name</label>
+                                        <div className="select-des">
+                                            <select
+                                                id="hospital_id"
+                                                name="hospital_id"
+                                                value={appointmentData.hospital_id}
+                                                onChange={handleChange}
+                                                required
+                                            >
+                                                <option value="" disabled>Select hospital</option>
+                                                {hospitals && hospitals.length > 0 ? (
+                                                    hospitals.map(hospital => (
+                                                        <option key={hospital.id} value={hospital.id}>
+                                                            {hospital.name} - {hospital.address || 'No address'}
+                                                        </option>
+                                                    ))
+                                                ) : (
+                                                    <option value="" disabled>No hospitals available</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                        {errors.hospital_id && (<small className="error-text">{errors.hospital_id}</small>)}
                                     </div>
-                                    {errors.hospital_id && (<small className="error-text">{errors.hospital_id}</small>)}
                                 </div>
-                            </div>
+                            )}
 
                             {/* Appointment Type */}
                             <div className="form-group">
@@ -283,7 +285,7 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
                                 <>
                                     <div className="form-group">
                                         <div>
-                                            <label htmlFor="due_date">Due Date (Within 24 hours)</label>
+                                            <label htmlFor="due_date">Due Date (Today Only - Within 24 hours)</label>
                                             <input 
                                                 id="due_date"
                                                 type="date"
@@ -291,12 +293,14 @@ export default function AddHomeApp({ onClose, hospitals = [], onAppointmentAdded
                                                 value={appointmentData.due_date}
                                                 onChange={handleChange}
                                                 required
-                                        min={getTodayDate()}
-                                        max={getTomorrowDate()}
+                                                min={getTodayDate()}
+                                                max={getTodayDate()}
+                                                readOnly
+                                                style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
                                             />
                                             {errors.due_date && (<small className="error-text">{errors.due_date}</small>)}
                                             <small className="info-text" style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                                                Urgent appointments must be within 24 hours from release time
+                                                Urgent appointments can only be scheduled for today within 24 hours
                                             </small>
                                         </div>
                                         <div>

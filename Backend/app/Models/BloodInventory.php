@@ -13,6 +13,9 @@ class BloodInventory extends Model
 {
     use HasFactory;
 
+    // Explicitly set table name since migration uses singular
+    protected $table = 'blood_inventory';
+
     protected $fillable = [
         'code',
         'hospital_id',

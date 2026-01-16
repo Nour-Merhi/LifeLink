@@ -6,7 +6,7 @@ import profile from "../assets/imgs/profile.svg";
 import ProfileDropdown from "./ProfileDropdown";
 import AdminProfileDropdown from "./adminDashboard/AdminProfileDropdown";
 
-export default function Navbar() {
+export default function Navbar({ handleContactUsClick }) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -68,14 +68,24 @@ export default function Navbar() {
         >
           Let's Play
         </NavLink>
-        <NavLink 
-          to="/contact" 
-          className={({ isActive }) => 
-            `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
-          }
-        >
-          Contact Us
-        </NavLink>
+        {handleContactUsClick ? (
+          <button
+            onClick={handleContactUsClick}
+            className="quiz-nav-link"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            Contact Us
+          </button>
+        ) : (
+          <NavLink 
+            to="/support"
+            className={({ isActive }) => 
+              `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
+            }
+          >
+            Contact Us
+          </NavLink>
+        )}
 
         {/* Authentication Section */}
         {user ? (

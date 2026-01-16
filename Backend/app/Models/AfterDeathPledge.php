@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use App\Models\Hospital;
 
 class AfterDeathPledge extends Model
 {
@@ -34,6 +35,8 @@ class AfterDeathPledge extends Model
         'pledged_organs',
         'blood_type',
         'status',
+        'hospital_selection',
+        'hospital_id',
     ];
 
     protected $casts = [
@@ -108,6 +111,7 @@ class AfterDeathPledge extends Model
             'tendons' => 'Tendons',
             'intestines' => 'Intestines',
             'blood-vessels' => 'Blood Vessels',
+            'blood-vesseles' => 'Blood Vessels', // Handle typo from frontend
         ];
         
         $organs = array_map(function($organ) use ($organMap) {
@@ -115,5 +119,11 @@ class AfterDeathPledge extends Model
         }, $this->pledged_organs);
         
         return implode(', ', $organs);
+    }
+
+    // Relationship to Hospital
+    public function hospital()
+    {
+        return $this->belongsTo(Hospital::class, 'hospital_id');
     }
 }

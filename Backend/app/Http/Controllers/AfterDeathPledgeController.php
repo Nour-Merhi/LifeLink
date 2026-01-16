@@ -14,8 +14,13 @@ class AfterDeathPledgeController extends Controller
      */
     public function store(Request $request)
     {
+        $idPhotoPath = null;
+        $fatherIdPhotoPath = null;
+        $motherIdPhotoPath = null;
+
         try {
-            $validated = $request->validate([
+            // Validation rules
+            $rules = [
                 // Step 1: General Information
                 'first_name' => 'required|string|max:100',
                 'middle_name' => 'nullable|string|max:100',
@@ -30,38 +35,101 @@ class AfterDeathPledgeController extends Controller
                 
                 // Step 2: Personal Information
                 'marital_status' => 'required|in:single,married,divorced,widowed',
-                'education_level' => 'required|string',
+                'education_level' => 'required|string|max:100',
                 'professional_status' => 'required|in:no-work,working',
                 'work_type' => 'nullable|string|max:255',
                 'mother_name' => 'nullable|string|max:100',
                 'spouse_name' => 'nullable|string|max:100',
-                'id_photo' => 'required|file|image|max:5120', // 5MB max
-                'father_id_photo' => 'nullable|file|image|max:5120',
-                'mother_id_photo' => 'nullable|file|image|max:5120',
+                'id_photo' => 'required|file|image|mimes:jpeg,jpg,png,webp|max:5120', // 5MB max
+                'father_id_photo' => 'nullable|file|image|mimes:jpeg,jpg,png,webp|max:5120',
+                'mother_id_photo' => 'nullable|file|image|mimes:jpeg,jpg,png,webp|max:5120',
                 
                 // Step 3: Organ Selection
                 'pledged_organs' => 'required|array|min:1',
-                'pledged_organs.*' => 'string',
+                'pledged_organs.*' => 'string|in:heart,corneas,liver,skin,kidneys,bones,lungs,valves,pancrease,tendons,intestines,blood-vesseles,all-organs',
                 
                 // Required
                 'blood_type' => 'required|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-            ]);
+                
+                // Hospital Selection
+                'hospital_selection' => 'required|in:general,specific',
+                'hospital_id' => 'nullable|exists:hospitals,id',
+            ];
 
-            // Handle file uploads
-            $idPhotoPath = null;
-            $fatherIdPhotoPath = null;
-            $motherIdPhotoPath = null;
+            $validated = $request->validate($rules);
 
+            // Conditional validation based on marital status
+            if ($validated['marital_status'] === 'single') {
+                if (empty($validated['mother_name'])) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['mother_name' => ['Mother\'s name is required for single individuals.']]
+                    ], 422);
+                }
+            } elseif (in_array($validated['marital_status'], ['married', 'divorced', 'widowed'])) {
+                if (empty($validated['spouse_name'])) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['spouse_name' => ['Spouse name is required for married/divorced/widowed individuals.']]
+                    ], 422);
+                }
+            }
+
+            // Conditional validation based on professional status
+            if ($validated['professional_status'] === 'working' && empty($validated['work_type'])) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['work_type' => ['Work type is required when professional status is "working".']]
+                ], 422);
+            }
+
+            // Conditional validation based on age (under 18 requires parent ID photos)
+            $birthDate = \Carbon\Carbon::parse($validated['birth_date']);
+            $age = $birthDate->diffInYears(\Carbon\Carbon::now());
+            
+            if ($age < 18) {
+                if (!$request->hasFile('father_id_photo') || !$request->hasFile('mother_id_photo')) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => [
+                            'father_id_photo' => ['Father\'s ID photo is required for individuals under 18.'],
+                            'mother_id_photo' => ['Mother\'s ID photo is required for individuals under 18.']
+                        ]
+                    ], 422);
+                }
+            }
+
+            // Conditional validation for hospital selection
+            if ($validated['hospital_selection'] === 'specific' && empty($validated['hospital_id'])) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['hospital_id' => ['Hospital is required when selecting specific hospital.']]
+                ], 422);
+            }
+
+            // Handle file uploads with better organization
             if ($request->hasFile('id_photo')) {
-                $idPhotoPath = $request->file('id_photo')->store('id_photos', 'public');
+                $file = $request->file('id_photo');
+                $filename = 'id_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $idPhotoPath = $file->storeAs('after_death_pledges/id_photos', $filename, 'public');
             }
 
             if ($request->hasFile('father_id_photo')) {
-                $fatherIdPhotoPath = $request->file('father_id_photo')->store('id_photos', 'public');
+                $file = $request->file('father_id_photo');
+                $filename = 'father_id_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $fatherIdPhotoPath = $file->storeAs('after_death_pledges/id_photos', $filename, 'public');
             }
 
             if ($request->hasFile('mother_id_photo')) {
-                $motherIdPhotoPath = $request->file('mother_id_photo')->store('id_photos', 'public');
+                $file = $request->file('mother_id_photo');
+                $filename = 'mother_id_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $motherIdPhotoPath = $file->storeAs('after_death_pledges/id_photos', $filename, 'public');
+            }
+
+            // Process pledged organs - ensure it's an array
+            $pledgedOrgans = $validated['pledged_organs'];
+            if (!is_array($pledgedOrgans)) {
+                $pledgedOrgans = [$pledgedOrgans];
             }
 
             // Create after-death pledge
@@ -76,17 +144,21 @@ class AfterDeathPledgeController extends Controller
                 'address' => $validated['address'],
                 'emergency_contact_name' => $validated['emergency_contact'] ?? null,
                 'emergency_contact_phone' => $validated['emergency_contact_number'] ?? null,
-                'marital_status' => $validated['marital_status'] ?? null,
-                'education_level' => $validated['education_level'] ?? null,
-                'professional_status' => $validated['professional_status'] ?? null,
+                'marital_status' => $validated['marital_status'],
+                'education_level' => $validated['education_level'],
+                'professional_status' => $validated['professional_status'],
                 'work_type' => $validated['work_type'] ?? null,
                 'mother_name' => $validated['mother_name'] ?? null,
                 'spouse_name' => $validated['spouse_name'] ?? null,
                 'id_photo_path' => $idPhotoPath,
                 'father_id_photo_path' => $fatherIdPhotoPath,
                 'mother_id_photo_path' => $motherIdPhotoPath,
-                'pledged_organs' => $validated['pledged_organs'],
-                'blood_type' => $validated['blood_type'] ?? null,
+                'pledged_organs' => $pledgedOrgans,
+                'blood_type' => $validated['blood_type'],
+                'hospital_selection' => $validated['hospital_selection'],
+                'hospital_id' => ($validated['hospital_selection'] === 'specific' && isset($validated['hospital_id'])) 
+                    ? (int)$validated['hospital_id'] 
+                    : null,
                 'status' => 'active',
             ]);
 
@@ -106,14 +178,36 @@ class AfterDeathPledgeController extends Controller
                 'pledge' => $pledge
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            // Delete uploaded files if validation fails
+            if ($idPhotoPath) {
+                Storage::disk('public')->delete($idPhotoPath);
+            }
+            if ($fatherIdPhotoPath) {
+                Storage::disk('public')->delete($fatherIdPhotoPath);
+            }
+            if ($motherIdPhotoPath) {
+                Storage::disk('public')->delete($motherIdPhotoPath);
+            }
+
             return response()->json([
                 'message' => 'Validation failed. Please check all required fields.',
                 'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
+            // Delete uploaded files if creation fails
+            if ($idPhotoPath) {
+                Storage::disk('public')->delete($idPhotoPath);
+            }
+            if ($fatherIdPhotoPath) {
+                Storage::disk('public')->delete($fatherIdPhotoPath);
+            }
+            if ($motherIdPhotoPath) {
+                Storage::disk('public')->delete($motherIdPhotoPath);
+            }
+
             \Log::error('Error creating after-death pledge: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'request' => $request->except(['id_photo', 'father_id_photo', 'mother_id_photo']) // Don't log file contents
+                'request_data' => $request->except(['id_photo', 'father_id_photo', 'mother_id_photo'])
             ]);
 
             return response()->json([
@@ -129,7 +223,7 @@ class AfterDeathPledgeController extends Controller
     public function index()
     {
         try {
-            $pledges = AfterDeathPledge::orderBy('created_at', 'desc')->get();
+            $pledges = AfterDeathPledge::with('hospital')->orderBy('created_at', 'desc')->get();
 
             // Transform data to match frontend format
             $transformedPledges = $pledges->map(function ($pledge) {
@@ -168,6 +262,9 @@ class AfterDeathPledgeController extends Controller
                     'id_photo' => $idPhotoUrl,
                     'father_id_photo' => $fatherIdPhotoUrl,
                     'mother_id_photo' => $motherIdPhotoUrl,
+                    'hospital_selection' => $pledge->hospital_selection ?? 'general',
+                    'hospital_id' => $pledge->hospital_id ?? null,
+                    'hospital_name' => $pledge->hospital ? $pledge->hospital->name : null,
                     'status' => $pledge->status,
                     'created_at' => $pledge->created_at ? $pledge->created_at->format('Y-m-d') : null,
                 ];

@@ -45,6 +45,7 @@ export default function BloodDonationStatsAndLeaderboard() {
 
   return (
     <div className="max-w-[810px] mx-auto p-6 relative">
+
       {/* Heroes image - positioned behind the table */}
       <div className="absolute inset-0 flex items-center justify-center z-0 opacity-50 mt-25">
         <img src={heroes} alt="heroes" className="max-w-full h-full" />

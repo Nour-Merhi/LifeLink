@@ -329,6 +329,39 @@ class HomeAppointmentController extends Controller
                 ], 404);
             }
 
+            // Validate urgent appointment constraints
+            if ($appointment->appointment_type === 'urgent') {
+                $appointmentDate = Carbon::parse($appointment->appointment_date);
+                $today = Carbon::today();
+                
+                // Check if appointment date is today
+                if (!$appointmentDate->isSameDay($today)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Urgent appointments can only be scheduled for today'
+                    ], 422);
+                }
+                
+                // Check if appointment time is within 24 hours
+                $appointmentDateTime = Carbon::parse($appointment->appointment_date . ' ' . $requestedStartTime);
+                $now = Carbon::now();
+                $hoursDiff = $now->diffInHours($appointmentDateTime, false);
+                
+                if ($hoursDiff <= 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Urgent appointment time must be in the future'
+                    ], 422);
+                }
+                
+                if ($hoursDiff > 24) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Urgent appointments can only be scheduled within 24 hours from now'
+                    ], 422);
+                }
+            }
+
             // Use the extracted start time for storing
             // Create Home Appointment
             $homeAppointmentData = [

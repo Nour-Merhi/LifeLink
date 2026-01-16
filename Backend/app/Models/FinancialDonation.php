@@ -23,7 +23,6 @@ class FinancialDonation extends Model
         'recipient_chosen',
         'patient_case_id',
         'payment_method',
-        'preference',
         'status',
         'notes',
     ];

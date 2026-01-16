@@ -39,7 +39,7 @@ export default function Navbar(){
                         />
                         <div className="admin-name">
                             <h3>{getUserName()}</h3>
-                            <small>Nurse Professional</small>
+                            <small>Mobile Phlebotomist</small>
                         </div>
                     </div>
                 </div>

@@ -47,9 +47,22 @@ export default function HospitalBloodBooking({ pageType }) {
   useEffect(() => {
     localStorage.setItem(prefix + "step", step)
     if (hospital) localStorage.setItem(prefix + "hospital", JSON.stringify(hospital))
-    if (date) localStorage.setItem(prefix + "date", date)
+    if (date) {
+      localStorage.setItem(prefix + "date", date)
+    }
     if (time) localStorage.setItem(prefix + "time", time)
   }, [step, hospital, date, time, prefix])
+  
+  // Clear date when hospital changes (especially important for urgent appointments)
+  useEffect(() => {
+    if (hospital?.appointment_type === 'urgent') {
+      // Clear any old date when urgent hospital is selected
+      const today = new Date();
+      const pad = (n) => n.toString().padStart(2, "0");
+      const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+      // Date will be set by Calendar component when it loads
+    }
+  }, [hospital?.id, hospital?.appointment_type])
       
   //Getting Hospitals with Hospital Blood Donation appointments
   useEffect(() => {
@@ -109,6 +122,19 @@ export default function HospitalBloodBooking({ pageType }) {
           setAppointments(appointmentsData);
           setTimeSlots(timeSlotsData);
           setAvailableSlots(totalSlots);
+          
+          // For urgent appointments, auto-set today's date when appointments load
+          // Only set if date is not already set to prevent loops
+          if (hospital.appointment_type === 'urgent' && !date) {
+            const today = new Date();
+            const pad = (n) => n.toString().padStart(2, "0");
+            const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+            setDate(todayStr);
+            setHospitalAppt(prev => ({
+              ...prev,
+              appointment_date: todayStr
+            }));
+          }
         })
         .catch(err => {
           console.error('Error fetching hospital appointments:', err);
@@ -121,14 +147,29 @@ export default function HospitalBloodBooking({ pageType }) {
 
   //Setting hospital appointment data
   useEffect(() => {
-    setHospitalAppt((prev) => ({
-      ...prev,
+    setHospitalAppt((prev) => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      const newData = {
       hospital_name: hospital ? hospital.name : "",
       hospital_id: hospital ? hospital.id : null,
       hospital: hospital || null,
       appointment_time: time || '',
       appointment_date: date || '',
-    }));
+      };
+      
+      // Check if anything actually changed
+      if (
+        prev.hospital_name === newData.hospital_name &&
+        prev.hospital_id === newData.hospital_id &&
+        prev.appointment_time === newData.appointment_time &&
+        prev.appointment_date === newData.appointment_date &&
+        prev.hospital?.id === newData.hospital?.id
+      ) {
+        return prev; // Return same object if nothing changed
+      }
+      
+      return newData;
+    });
   }, [hospital, time, date]);
 
 
@@ -170,7 +211,6 @@ export default function HospitalBloodBooking({ pageType }) {
     }
   };
   
-  console.log(hospitalAppt)
   return (
     <div className="booking"> 
       <Searchbar 
@@ -205,7 +245,11 @@ export default function HospitalBloodBooking({ pageType }) {
           hospitalAppt = {hospitalAppt}
           setThankMessHospital = {setThankMessHospital}
           onSelectDate={(d) => { 
-            setDate(d); }} 
+            // Only update if date actually changed to prevent loops
+            if (d !== date) {
+              setDate(d);
+            }
+          }} 
         /> 
       )} 
         

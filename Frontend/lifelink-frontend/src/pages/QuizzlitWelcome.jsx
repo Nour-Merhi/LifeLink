@@ -5,7 +5,19 @@ import QuizSteps from "../components/Quizzlit/QuizSteps";
 import TopPlayers from "../components/Quizzlit/TopPlayers";
 import Footer from "../components/Footer";
 
+import { useRef } from "react";
+
 export default function QuizzlitWelcome() {
+    const topPlayersRef = useRef(null);
+    const footerRef = useRef(null);
+
+    const handleTopPlayersClick = () => {
+        topPlayersRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+    const handleContactUsClick = () => {
+        footerRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+
     return (
         <section className="quizzlit-section">
             <div className="circle-container">
@@ -15,12 +27,12 @@ export default function QuizzlitWelcome() {
                 <div className="circle-purple circle-bottom-right animate-soft-pulse"></div>
             </div>
             <div className="quizzlit-content">
-                <Navbar />
-                <HeroSection />
+                <Navbar handleContactUsClick={handleContactUsClick}/>
+                <HeroSection handleTopPlayersClick={handleTopPlayersClick} />
                 <AboutSection />
                 <QuizSteps />
-                <TopPlayers />
-                <Footer />
+                <TopPlayers ref={topPlayersRef} />
+                <Footer  ref={footerRef}/>
             </div>
         </section>
     )

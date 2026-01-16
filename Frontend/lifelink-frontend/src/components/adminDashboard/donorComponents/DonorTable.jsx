@@ -5,8 +5,19 @@ import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import api from "../../../api/axios";
 import EditDonorForm from "./EditDonorForm";
+
+// Fix for default marker icons in Leaflet with React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 export default function DonorTable({ donors = [], loading = false, error = "", onDonorsUpdate }){
     const navigate = useNavigate();
@@ -21,6 +32,8 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
     const [selectedDonors, setSelectedDonors] = useState(new Set()); // Set of donor IDs
     const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
     const [bulkDeleteError, setBulkDeleteError] = useState("");
+    const [mapModalOpen, setMapModalOpen] = useState(false);
+    const [selectedDonorForMap, setSelectedDonorForMap] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -116,6 +129,17 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
     //Displaying text
     const startDisplay = startIndex + 1;
     const endDisplay = Math.min(endIndex, totalDonors);
+
+    // Handle map modal
+    const handleOpenMap = (donor) => {
+        setSelectedDonorForMap(donor);
+        setMapModalOpen(true);
+    };
+
+    const handleCloseMap = () => {
+        setMapModalOpen(false);
+        setSelectedDonorForMap(null);
+    };
 
     // Handle edit click
     const handleEditClick = (donor) => {
@@ -421,7 +445,16 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                                     <div className="cell-sub">
                                         <span title={d.address}>{ d.address }</span>
                                         <div>
-                                            <a href="#" className="link">View on Map</a>
+                                            <a 
+                                                href="#" 
+                                                className="link"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    handleOpenMap(d);
+                                                }}
+                                            >
+                                                View on Map
+                                            </a>
                                         </div>
                                     </div>
                                 </td>
@@ -625,6 +658,43 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
                                     </div>
                                 </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Map Modal */}
+            {mapModalOpen && selectedDonorForMap && (
+                <div className="modal-overlay" onClick={handleCloseMap}>
+                    <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '90%' }}>
+                        <div className="modal-title">
+                            <h2>{selectedDonorForMap.name} - Location</h2>
+                            <button onClick={handleCloseMap}><IoClose /></button>
+                        </div>
+                        <div style={{ padding: '20px' }}>
+                            {selectedDonorForMap.latitude && selectedDonorForMap.longitude ? (
+                                <div style={{ height: '400px', width: '100%', marginBottom: '15px' }}>
+                                    <MapContainer
+                                        center={[selectedDonorForMap.latitude, selectedDonorForMap.longitude]}
+                                        zoom={15}
+                                        style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+                                        scrollWheelZoom={true}
+                                    >
+                                        <TileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        />
+                                        <Marker position={[selectedDonorForMap.latitude, selectedDonorForMap.longitude]} />
+                                    </MapContainer>
+                                </div>
+                            ) : (
+                                <div style={{ padding: '40px', textAlign: 'center', color: '#767676' }}>
+                                    <p>No location coordinates available for this donor.</p>
+                                </div>
+                            )}
+                            <p className="text-gray-700 text-sm text-center" style={{ marginTop: '10px' }}>
+                                {selectedDonorForMap.address}
+                            </p>
                         </div>
                     </div>
                 </div>

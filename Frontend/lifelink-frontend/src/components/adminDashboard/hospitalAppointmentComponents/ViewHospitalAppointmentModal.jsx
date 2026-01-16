@@ -34,118 +34,130 @@ export default function ViewHospitalAppointmentModal({ onClose, appointmentCode 
         }
     };
 
+    const statusLabel = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'canceled' || s === 'cancelled') return 'Cancelled';
+        if (!s) return 'Pending';
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    const statusBadgeClass = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'completed') return 'badge-success';
+        if (s === 'pending') return 'badge-pending';
+        return 'badge-danger';
+    };
+
     return (
-        <div className="modal-overlay modal-overlay-edit" onClick={onClose}>
-            <div className="modal-container modal-container-edit" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-title">
-                    <h2>Hospital Appointment Details</h2>
-                    <button onClick={onClose}>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-container modal-modern" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="modal-modern-header">
+                    <div className="modal-modern-title">
+                        <h2>Hospital Appointment</h2>
+                        <div className="modal-modern-subtitle">
+                            <span>Appointment: {appointmentCode || appointmentData?.id || 'N/A'}</span>
+                            {appointmentData?.status && (
+                                <span className={`badge ${statusBadgeClass(appointmentData.status)}`}>
+                                    {statusLabel(appointmentData.status)}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <button className="modal-icon-btn" onClick={onClose} aria-label="Close">
                         <IoClose />
                     </button>
                 </div>
-                <div className="modal-form">
+
+                <div className="modal-modern-body">
                     {loading ? (
                         <div className="loader">
                             <SpinnerDotted size={60} thickness={125} speed={100} color="#f01010ff" />
                             <h3>Loading Appointment Details...</h3>
                         </div>
                     ) : error ? (
-                        <div className="error-message modal-error-container">
-                            {error}
-                        </div>
+                        <div className="error-message modal-error-container">{error}</div>
                     ) : appointmentData ? (
-                        <div className="edit-modal-description">
-                            <div className="info-text" style={{ marginBottom: '20px' }}>
-                                <h3 style={{ marginBottom: '15px', color: '#2349C2' }}>Appointment Information</h3>
-                                
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Appointment ID:</strong>
-                                        <p>{appointmentData.id}</p>
+                        <>
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">
+                                    Appointment Overview
+                                    <span className="muted">{appointmentData.created_at || 'N/A'}</span>
+                                </h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Appointment ID</span>
+                                        <span className="value">{appointmentData.id || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Status:</strong>
-                                        <p>
-                                            <span className={`badge ${
-                                                appointmentData.status === "completed" ? "badge-success" : 
-                                                (appointmentData.status === "pending" || appointmentData.status === "Pending") ? "badge-pending" : 
-                                                "badge-danger"
-                                            }`}>
-                                                {appointmentData.status === "canceled" ? "Cancelled" : (appointmentData.status?.charAt(0).toUpperCase() + appointmentData.status?.slice(1)) || "Pending"}
+                                    <div className="modal-field">
+                                        <span className="label">Status</span>
+                                        <span className="value">
+                                            <span className={`badge ${statusBadgeClass(appointmentData.status)}`}>
+                                                {statusLabel(appointmentData.status)}
                                             </span>
-                                        </p>
+                                        </span>
                                     </div>
                                 </div>
+                            </div>
 
-                                <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#2349C2' }}>Donor Information</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Name:</strong>
-                                        <p>{appointmentData.name || 'N/A'}</p>
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Donor</h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Name</span>
+                                        <span className="value">{appointmentData.name || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Age:</strong>
-                                        <p>{appointmentData.age ? `${appointmentData.age} years` : 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Age</span>
+                                        <span className="value">{appointmentData.age ? `${appointmentData.age} years` : 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Blood Type:</strong>
-                                        <p>{appointmentData.blood_type || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Blood Type</span>
+                                        <span className="value">{appointmentData.blood_type || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Email:</strong>
-                                        <p>{appointmentData.email || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Email</span>
+                                        <span className="value">{appointmentData.email || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Phone:</strong>
-                                        <p>{appointmentData.phone || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Phone</span>
+                                        <span className="value">{appointmentData.phone || 'N/A'}</span>
                                     </div>
                                 </div>
+                            </div>
 
-                                <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#2349C2' }}>Appointment Details</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Hospital:</strong>
-                                        <p>{appointmentData.hospital_name || 'N/A'}</p>
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Schedule</h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Hospital</span>
+                                        <span className="value">{appointmentData.hospital_name || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Date:</strong>
-                                        <p>{appointmentData.date || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Date</span>
+                                        <span className="value">{appointmentData.date || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Time:</strong>
-                                        <p>{appointmentData.time || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <strong>Created At:</strong>
-                                        <p>{appointmentData.created_at || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Time</span>
+                                        <span className="value">{appointmentData.time || 'N/A'}</span>
                                     </div>
                                 </div>
 
                                 {appointmentData.note && (
-                                    <div style={{ marginTop: '20px' }}>
-                                        <strong>Note:</strong>
-                                        <p style={{ marginTop: '5px', padding: '10px', background: '#f5f5f5', borderRadius: '5px' }}>
-                                            {appointmentData.note}
-                                        </p>
+                                    <div className="modal-note">
+                                        {appointmentData.note}
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </>
                     ) : (
-                        <div className="error-message modal-error-container">
-                            No appointment data available
-                        </div>
+                        <div className="error-message modal-error-container">No appointment data available</div>
                     )}
+                </div>
 
-                    <div className="form-actions form-actions-modal">
-                        <button 
-                            type="button" 
-                            onClick={onClose}
-                            className="btn-cancel"
-                        >
-                            Close
-                        </button>
-                    </div>
+                <div className="modal-modern-footer">
+                    <button type="button" onClick={onClose} className="btn-cancel">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>

@@ -1,6 +1,41 @@
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../api/axios";
 import QuizCards from "./InterfaceComponents/QuizCards";
+import QuizLevels from "./InterfaceComponents/QuizLevels";
 
 export default function GameInterface() {
+    const location = useLocation();
+    const { startLevel } = location.state || {};
+    const { user } = useAuth();
+    const [currentLevel, setCurrentLevel] = useState(startLevel || 1);
+
+    // Update level if startLevel is provided from navigation
+    useEffect(() => {
+        if (startLevel) {
+            setCurrentLevel(startLevel);
+        }
+    }, [startLevel]);
+
+    // Fetch current level from backend if no startLevel is provided (normal navigation)
+    useEffect(() => {
+        const fetchProgress = async () => {
+            if (!startLevel && user) {
+                try {
+                    const response = await api.get('/api/quiz/progress');
+                    const level = response.data.currentLevel || 1;
+                    setCurrentLevel(level);
+                } catch (err) {
+                    console.error('Error fetching quiz progress:', err);
+                    // Keep default level on error
+                }
+            }
+        };
+
+        fetchProgress();
+    }, [user, startLevel]);
+
     return (
         <div className=" quizzlit-section h-screen w-screen">
             <div className="circle-container">
@@ -11,7 +46,8 @@ export default function GameInterface() {
             </div>
 
             <div className="game-interface-container">
-                <QuizCards />
+                <QuizLevels currentLevel={currentLevel} onLevelChange={setCurrentLevel} />
+                <QuizCards currentLevel={currentLevel} />
             </div>
         </div>
     );

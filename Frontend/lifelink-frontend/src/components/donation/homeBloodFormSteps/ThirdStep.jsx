@@ -1,17 +1,20 @@
 import { useNavigate } from "react-router-dom"
 import { useState } from "react";
 import { IoHeart } from "react-icons/io5";
-import axios from 'axios';
+import api from "../../../api/axios";
 
 import ScrollToTop from "../../ScrollToTop";
 import ThankModalHomeBlood from "../ThankModals/ThankModalHomeBlood";
 
 
-export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
+export default function ThirdStep({ prevStep, pageType = "home", homeBloodFormData }){
      const navigate = useNavigate()
      const [thankMessHome, setThankMessHome] = useState(false);
      const [loading, setLoading] = useState(false);
      const [error, setError] = useState("");
+
+     // Log pageType on mount to help debug
+     console.log('ThirdStep rendered with pageType:', pageType);
 
      const handleSubmit = async (e) => {
         e.preventDefault();
@@ -23,36 +26,42 @@ export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
             // Ensure all required fields are present
             const formDataToSend = {
                 ...homeBloodFormData,
-                date_of_birth: homeBloodFormData.date_of_birth || '',                // Ensure appointment data is properly formatted
+                date_of_birth: homeBloodFormData.date_of_birth || '',
                 hospital_id: homeBloodFormData.hospital_id || null,
                 appointment_date: homeBloodFormData.appointment_date || '',
                 appointment_time: homeBloodFormData.appointment_time || '',
                 medical_conditions: homeBloodFormData.medical_conditions || {}
             };
 
+            // For hospital appointments, remove address-related fields as they're not needed
+            if (pageType === "hospital") {
+                delete formDataToSend.address;
+                delete formDataToSend.latitude;
+                delete formDataToSend.longitude;
+            }
+
             console.log('Submitting form data:', formDataToSend);
+            console.log('Page type:', pageType);
+            console.log('Page type check (pageType === "hospital"):', pageType === "hospital");
 
-            // Send all data to backend
-            const response = await axios.post(
-                'http://localhost:8000/api/blood/home_appointment',
-                formDataToSend,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                }
-            );
+            // Send all data to backend - use different endpoint based on pageType
+            const endpoint = pageType === "hospital" 
+                ? '/api/hospital/appointments' 
+                : '/api/blood/home_appointment';
+            
+            console.log('Using endpoint:', endpoint);
+            const response = await api.post(endpoint, formDataToSend);
 
-            console.log('Home appointment created:', response.data);
+            console.log(`${pageType === "hospital" ? "Hospital" : "Home"} appointment created:`, response.data);
 
             // Clear localStorage only on successful submission
-            const prefix = "home_"; // Always home for this form
-            localStorage.setItem("step", "hospitals");
+            const prefix = pageType === "home" ? "home_" : "hospital_";
+            const formDataKey = pageType === "home" ? 'home_blood_form_data' : 'hospital_blood_form_data';
+            localStorage.setItem(prefix + "step", "hospitals");
             localStorage.removeItem(prefix + "hospital");
-            localStorage.removeItem("date");
+            localStorage.removeItem(prefix + "date");
             localStorage.removeItem("appointment_time");
-            localStorage.removeItem("home_blood_form_data"); // Clear form data
+            localStorage.removeItem(formDataKey); // Clear form data
 
             setThankMessHome(true);
         } catch (err) {
@@ -74,7 +83,7 @@ export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
                 const errorMessage = err.response?.data?.error 
                     || err.response?.data?.message 
                     || err.message 
-                    || "Failed to submit appointment. Please try again.";
+                    || `Failed to submit ${pageType === "hospital" ? "hospital" : "home"} appointment. Please try again.`;
                 
                 console.error('Full error details:', {
                     message: errorMessage,
@@ -93,7 +102,7 @@ export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
 
      const onClose = () => {
         setThankMessHome (false);
-        navigate("/donation/home-blood-donation");
+        navigate(pageType === "hospital" ? "/donation/hospital-blood-donation" : "/donation/home-blood-donation");
      }
      
     return (
@@ -170,7 +179,7 @@ export default function ThirdStep({ prevStep, pageType, homeBloodFormData }){
                                     <div>
                                         <button type="button" className="cancel-btn"
                                             onClick={
-                                                ()=> navigate("/donation/home-blood-donation")
+                                                ()=> navigate(pageType === "hospital" ? "/donation/hospital-blood-donation" : "/donation/home-blood-donation")
                                             }
                                         >Cancel</button>
                                         <button 

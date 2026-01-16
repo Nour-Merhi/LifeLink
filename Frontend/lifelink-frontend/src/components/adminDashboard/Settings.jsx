@@ -67,23 +67,23 @@ export default function Settings() {
     const fetchSettings = async () => {
         try {
             setLoading(true);
-            // TODO: Replace with actual API endpoint
-            // const response = await api.get("/api/admin/dashboard/settings");
-            // const data = response.data;
-            
-            // For now, use default values
-            const data = {
-                general: generalSettings,
-                medical: medicalSettings
-            };
+            await api.get("/sanctum/csrf-cookie");
+            const response = await api.get("/api/admin/dashboard/settings");
+            const data = response.data;
 
-            setGeneralSettings(data.general || generalSettings);
-            setMedicalSettings(data.medical || medicalSettings);
+            setGeneralSettings({
+                ...generalSettings,
+                ...data.general
+            });
+            setMedicalSettings({
+                ...medicalSettings,
+                ...data.medical
+            });
             setInitialGeneral(JSON.parse(JSON.stringify(data.general || generalSettings)));
             setInitialMedical(JSON.parse(JSON.stringify(data.medical || medicalSettings)));
         } catch (err) {
             console.error("Error fetching settings:", err);
-            setError("Failed to load settings");
+            setError(err.response?.data?.message || "Failed to load settings");
         } finally {
             setLoading(false);
         }
@@ -176,11 +176,8 @@ export default function Settings() {
                 return;
             }
 
-            // TODO: Replace with actual API endpoint
-            // await api.put("/api/admin/dashboard/settings/general", generalSettings);
-            
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await api.get("/sanctum/csrf-cookie");
+            await api.put("/api/admin/dashboard/settings/general", generalSettings);
 
             setSuccess(true);
             setInitialGeneral(JSON.parse(JSON.stringify(generalSettings)));
@@ -225,11 +222,8 @@ export default function Settings() {
                 return;
             }
 
-            // TODO: Replace with actual API endpoint
-            // await api.put("/api/admin/dashboard/settings/medical", medicalSettings);
-            
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await api.get("/sanctum/csrf-cookie");
+            await api.put("/api/admin/dashboard/settings/medical", medicalSettings);
 
             setSuccess(true);
             setInitialMedical(JSON.parse(JSON.stringify(medicalSettings)));

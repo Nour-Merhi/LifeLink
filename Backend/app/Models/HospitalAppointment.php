@@ -20,6 +20,7 @@ class HospitalAppointment extends Model
         'donor_id',
         'hospital_Id',
         'appointment_id',
+        'appointment_time',
         'state',
         'note',
         'code',
@@ -41,8 +42,13 @@ class HospitalAppointment extends Model
     public function donor(){
         return $this->belongsTo(Donor::class, 'donor_id');
     }
-    public function appointments(){
+    public function appointment(){
         return $this->belongsTo(Appointment::class, 'appointment_id');
+    }
+    
+    // Keep old method name for backward compatibility, but redirect to singular
+    public function appointments(){
+        return $this->appointment();
     }
     
 

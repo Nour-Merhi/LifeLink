@@ -6,6 +6,7 @@ import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { BsCalendar3 } from "react-icons/bs";
 import { BsListUl } from "react-icons/bs";
 import { FiUserPlus } from "react-icons/fi";
+import { FaTint, FaClock, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
 import CalendarView from "./CalendarView";
@@ -14,8 +15,9 @@ import ViewHomeOrderModal from "./ViewHomeOrderModal";
 import EditHomeOrderModal from "./EditHomeOrderModal";
 
 export default function HomeOrderTable({ orders = [], loading = false, error = "", onOrdersUpdate }){
-    const [visitState, setVisitState] = useState("all-states"); 
-    const [bloodType, setBloodType] = useState("all-blood");
+    const [visitState, setVisitState] = useState(""); 
+    const [bloodType, setBloodType] = useState("");
+    const [hospital, setHospital] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
     const [viewMode, setViewMode] = useState("table"); 
@@ -32,10 +34,12 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
 
     const [searchTerm, setSearchTerm] = useState("");
 
+    // Get unique hospitals from orders
+    const uniqueHospitals = Array.from(new Set(orders.map(order => order.hospital_name).filter(Boolean))).sort();
+
     useEffect(()=>{
         setCurrentPage(1);
-    }, [searchTerm, visitState, bloodType])
-
+    }, [searchTerm, visitState, bloodType, hospital])
 
     // Normalize status for filtering (backend uses 'canceled', frontend expects 'cancelled')
     const normalizeStatus = (status) => {
@@ -43,16 +47,84 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
         return status;
     };
 
-    //Filtering orders based on search term, status and blood type (with normalized status)
+    const normalizeDateStr = (value) => {
+        if (!value || value === 'N/A') return null;
+        if (typeof value === 'string') {
+            // Already YYYY-MM-DD?
+            const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (m) return m[1];
+        }
+        try {
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return null;
+            return d.toISOString().split('T')[0];
+        } catch {
+            return null;
+        }
+    };
+
+    // Handle clear filters
+    const handleClearFilters = () => {
+        setVisitState("");
+        setBloodType("");
+        setHospital("");
+    };
+
+    //Filtering orders based on search term, status, blood type, and hospital (with normalized status)
     const filteredOrders = orders.filter((order) => {
         const normalizedStatus = normalizeStatus(order.status || 'pending');
         const matchesSearch = order.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
         const matchPhlebotomist = order.phlebotomist?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
-        const matchesStatus = visitState === "all-states" || normalizedStatus === visitState;
-        const matchesBlood = bloodType === "all-blood" || order.blood_type === bloodType;
+        const matchesStatus = !visitState || normalizedStatus === visitState;
+        const matchesBlood = !bloodType || order.blood_type === bloodType;
+        const matchesHospital = !hospital || order.hospital_name === hospital;
 
-        return (matchesSearch || matchPhlebotomist) && matchesStatus && matchesBlood;
+        return (matchesSearch || matchPhlebotomist) && matchesStatus && matchesBlood && matchesHospital;
     });
+
+    // Metrics (same design system as other admin pages)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const metrics = {
+        totalToday: filteredOrders.filter(o => normalizeDateStr(o.date) === todayStr).length,
+        pending: filteredOrders.filter(o => normalizeStatus(o.status || 'pending') === 'pending').length,
+        completed: filteredOrders.filter(o => normalizeStatus(o.status || 'pending') === 'completed').length,
+        cancelled: filteredOrders.filter(o => normalizeStatus(o.status || 'pending') === 'cancelled').length,
+    };
+
+    const metricsData = [
+        {
+            title: "Today's Visits",
+            value: metrics.totalToday.toString(),
+            change: "Scheduled for today",
+            icon: <FaTint className="text-3xl" />,
+            bgColor: "#EBEAFF",
+            iconColor: "#285BFF",
+        },
+        {
+            title: "Pending Orders",
+            value: metrics.pending.toString(),
+            change: "Awaiting completion",
+            icon: <FaClock className="text-3xl" />,
+            bgColor: "#FFF7D6",
+            iconColor: "#B45309",
+        },
+        {
+            title: "Completed Visits",
+            value: metrics.completed.toString(),
+            change: "Finished visits",
+            icon: <FaCheckCircle className="text-3xl" />,
+            bgColor: "#EAFFE5",
+            iconColor: "#16a34a",
+        },
+        {
+            title: "Cancelled",
+            value: metrics.cancelled.toString(),
+            change: "Cancelled/canceled",
+            icon: <FaTimesCircle className="text-3xl" />,
+            bgColor: "#FFE5E5",
+            iconColor: "#F12C31",
+        },
+    ];
 
     // Handle individual checkbox change
     const handleCheckboxChange = (orderId, isChecked) => {
@@ -113,8 +185,28 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
 
     return(
         <section className="hospital-table-section">
+            {/* Metrics Grid (same design as other admin pages) */}
+            <div className="metrics-grid-4">
+                {metricsData.map((metric, index) => (
+                    <div key={index} className="metric-card">
+                        <div className="metric-content">
+                            <div className="metric-info">
+                                <p className="metric-title">{metric.title}</p>
+                                <h3 className="metric-value">{metric.value}</h3>
+                                <span className="metric-change">{metric.change}</span>
+                            </div>
+                            <div
+                                className="metric-icon"
+                                style={{ backgroundColor: metric.bgColor, color: metric.iconColor }}
+                            >
+                                {metric.icon}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
             <div className="control-panel">
-                <h3 className="control-panel-title">Home Donations Orders</h3>
                 <div className="control-panel-layout">
                     <div className="control-panel-layout-left">
                         <div className="search-input">
@@ -143,52 +235,143 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
                             </button>
                         </div>
                     </div>
-
-                    <div className="filter-gap">
-                        <div className="filters">
+                </div>
+                {/* Filters Section */}
+                <div className="mt-5">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end' }}>
+                        {/* Hospital Filter */}
+                        <div style={{ flex: '1', minWidth: '200px' }}>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>
+                                Hospital
+                            </label>
                             <select
-                                value = { bloodType } 
-                                onChange = { (e) => setBloodType (e.target.value) }
+                                value={hospital}
+                                onChange={(e) => setHospital(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    backgroundColor: '#fff'
+                                }}
                             >
-                                <option value = "all-blood" >All blood types</option>
-                                <option value = "AB+" >AB+</option>
-                                <option value = "A+" >A+</option>
-                                <option value = "B+" >B+</option>
-                                <option value = "O+" >O+</option>
-                                <option value = "O-" >O-</option>
-                                <option value = "B-" >B-</option>
-                                <option value = "A-" >A-</option>
-                                <option value = "AB-" >AB-</option>
+                                <option value="">All Hospitals</option>
+                                {uniqueHospitals.map(hosp => (
+                                    <option key={hosp} value={hosp}>{hosp}</option>
+                                ))}
                             </select>
                         </div>
-                        <div className="filters">
+
+                        {/* Blood Type Filter */}
+                        <div style={{ flex: '1', minWidth: '200px' }}>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>
+                                Blood Type
+                            </label>
+                            <select
+                                value={bloodType}
+                                onChange={(e) => setBloodType(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    backgroundColor: '#fff'
+                                }}
+                            >
+                                <option value="">All Blood Types</option>
+                                <option value="AB+">AB+</option>
+                                <option value="A+">A+</option>
+                                <option value="B+">B+</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="B-">B-</option>
+                                <option value="A-">A-</option>
+                                <option value="AB-">AB-</option>
+                            </select>
+                        </div>
+
+                        {/* Status Filter */}
+                        <div style={{ flex: '1', minWidth: '200px' }}>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', fontSize: '14px' }}>
+                                Status
+                            </label>
                             <select 
-                                value = { visitState } 
-                                onChange = { (e) => setVisitState (e.target.value) }
+                                value={visitState}
+                                onChange={(e) => setVisitState(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    backgroundColor: '#fff'
+                                }}
                             >
-                                <option value = "all-states" >All states</option>
-                                <option value = "completed" >Completed</option>
-                                <option value = "pending" >Pending</option>
-                                <option value = "cancelled" >Cancelled</option>
+                                <option value="">All Statuses</option>
+                                <option value="completed">Completed</option>
+                                <option value="pending">Pending</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
-                        {/* Assign Phlebotomist Button - appears when orders are selected */}
-                        {selectedOrders.length > 0 ? (
-                            <div className="assign-phlebotomist-btn">
-                                <button
-                                    className="assign-phlebotomist-btn"
-                                    onClick={() => setAssignModalOpen(true)}
-                                >
-                                    Assign Phlebotomist ({selectedOrders.length})
-                                </button>
-                            </div>
-                        ) : <div className="filters">
-                                <small>Select order/s to assign phlebotomist</small>
-                            </div>
-                        }
+
+                        {/* Clear Filters Button */}
+                        <div>
+                            <button
+                                onClick={handleClearFilters}
+                                style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: '#6B6B6B',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500'
+                                }}
+                                onMouseOver={(e) => e.target.style.backgroundColor = '#5a5a5a'}
+                                onMouseOut={(e) => e.target.style.backgroundColor = '#6B6B6B'}
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Active Filters Display */}
+                    {(visitState || bloodType || hospital) && (
+                        <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '6px', fontSize: '13px' }}>
+                            <strong>Active Filters:</strong>
+                            {hospital && <span style={{ marginLeft: '10px', padding: '4px 8px', backgroundColor: '#fff', borderRadius: '4px' }}>Hospital: {hospital}</span>}
+                            {bloodType && <span style={{ marginLeft: '10px', padding: '4px 8px', backgroundColor: '#fff', borderRadius: '4px' }}>Blood Type: {bloodType}</span>}
+                            {visitState && <span style={{ marginLeft: '10px', padding: '4px 8px', backgroundColor: '#fff', borderRadius: '4px' }}>Status: {visitState}</span>}
+                        </div>
+                    )}
                 </div>
             </div>
+
+
+            {/* Assign Phlebotomist Button - appears when orders are selected */}
+            {selectedOrders.length > 0 && (
+                <div style={{ marginBottom: '20px', padding: '0 20px' }}>
+                    <button
+                        className="assign-phlebotomist-btn"
+                        onClick={() => setAssignModalOpen(true)}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#3257CD',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                        }}
+                    >
+                        Assign Phlebotomist ({selectedOrders.length})
+                    </button>
+                </div>
+            )}
 
             {viewMode === "calendar" && (
                 <CalendarView orders={orders} filteredOrders={filteredOrders} />
