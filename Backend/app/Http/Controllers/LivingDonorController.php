@@ -16,6 +16,24 @@ class LivingDonorController extends Controller
     public function store(Request $request)
     {
         try {
+            // Normalize checkbox boolean coming from FormData:
+            // - Frontend may send `agree_intrest` (typo) and FormData stringifies booleans as "true"/"false"
+            // - Laravel boolean validator accepts: true/false/1/0/"1"/"0" but NOT "true"/"false"
+            if ($request->has('agree_intrest') && !$request->has('agree_interest')) {
+                $request->merge(['agree_interest' => $request->input('agree_intrest')]);
+            }
+            if ($request->has('agree_interest')) {
+                $v = $request->input('agree_interest');
+                if (is_string($v)) {
+                    $vv = strtolower(trim($v));
+                    if (in_array($vv, ['true', 'on', 'yes'], true)) {
+                        $request->merge(['agree_interest' => 1]);
+                    } elseif (in_array($vv, ['false', 'off', 'no', ''], true)) {
+                        $request->merge(['agree_interest' => 0]);
+                    }
+                }
+            }
+
             // Handle both FormData and JSON requests
             // Get donation_type first to determine validation rules
             $donationType = $request->input('donation_type');
@@ -251,6 +269,180 @@ class LivingDonorController extends Controller
                 'living_donors' => [],
                 'total' => 0,
                 'error' => 'Failed to fetch living donors'
+            ], 500);
+        }
+    }
+
+    /**
+     * Display a single living donor pledge (full details) for admin dashboard.
+     */
+    public function show(string $code)
+    {
+        try {
+            $donor = LivingDonor::with('hospital.healthCenterManager.user')
+                ->where('code', $code)
+                ->firstOrFail();
+
+            $age = $donor->date_of_birth ? Carbon::parse($donor->date_of_birth)->age : null;
+
+            $hospitalName = 'Not Assigned';
+            $managerName = 'N/A';
+            if ($donor->hospital) {
+                $hospitalName = $donor->hospital->name ?? 'Not Assigned';
+                if ($donor->hospital->healthCenterManager && $donor->hospital->healthCenterManager->user) {
+                    $user = $donor->hospital->healthCenterManager->user;
+                    $nameParts = array_filter([
+                        $user->first_name,
+                        $user->middle_name,
+                        $user->last_name
+                    ]);
+                    $managerName = implode(' ', $nameParts);
+                }
+            }
+
+            $idPictureUrl = null;
+            if ($donor->id_picture) {
+                $idPictureUrl = asset('storage/' . $donor->id_picture);
+            }
+
+            return response()->json([
+                'living_donor' => [
+                    'id' => $donor->code,
+                    'first_name' => $donor->first_name,
+                    'middle_name' => $donor->middle_name,
+                    'last_name' => $donor->last_name,
+                    'full_name' => $donor->full_name,
+                    'email' => $donor->email,
+                    'phone_nb' => $donor->phone_nb,
+                    'date_of_birth' => $donor->date_of_birth ? Carbon::parse($donor->date_of_birth)->format('Y-m-d') : null,
+                    'age' => $age,
+                    'gender' => $donor->gender,
+                    'address' => $donor->address,
+                    'blood_type' => $donor->blood_type,
+                    'organ' => $donor->organ,
+                    'medical_conditions' => $donor->medical_conditions ?? [],
+                    'donation_type' => $donor->donation_type, // directed | non-directed
+                    'medical_status' => $donor->medical_status,
+                    'ethics_status' => $donor->ethics_status,
+                    'agree_interest' => $donor->agree_interest ?? null,
+                    'hospital_selection' => $donor->hospital_selection,
+                    'hospital_id' => $donor->hospital_id,
+                    'hospital_name' => $hospitalName,
+                    'manager_name' => $managerName,
+                    'recipient_full_name' => $donor->recipient_full_name,
+                    'recipient_age' => $donor->recipient_age,
+                    'recipient_contact' => $donor->recipient_contact,
+                    'recipient_contact_type' => $donor->recipient_contact_type,
+                    'recipient_blood_type' => $donor->recipient_blood_type,
+                    'id_picture' => $idPictureUrl,
+                    'created_at' => $donor->created_at ? $donor->created_at->toISOString() : null,
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Living donor pledge not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching living donor details: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'code' => $code
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch living donor details'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a living donor pledge (admin).
+     */
+    public function update(Request $request, string $code)
+    {
+        try {
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+
+            $validated = $request->validate([
+                'medical_status' => 'nullable|in:not_started,in_progress,cleared,rejected',
+                'ethics_status' => 'nullable|in:pending,approved,N/A',
+                'hospital_selection' => 'nullable|in:general,specific',
+                'hospital_id' => 'nullable|exists:hospitals,id',
+            ]);
+
+            // If hospital_selection is specific, require hospital_id
+            if (($validated['hospital_selection'] ?? $donor->hospital_selection) === 'specific') {
+                $hospitalId = $validated['hospital_id'] ?? $donor->hospital_id;
+                if (!$hospitalId) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['hospital_id' => ['Hospital is required when selecting specific hospital.']]
+                    ], 422);
+                }
+            }
+
+            // If hospital_selection becomes general, clear hospital_id
+            if (array_key_exists('hospital_selection', $validated) && $validated['hospital_selection'] === 'general') {
+                $validated['hospital_id'] = null;
+            }
+
+            $donor->fill($validated);
+            $donor->save();
+
+            return response()->json([
+                'message' => 'Living donor pledge updated successfully.',
+                'living_donor' => $donor->fresh()
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Living donor pledge not found'
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating living donor: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'code' => $code
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update living donor pledge'
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a living donor pledge (admin).
+     */
+    public function destroy(string $code)
+    {
+        try {
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+
+            // Remove stored id picture if exists
+            if ($donor->id_picture) {
+                Storage::disk('public')->delete($donor->id_picture);
+            }
+
+            $donor->delete();
+
+            return response()->json([
+                'message' => 'Living donor pledge deleted successfully.'
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Living donor pledge not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting living donor: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'code' => $code
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete living donor pledge'
             ], 500);
         }
     }

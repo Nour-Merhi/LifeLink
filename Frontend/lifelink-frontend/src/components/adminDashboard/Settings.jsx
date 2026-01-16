@@ -28,7 +28,7 @@ export default function Settings() {
         min_days_between_donations: 56,
         allowed_blood_types: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
         emergency_request_expiry: "24h",
-        donor_age_min: 18,
+        donor_age_min: 16,
         donor_age_max: 65,
     });
 
@@ -67,7 +67,6 @@ export default function Settings() {
     const fetchSettings = async () => {
         try {
             setLoading(true);
-            await api.get("/sanctum/csrf-cookie");
             const response = await api.get("/api/admin/dashboard/settings");
             const data = response.data;
 
@@ -83,7 +82,8 @@ export default function Settings() {
             setInitialMedical(JSON.parse(JSON.stringify(data.medical || medicalSettings)));
         } catch (err) {
             console.error("Error fetching settings:", err);
-            setError(err.response?.data?.message || "Failed to load settings");
+            const hint = err.response?.data?.hint ? ` (${err.response.data.hint})` : "";
+            setError((err.response?.data?.message || "Failed to load settings") + hint);
         } finally {
             setLoading(false);
         }
@@ -176,7 +176,6 @@ export default function Settings() {
                 return;
             }
 
-            await api.get("/sanctum/csrf-cookie");
             await api.put("/api/admin/dashboard/settings/general", generalSettings);
 
             setSuccess(true);
@@ -184,7 +183,8 @@ export default function Settings() {
             setTimeout(() => setSuccess(false), 3000);
         } catch (err) {
             console.error("Error saving general settings:", err);
-            setError(err.response?.data?.message || "Failed to save general settings");
+            const hint = err.response?.data?.hint ? ` (${err.response.data.hint})` : "";
+            setError((err.response?.data?.message || "Failed to save general settings") + hint);
         } finally {
             setSaving(false);
         }
@@ -204,8 +204,8 @@ export default function Settings() {
                 return;
             }
 
-            if (medicalSettings.donor_age_min < 18 || medicalSettings.donor_age_max > 100) {
-                setError("Donor age must be between 18 and 100");
+            if (medicalSettings.donor_age_min < 16|| medicalSettings.donor_age_max > 100) {
+                setError("Donor age must be between 16 and 100");
                 setSaving(false);
                 return;
             }
@@ -222,7 +222,6 @@ export default function Settings() {
                 return;
             }
 
-            await api.get("/sanctum/csrf-cookie");
             await api.put("/api/admin/dashboard/settings/medical", medicalSettings);
 
             setSuccess(true);
@@ -230,7 +229,8 @@ export default function Settings() {
             setTimeout(() => setSuccess(false), 3000);
         } catch (err) {
             console.error("Error saving medical settings:", err);
-            setError(err.response?.data?.message || "Failed to save medical settings");
+            const hint = err.response?.data?.hint ? ` (${err.response.data.hint})` : "";
+            setError((err.response?.data?.message || "Failed to save medical settings") + hint);
         } finally {
             setSaving(false);
         }
@@ -537,7 +537,7 @@ export default function Settings() {
                             <input
                                 id="donor_age_min"
                                 type="number"
-                                min="18"
+                                min="16"
                                 max="100"
                                 value={medicalSettings.donor_age_min}
                                 onChange={(e) => handleMedicalChange('donor_age_min', parseInt(e.target.value) || 18)}
@@ -553,7 +553,7 @@ export default function Settings() {
                             <input
                                 id="donor_age_max"
                                 type="number"
-                                min="18"
+                                min="16"
                                 max="100"
                                 value={medicalSettings.donor_age_max}
                                 onChange={(e) => handleMedicalChange('donor_age_max', parseInt(e.target.value) || 65)}

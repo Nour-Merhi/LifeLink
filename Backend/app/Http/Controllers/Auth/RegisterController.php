@@ -99,13 +99,12 @@ class RegisterController extends Controller
             $firstName = $nameParts[0];
             $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
 
-            // Create user - phone_nb is unique, so we'll generate a temporary unique value
-            // User can update it later
+            // Create user - phone_nb is nullable (avoid fake values like temp_*)
             $user = User::create([
                 'first_name' => $firstName,
                 'last_name' => $lastName,
                 'email' => $validated['email'],
-                'phone_nb' => 'temp_' . uniqid() . '_' . mt_rand(10000, 99999), // Temporary unique value
+                'phone_nb' => null,
                 'city' => $validated['city'] ?? null,
                 'role' => 'Donor',
                 'password' => Hash::make($validated['password']),

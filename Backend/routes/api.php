@@ -36,10 +36,14 @@ use App\Http\Controllers\AdminAppointmentsController;
 use App\Http\Controllers\HospitalDonorManagementController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\HomeAppointmentRatingController;
+use App\Http\Controllers\SystemSettingsPublicController;
+use App\Http\Controllers\PublicDonationStatsController;
 
 
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [AuthenticatedSessionController::class, 'login']);
+Route::get('/system-settings', [SystemSettingsPublicController::class, 'show']);
+Route::get('/public/donation-stats', [PublicDonationStatsController::class, 'index']);
 Route::middleware('auth:sanctum')->get('/user', [AuthenticatedSessionController::class, 'user']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthenticatedSessionController::class, 'logout']);
 
@@ -75,6 +79,15 @@ Route::middleware('auth:sanctum')->prefix('/hospital/dashboard')->group(function
     Route::post('/appointments', [HospitalAppointmentManagementController::class, 'store']);
     Route::post('/generate-appointments/{hospitalId?}', [AppointmentsController::class, 'createHomeAppointments']);
     Route::post('/generate-hospital-appointments/{hospitalId?}', [AppointmentsController::class, 'createHospitalAppointments']);
+    // Organ coordination (hospital-scoped)
+    Route::get('/organ-coordination/living-donors', [HospitalDashboardController::class, 'getLivingDonors']);
+    Route::get('/organ-coordination/after-death-pledges', [HospitalDashboardController::class, 'getAfterDeathPledges']);
+    Route::get('/organ-coordination/living-donors/{code}', [HospitalDashboardController::class, 'showLivingDonor']);
+    Route::get('/organ-coordination/after-death-pledges/{code}', [HospitalDashboardController::class, 'showAfterDeathPledge']);
+    Route::put('/organ-coordination/living-donors/{code}', [HospitalDashboardController::class, 'updateLivingDonor']);
+    Route::delete('/organ-coordination/living-donors/{code}', [HospitalDashboardController::class, 'deleteLivingDonor']);
+    Route::put('/organ-coordination/after-death-pledges/{code}', [HospitalDashboardController::class, 'updateAfterDeathPledge']);
+    Route::delete('/organ-coordination/after-death-pledges/{code}', [HospitalDashboardController::class, 'deleteAfterDeathPledge']);
 
     // More specific route first (with donorCode)
     Route::get('/donors/{hospitalId}/{donorCode}', [HospitalDonorManagementController::class, 'getDonor']);
@@ -140,9 +153,15 @@ Route::middleware('auth:sanctum')->prefix('/admin/dashboard')->group(function(){
 
     //Living Donor Routes
     Route::get('/living-donors', [LivingDonorController::class, 'index']);
+    Route::get('/living-donors/{code}', [LivingDonorController::class, 'show']);
+    Route::put('/living-donors/{code}', [LivingDonorController::class, 'update']);
+    Route::delete('/living-donors/{code}', [LivingDonorController::class, 'destroy']);
 
     //After Death Pledge Routes
     Route::get('/after-death-pledges', [AfterDeathPledgeController::class, 'index']);
+    Route::get('/after-death-pledges/{code}', [AfterDeathPledgeController::class, 'show']);
+    Route::put('/after-death-pledges/{code}', [AfterDeathPledgeController::class, 'update']);
+    Route::delete('/after-death-pledges/{code}', [AfterDeathPledgeController::class, 'destroy']);
 
     //Article Routes
     Route::get('/articles', [ArticleController::class, 'indexAdmin']);

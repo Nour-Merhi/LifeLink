@@ -286,4 +286,171 @@ class AfterDeathPledgeController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Display a single after-death pledge (full details) for admin dashboard.
+     */
+    public function show(string $code)
+    {
+        try {
+            $pledge = AfterDeathPledge::with('hospital')
+                ->where('code', $code)
+                ->firstOrFail();
+
+            $idPhotoUrl = $pledge->id_photo_path ? asset('storage/' . $pledge->id_photo_path) : null;
+            $fatherIdPhotoUrl = $pledge->father_id_photo_path ? asset('storage/' . $pledge->father_id_photo_path) : null;
+            $motherIdPhotoUrl = $pledge->mother_id_photo_path ? asset('storage/' . $pledge->mother_id_photo_path) : null;
+
+            return response()->json([
+                'after_death_pledge' => [
+                    'id' => $pledge->code,
+                    'first_name' => $pledge->first_name,
+                    'middle_name' => $pledge->middle_name,
+                    'last_name' => $pledge->last_name,
+                    'full_name' => $pledge->full_name,
+                    'email' => $pledge->email,
+                    'phone_nb' => $pledge->phone_nb,
+                    'date_of_birth' => $pledge->date_of_birth ? Carbon::parse($pledge->date_of_birth)->format('Y-m-d') : null,
+                    'age' => $pledge->age,
+                    'gender' => $pledge->gender,
+                    'address' => $pledge->address,
+                    'emergency_contact_name' => $pledge->emergency_contact_name,
+                    'emergency_contact_phone' => $pledge->emergency_contact_phone,
+                    'marital_status' => $pledge->marital_status,
+                    'education_level' => $pledge->education_level,
+                    'professional_status' => $pledge->professional_status,
+                    'work_type' => $pledge->work_type,
+                    'mother_name' => $pledge->mother_name,
+                    'spouse_name' => $pledge->spouse_name,
+                    'pledged_organs' => $pledge->pledged_organs ?? [],
+                    'pledged_organs_string' => $pledge->pledged_organs_string,
+                    'blood_type' => $pledge->blood_type,
+                    'hospital_selection' => $pledge->hospital_selection,
+                    'hospital_id' => $pledge->hospital_id,
+                    'hospital_name' => $pledge->hospital ? $pledge->hospital->name : null,
+                    'status' => $pledge->status,
+                    'id_photo' => $idPhotoUrl,
+                    'father_id_photo' => $fatherIdPhotoUrl,
+                    'mother_id_photo' => $motherIdPhotoUrl,
+                    'created_at' => $pledge->created_at ? $pledge->created_at->toISOString() : null,
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'After-death pledge not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching after-death pledge details: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'code' => $code
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch after-death pledge details'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update an after-death pledge (admin).
+     */
+    public function update(Request $request, string $code)
+    {
+        try {
+            $pledge = AfterDeathPledge::where('code', $code)->firstOrFail();
+
+            $validated = $request->validate([
+                'status' => 'nullable|in:active,cancelled',
+                'email' => 'nullable|email|max:255',
+                'phone_nb' => 'nullable|string|max:50',
+                'emergency_contact_name' => 'nullable|string|max:255',
+                'emergency_contact_phone' => 'nullable|string|max:50',
+                'pledged_organs' => 'nullable|array|min:1',
+                'pledged_organs.*' => 'in:all-organs,heart,corneas,liver,skin,kidneys,bones,lungs,valves,pancrease,tendons,intestines,blood-vessels,blood-vesseles',
+                'hospital_selection' => 'nullable|in:general,specific',
+                'hospital_id' => 'nullable|exists:hospitals,id',
+            ]);
+
+            // If hospital_selection is specific, require hospital_id
+            if (($validated['hospital_selection'] ?? $pledge->hospital_selection) === 'specific') {
+                $hospitalId = $validated['hospital_id'] ?? $pledge->hospital_id;
+                if (!$hospitalId) {
+                    return response()->json([
+                        'message' => 'Validation failed.',
+                        'errors' => ['hospital_id' => ['Hospital is required when selecting specific hospital.']]
+                    ], 422);
+                }
+            }
+
+            // If hospital_selection becomes general, clear hospital_id
+            if (array_key_exists('hospital_selection', $validated) && $validated['hospital_selection'] === 'general') {
+                $validated['hospital_id'] = null;
+            }
+
+            $pledge->fill($validated);
+            $pledge->save();
+
+            return response()->json([
+                'message' => 'After-death pledge updated successfully.',
+                'after_death_pledge' => $pledge->fresh()
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'After-death pledge not found'
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating after-death pledge: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'code' => $code
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update after-death pledge'
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete an after-death pledge (admin).
+     */
+    public function destroy(string $code)
+    {
+        try {
+            $pledge = AfterDeathPledge::where('code', $code)->firstOrFail();
+
+            if ($pledge->id_photo_path) {
+                Storage::disk('public')->delete($pledge->id_photo_path);
+            }
+            if ($pledge->father_id_photo_path) {
+                Storage::disk('public')->delete($pledge->father_id_photo_path);
+            }
+            if ($pledge->mother_id_photo_path) {
+                Storage::disk('public')->delete($pledge->mother_id_photo_path);
+            }
+
+            $pledge->delete();
+
+            return response()->json([
+                'message' => 'After-death pledge deleted successfully.'
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'After-death pledge not found'
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting after-death pledge: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'code' => $code
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete after-death pledge'
+            ], 500);
+        }
+    }
 }

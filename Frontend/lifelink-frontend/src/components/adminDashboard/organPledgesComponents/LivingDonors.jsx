@@ -4,6 +4,10 @@ import { RiDeleteBin6Line } from "react-icons/ri";
 import { IoSearchSharp } from "react-icons/io5";
 import { FaCheckCircle } from "react-icons/fa";
 import { SpinnerDotted } from 'spinners-react';
+import ViewOrganCoordinationModal from "./ViewOrganCoordinationModal";
+import EditOrganCoordinationModal from "./EditOrganCoordinationModal";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import api from "../../../api/axios";
 
 export default function LivingDonors({ livingDonors = [], metricsData, loading = false, error = "", onRefresh }) {
     const [searchTerm, setSearchTerm] = useState("");
@@ -12,6 +16,11 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
     const [filterOrgan, setFilterOrgan] = useState("all-organs");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
+    const [viewingDonor, setViewingDonor] = useState(null);
+    const [editingDonor, setEditingDonor] = useState(null);
+    const [deletingDonor, setDeletingDonor] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     useEffect(() => {
         setCurrentPage(1);
@@ -248,10 +257,18 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
                                 {/* Actions */}
                                 <td className="col-actions">
                                     <div className="row-actions">
-                                        <button className="icon-btn text-blue-800" title="View Details">
+                                        <button
+                                            className="icon-btn text-blue-800"
+                                            title="View Details"
+                                            onClick={() => setViewingDonor(donor)}
+                                        >
                                             <FiEye />
                                         </button>
-                                        <button className="icon-btn text-green-600" title="Edit">
+                                        <button
+                                            className="icon-btn text-green-600"
+                                            title="Edit"
+                                            onClick={() => setEditingDonor(donor)}
+                                        >
                                             <FiEdit />
                                         </button>
                                         {donor.medical_status === "cleared" && donor.ethics_status === "approved" && (
@@ -259,7 +276,14 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
                                                 <FaCheckCircle />
                                             </button>
                                         )}
-                                        <button className="icon-btn text-red-500" title="Reject">
+                                        <button
+                                            className="icon-btn text-red-500"
+                                            title="Delete"
+                                            onClick={() => {
+                                                setDeleteError("");
+                                                setDeletingDonor(donor);
+                                            }}
+                                        >
                                             <RiDeleteBin6Line />
                                         </button>
                                     </div>
@@ -311,6 +335,48 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
                 </div>
             </div>
             </div>
+            )}
+
+            {/* View Details Modal */}
+            {viewingDonor && (
+                <ViewOrganCoordinationModal
+                    mode="living"
+                    code={viewingDonor?.id}
+                    data={viewingDonor}
+                    onClose={() => setViewingDonor(null)}
+                />
+            )}
+
+            {editingDonor && (
+                <EditOrganCoordinationModal
+                    mode="living"
+                    code={editingDonor?.id}
+                    onClose={() => setEditingDonor(null)}
+                    onSaved={() => onRefresh?.()}
+                />
+            )}
+
+            {deletingDonor && (
+                <ConfirmDeleteModal
+                    title="Delete Living Donor Pledge"
+                    description={`Delete pledge ${deletingDonor.id}? This cannot be undone.`}
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={() => setDeletingDonor(null)}
+                    onConfirm={async () => {
+                        setDeleteLoading(true);
+                        setDeleteError("");
+                        try {
+                            await api.delete(`/api/admin/dashboard/living-donors/${deletingDonor.id}`);
+                            setDeletingDonor(null);
+                            onRefresh?.();
+                        } catch (e) {
+                            setDeleteError(e.response?.data?.message || "Failed to delete pledge");
+                        } finally {
+                            setDeleteLoading(false);
+                        }
+                    }}
+                />
             )}
         </section>
     );

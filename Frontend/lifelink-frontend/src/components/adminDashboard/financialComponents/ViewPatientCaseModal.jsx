@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import { IoPersonCircle } from "react-icons/io5";
-import { FaHospital } from "react-icons/fa";
-import { IoCalendarSharp } from "react-icons/io5";
 import api from "../../../api/axios";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -43,194 +41,201 @@ export default function ViewPatientCaseModal({ onClose, patientCaseId }) {
         return method;
     };
 
+    const statusLabel = (status) => {
+        const s = (status || '').toLowerCase();
+        if (!s) return 'Active';
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    const statusBadgeClass = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'active' || s === 'funded') return 'badge-success';
+        if (s === 'expired') return 'badge-danger';
+        return 'badge-danger';
+    };
+
+    const severityLabel = (severity) => {
+        const s = (severity || '').toLowerCase();
+        if (!s) return 'Low';
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    const severityBadgeClass = (severity) => {
+        const s = (severity || '').toLowerCase();
+        if (s === 'high') return 'badge-danger';
+        if (s === 'medium') return 'badge-pending';
+        return 'badge-success';
+    };
+
+    const money = (v) => {
+        const n = Number(v);
+        if (Number.isNaN(n)) return '$0';
+        return `$${n.toLocaleString()}`;
+    };
+
     const imageSrc = patientCaseData?.image 
         ? (patientCaseData.image.startsWith('http') ? patientCaseData.image : `${API_BASE_URL}/${patientCaseData.image}`)
         : null;
 
     return (
-        <div className="modal-overlay modal-overlay-edit" onClick={onClose}>
-            <div className="modal-container modal-container-edit" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
-                <div className="modal-title">
-                    <h2>Patient Case Details</h2>
-                    <button onClick={onClose}>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-container modal-modern modal-modern-wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="modal-modern-header">
+                    <div className="modal-modern-title">
+                        <h2>Patient Case</h2>
+                        <div className="modal-modern-subtitle">
+                            <span>Case: {patientCaseId || patientCaseData?.code || patientCaseData?.id || 'N/A'}</span>
+                            {patientCaseData?.status && (
+                                <span className={`badge ${statusBadgeClass(patientCaseData.status)}`}>
+                                    {statusLabel(patientCaseData.status)}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <button className="modal-icon-btn" onClick={onClose} aria-label="Close">
                         <IoClose />
                     </button>
                 </div>
-                <div className="modal-form">
+
+                <div className="modal-modern-body">
                     {loading ? (
                         <div className="loader">
                             <SpinnerDotted size={60} thickness={125} speed={100} color="#f01010ff" />
                             <h3>Loading Patient Case Details...</h3>
                         </div>
                     ) : error ? (
-                        <div className="error-message modal-error-container">
-                            {error}
-                        </div>
+                        <div className="error-message modal-error-container">{error}</div>
                     ) : patientCaseData ? (
-                        <div className="edit-modal-description">
-                            {/* Patient Image */}
+                        <>
                             {imageSrc && (
-                                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                                    <img 
-                                        src={imageSrc} 
-                                        alt={patientCaseData.patientName}
-                                        style={{ 
-                                            maxWidth: '200px', 
-                                            maxHeight: '200px', 
-                                            borderRadius: '10px',
-                                            objectFit: 'cover'
-                                        }} 
-                                    />
+                                <div className="modal-image-wrap">
+                                    <img className="modal-image" src={imageSrc} alt={patientCaseData.patientName || 'Patient'} />
                                 </div>
                             )}
 
-                            <div className="info-text" style={{ marginBottom: '20px' }}>
-                                <h3 style={{ marginBottom: '15px', color: '#2349C2' }}>Patient Information</h3>
-                                
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Case ID:</strong>
-                                        <p>{patientCaseData.code || patientCaseData.id}</p>
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">
+                                    Patient Information
+                                    <span className="muted">{patientCaseData.created_at || ''}</span>
+                                </h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Case ID</span>
+                                        <span className="value">{patientCaseData.code || patientCaseData.id || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Status:</strong>
-                                        <p>
-                                            <span className={`badge ${
-                                                patientCaseData.status === "active" ? "badge-success" : 
-                                                patientCaseData.status === "funded" ? "badge-success" : 
-                                                patientCaseData.status === "expired" ? "badge-danger" : 
-                                                "badge-danger"
-                                            }`}>
-                                                {patientCaseData.status?.charAt(0).toUpperCase() + patientCaseData.status?.slice(1) || "Active"}
+                                    <div className="modal-field">
+                                        <span className="label">Status</span>
+                                        <span className="value">
+                                            <span className={`badge ${statusBadgeClass(patientCaseData.status)}`}>
+                                                {statusLabel(patientCaseData.status)}
                                             </span>
-                                        </p>
+                                        </span>
                                     </div>
-                                    <div>
-                                        <strong>Patient Name:</strong>
-                                        <p>{patientCaseData.patientName}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Patient Name</span>
+                                        <span className="value">{patientCaseData.patientName || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Age:</strong>
-                                        <p>{patientCaseData.age} years</p>
+                                    <div className="modal-field">
+                                        <span className="label">Age</span>
+                                        <span className="value">{patientCaseData.age ? `${patientCaseData.age} years` : 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Gender:</strong>
-                                        <p>{patientCaseData.gender ? patientCaseData.gender.charAt(0).toUpperCase() + patientCaseData.gender.slice(1) : 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Gender</span>
+                                        <span className="value">{patientCaseData.gender ? patientCaseData.gender.charAt(0).toUpperCase() + patientCaseData.gender.slice(1) : 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Date of Birth:</strong>
-                                        <p>{patientCaseData.dateOfBirth || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Date of Birth</span>
+                                        <span className="value">{patientCaseData.dateOfBirth || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Case Title:</strong>
-                                        <p>{patientCaseData.condition}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Case Title</span>
+                                        <span className="value">{patientCaseData.condition || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Severity:</strong>
-                                        <p>
-                                            <span className={`badge ${
-                                                patientCaseData.severity === "high" ? "badge-danger" :
-                                                patientCaseData.severity === "medium" ? "badge-pending" :
-                                                "badge-success"
-                                            }`}>
-                                                {patientCaseData.severity ? patientCaseData.severity.charAt(0).toUpperCase() + patientCaseData.severity.slice(1) : 'Low'}
+                                    <div className="modal-field">
+                                        <span className="label">Severity</span>
+                                        <span className="value">
+                                            <span className={`badge ${severityBadgeClass(patientCaseData.severity)}`}>
+                                                {severityLabel(patientCaseData.severity)}
                                             </span>
-                                        </p>
+                                        </span>
                                     </div>
-                                    <div>
-                                        <strong>Hospital:</strong>
-                                        <p>{patientCaseData.hospital || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Hospital</span>
+                                        <span className="value">{patientCaseData.hospital || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Due Date:</strong>
-                                        <p>{patientCaseData.dueDate || 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Due Date</span>
+                                        <span className="value">{patientCaseData.dueDate || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Days Remaining:</strong>
-                                        <p>{patientCaseData.daysRemaining} days</p>
+                                    <div className="modal-field">
+                                        <span className="label">Days Remaining</span>
+                                        <span className="value">{typeof patientCaseData.daysRemaining === 'number' ? `${patientCaseData.daysRemaining} days` : (patientCaseData.daysRemaining || 'N/A')}</span>
                                     </div>
-                                    <div>
-                                        <strong>Created At:</strong>
-                                        <p>{patientCaseData.created_at || 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                <div style={{ marginBottom: '15px' }}>
-                                    <strong>Description:</strong>
-                                    <p style={{ marginTop: '5px', padding: '10px', background: '#f5f5f5', borderRadius: '5px' }}>
-                                        {patientCaseData.description}
-                                    </p>
-                                </div>
-
-                                <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#2349C2' }}>Funding Information</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Target Amount:</strong>
-                                        <p>${parseFloat(patientCaseData.targetFunding || 0).toLocaleString()}</p>
-                                    </div>
-                                    <div>
-                                        <strong>Current Funding:</strong>
-                                        <p>${parseFloat(patientCaseData.currentFunding || 0).toLocaleString()}</p>
-                                    </div>
-                                    <div>
-                                        <strong>Funding Progress:</strong>
-                                        <p>{patientCaseData.fundingPercentage || 0}%</p>
-                                    </div>
-                                    <div>
-                                        <strong>Total Donations:</strong>
-                                        <p>${parseFloat(patientCaseData.totalDonations || 0).toLocaleString()}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Created At</span>
+                                        <span className="value">{patientCaseData.created_at || 'N/A'}</span>
                                     </div>
                                 </div>
 
-                                <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#2349C2' }}>Donors Who Funded This Patient</h4>
+                                <div className="modal-note">
+                                    <strong>Description</strong>
+                                    <div>{patientCaseData.description || 'N/A'}</div>
+                                </div>
+                            </div>
+
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Funding Information</h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Target Amount</span>
+                                        <span className="value">{money(patientCaseData.targetFunding || 0)}</span>
+                                    </div>
+                                    <div className="modal-field">
+                                        <span className="label">Current Funding</span>
+                                        <span className="value">{money(patientCaseData.currentFunding || 0)}</span>
+                                    </div>
+                                    <div className="modal-field">
+                                        <span className="label">Funding Progress</span>
+                                        <span className="value">{patientCaseData.fundingPercentage || 0}%</span>
+                                    </div>
+                                    <div className="modal-field">
+                                        <span className="label">Total Donations</span>
+                                        <span className="value">{money(patientCaseData.totalDonations || 0)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Donors Who Funded This Patient</h3>
                                 {patientCaseData.donors && patientCaseData.donors.length > 0 ? (
-                                    <div style={{ marginBottom: '15px' }}>
-                                        <div style={{ display: 'grid', gap: '10px' }}>
-                                            {patientCaseData.donors.map((donor, index) => (
-                                                <div 
-                                                    key={index}
-                                                    style={{
-                                                        padding: '12px',
-                                                        background: '#f9f9f9',
-                                                        borderRadius: '8px',
-                                                        border: '1px solid #e0e0e0',
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center'
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <IoPersonCircle style={{ fontSize: '24px', color: '#2349C2' }} />
-                                                        <div>
-                                                            <strong>{donor.name}</strong>
-                                                            <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                                                Donated ${parseFloat(donor.amount || 0).toLocaleString()} on {donor.date}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ fontSize: '12px', color: '#666' }}>
-                                                        {formatPaymentMethod(donor.payment_method)}
+                                    <div className="modal-list">
+                                        {patientCaseData.donors.map((donor, index) => (
+                                            <div key={index} className="modal-list-item">
+                                                <div className="modal-list-item-left">
+                                                    <IoPersonCircle style={{ fontSize: '26px', color: '#2349C2', flexShrink: 0 }} />
+                                                    <div style={{ minWidth: 0 }}>
+                                                        <div className="modal-list-item-title">{donor.name || 'Donor'}</div>
+                                                        <p className="modal-list-item-sub">
+                                                            Donated {money(donor.amount || 0)}{donor.date ? ` on ${donor.date}` : ''}
+                                                        </p>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
+                                                <div className="muted">{formatPaymentMethod(donor.payment_method) || 'N/A'}</div>
+                                            </div>
+                                        ))}
                                     </div>
                                 ) : (
-                                    <p style={{ padding: '15px', background: '#f5f5f5', borderRadius: '5px', color: '#666' }}>
-                                        No donors have funded this patient case yet.
-                                    </p>
+                                    <div className="modal-note">No donors have funded this patient case yet.</div>
                                 )}
                             </div>
-                        </div>
-                    ) : null}
+                        </>
+                    ) : (
+                        <div className="error-message modal-error-container">No patient case data available</div>
+                    )}
                 </div>
 
-                <div className="form-actions form-actions-modal">
-                    <button 
-                        type="button" 
-                        onClick={onClose}
-                        className="btn-cancel"
-                    >
+                <div className="modal-modern-footer">
+                    <button type="button" onClick={onClose} className="btn-cancel">
                         Close
                     </button>
                 </div>

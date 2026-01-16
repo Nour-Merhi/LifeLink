@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { MdOutlineHealthAndSafety } from "react-icons/md";
 import { FiCheck, FiX, FiEye, FiFileText } from "react-icons/fi";
 import { IoSearchSharp } from "react-icons/io5";
-import axios from "axios";
 
 export default function OrganCoordination() {
     const [organRequests, setOrganRequests] = useState([]);

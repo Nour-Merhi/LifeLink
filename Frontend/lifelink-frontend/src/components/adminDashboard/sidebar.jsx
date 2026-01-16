@@ -13,9 +13,11 @@ import { FiLogOut } from "react-icons/fi";
 
 import { NavLink, useNavigate } from "react-router-dom";
 import api from "../../api/axios";
+import { useSystemSettings } from "../../context/SystemSettingsContext";
 
 export default function Sidebar(){
     const navigate = useNavigate();
+    const { systemLogo, platformName } = useSystemSettings();
     const handleLogout = async () => {
         try {
           await api.post("/api/logout");
@@ -34,7 +36,7 @@ export default function Sidebar(){
         <>
         <div className="sidebar linear-red layout admin-sidebar ">
             <button onClick={() => navigate("/home")}>
-                <img src={lifelinkLogoBlack} alt="lifelink logo" />
+                <img src={lifelinkLogoBlack} alt={`${platformName || "LifeLink"} logo`} />
             </button>
 
             <div className="links text-white">

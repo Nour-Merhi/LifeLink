@@ -182,7 +182,7 @@ export default function ViewHomeOrderModal({ onClose, orderCode }) {
                             <div className="modal-section">
                                 <h3 className="modal-section-title">Address & Emergency</h3>
                                 <div className="modal-grid">
-                                    <div className="modal-field" style={{ gridColumn: '1 / -1' }}>
+                                    <div className="modal-field full-width">
                                         <span className="label">Home Address</span>
                                         <span className="value">{orderData.address || 'N/A'}</span>
                                     </div>

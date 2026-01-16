@@ -5,6 +5,10 @@ import { IoSearchSharp } from "react-icons/io5";
 import { HiOutlineIdentification } from "react-icons/hi";
 import { IoCloseCircle } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
+import ViewOrganCoordinationModal from "./ViewOrganCoordinationModal";
+import EditOrganCoordinationModal from "./EditOrganCoordinationModal";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import api from "../../../api/axios";
 
 export default function AfterDeathPledges({ afterDeathPledges = [], metricsData, loading = false, error = "", onRefresh }) {
     const [searchTerm, setSearchTerm] = useState("");
@@ -14,6 +18,11 @@ export default function AfterDeathPledges({ afterDeathPledges = [], metricsData,
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
     const [viewingPhoto, setViewingPhoto] = useState(null);
+    const [viewingPledge, setViewingPledge] = useState(null);
+    const [editingPledge, setEditingPledge] = useState(null);
+    const [deletingPledge, setDeletingPledge] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     useEffect(() => {
         setCurrentPage(1);
@@ -275,13 +284,28 @@ export default function AfterDeathPledges({ afterDeathPledges = [], metricsData,
                                 {/* Actions */}
                                 <td className="col-actions">
                                     <div className="row-actions">
-                                        <button className="icon-btn text-blue-800" title="View Details">
+                                        <button
+                                            className="icon-btn text-blue-800"
+                                            title="View Details"
+                                            onClick={() => setViewingPledge(pledge)}
+                                        >
                                             <FiEye />
                                         </button>
-                                        <button className="icon-btn text-green-600" title="Edit">
+                                        <button
+                                            className="icon-btn text-green-600"
+                                            title="Edit"
+                                            onClick={() => setEditingPledge(pledge)}
+                                        >
                                             <FiEdit />
                                         </button>
-                                        <button className="icon-btn text-red-500" title="Cancel Pledge">
+                                        <button
+                                            className="icon-btn text-red-500"
+                                            title="Delete"
+                                            onClick={() => {
+                                                setDeleteError("");
+                                                setDeletingPledge(pledge);
+                                            }}
+                                        >
                                             <RiDeleteBin6Line />
                                         </button>
                                     </div>
@@ -390,6 +414,48 @@ export default function AfterDeathPledges({ afterDeathPledges = [], metricsData,
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* View Details Modal */}
+            {viewingPledge && (
+                <ViewOrganCoordinationModal
+                    mode="after-death"
+                    code={viewingPledge?.id}
+                    data={viewingPledge}
+                    onClose={() => setViewingPledge(null)}
+                />
+            )}
+
+            {editingPledge && (
+                <EditOrganCoordinationModal
+                    mode="after-death"
+                    code={editingPledge?.id}
+                    onClose={() => setEditingPledge(null)}
+                    onSaved={() => onRefresh?.()}
+                />
+            )}
+
+            {deletingPledge && (
+                <ConfirmDeleteModal
+                    title="Delete After-Death Pledge"
+                    description={`Delete pledge ${deletingPledge.id}? This cannot be undone.`}
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={() => setDeletingPledge(null)}
+                    onConfirm={async () => {
+                        setDeleteLoading(true);
+                        setDeleteError("");
+                        try {
+                            await api.delete(`/api/admin/dashboard/after-death-pledges/${deletingPledge.id}`);
+                            setDeletingPledge(null);
+                            onRefresh?.();
+                        } catch (e) {
+                            setDeleteError(e.response?.data?.message || "Failed to delete pledge");
+                        } finally {
+                            setDeleteLoading(false);
+                        }
+                    }}
+                />
             )}
         </section>
     );

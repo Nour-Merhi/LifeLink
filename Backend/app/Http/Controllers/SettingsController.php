@@ -179,7 +179,7 @@ class SettingsController extends Controller
                 'middle_name' => 'nullable|string|max:100',
                 'last_name' => 'sometimes|string|max:100',
                 'email' => 'sometimes|email|unique:users,email,' . $user->id,
-                'phone_nb' => 'sometimes|string|max:30|unique:users,phone_nb,' . $user->id,
+                'phone_nb' => 'nullable|string|max:30|unique:users,phone_nb,' . $user->id,
                 'city' => 'nullable|string|max:100',
                 'address' => 'nullable|string',
                 'profile_picture' => ['nullable', function ($attribute, $value, $fail) {
@@ -213,7 +213,7 @@ class SettingsController extends Controller
             if (isset($validated['middle_name'])) $userUpdates['middle_name'] = $validated['middle_name'];
             if (isset($validated['last_name'])) $userUpdates['last_name'] = $validated['last_name'];
             if (isset($validated['email'])) $userUpdates['email'] = $validated['email'];
-            if (isset($validated['phone_nb'])) $userUpdates['phone_nb'] = $validated['phone_nb'];
+            if (array_key_exists('phone_nb', $validated)) $userUpdates['phone_nb'] = $validated['phone_nb'] ?: null;
             if (isset($validated['city'])) $userUpdates['city'] = $validated['city'];
             if (isset($validated['address'])) $userUpdates['address'] = $validated['address'];
             // Handle profile picture - set to null if empty string, otherwise use the value

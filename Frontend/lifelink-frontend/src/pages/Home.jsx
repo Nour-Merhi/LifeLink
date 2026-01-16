@@ -10,10 +10,12 @@ import RegisteredHospitals from "../components/home/RegisteredHospitals";
 import QuestionSection from "../components/home/QuestionSection";
 import GameSection from "../components/home/GameSection";
 import BloodHeroes from "../components/home/BloodHeroes";
+import GlobalDonationStats from "../components/home/GlobalDonationStats";
 
 import bloodIllustration from "../assets/illustrations/blood_home.svg";
 import humanBodyIllustration from "../assets/imgs/HumanBodySvg/HumanBody.svg";
 import "../styles/HumanBodySection.css";
+import "../styles/HomeStats.css";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -98,13 +100,16 @@ export default function Home() {
         </div>
       </section>
 
+      {/*=================GLOBAL STATS ================= */}
+      <GlobalDonationStats />
+
       {/*=================TOP Blood Donors ================= */}
       <section className="mt-12 min-h-screen">
       <div className="text-center">
-       <h2 className="text-[48px] font-bold  mb-2">
+       <h2 className="text-[34px] font-extrabold  mb-2">
           Top Donor Players
         </h2>
-        <p className="max-w-3xl mx-auto text-gray-600">
+        <p className="max-w-3xl mx-auto text-gray-600 text-sm">
             Honoring our champions who make a difference through their learning process and inspire others to learn
         </p>
       </div>

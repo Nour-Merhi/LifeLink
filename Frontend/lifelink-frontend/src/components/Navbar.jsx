@@ -5,10 +5,12 @@ import lifelink_logo from "../assets/imgs/Logo.png";
 import profile from "../assets/imgs/profile.svg";
 import ProfileDropdown from "./ProfileDropdown";
 import AdminProfileDropdown from "./adminDashboard/AdminProfileDropdown";
+import { useSystemSettings } from "../context/SystemSettingsContext";
 
 export default function Navbar({ handleContactUsClick }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { systemLogo, platformName } = useSystemSettings();
 
   const handleLogout = async () => {
     try {
@@ -39,7 +41,11 @@ export default function Navbar({ handleContactUsClick }) {
     <nav className="px-6 py-4 flex items-center justify-between relative z-50 quiz-navbar">
       {/* Logo */}
       <Link to="/home" className="flex items-center gap-2">
-          <img src={lifelink_logo} alt="LifeLink Logo" className="h-10 w-auto cursor-pointer" />
+          <img
+            src={systemLogo || lifelink_logo}
+            alt={`${platformName || "LifeLink"} Logo`}
+            className="h-10 w-auto cursor-pointer"
+          />
       </Link>
 
       {/* Navigation Links */}

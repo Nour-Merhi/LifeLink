@@ -51,7 +51,7 @@ export default function AdminProfileDropdown() {
     {
       label: "Settings",
       icon: <IoSettings />,
-      path: "/admin/settings",
+      path: "/admin/platform-settings",
     },
   ];
 

@@ -49,11 +49,14 @@ import UrgentRequests from "./components/HospitalDashboard/UrgentRequests.jsx";
 import HomeVisits from "./components/HospitalDashboard/HomeVisits.jsx";
 import Phlebotomists from "./components/HospitalDashboard/Phlebotomists.jsx";
 import OrganCoordination from "./components/HospitalDashboard/OrganCoordination.jsx";
+import OrganCoordinationLiving from "./components/HospitalDashboard/OrganCoordinationLiving.jsx";
+import OrganCoordinationAfterDeath from "./components/HospitalDashboard/OrganCoordinationAfterDeath.jsx";
 import Inventory from "./components/HospitalDashboard/Inventory.jsx";
 import AnalyticsReports from "./components/HospitalDashboard/AnalyticsReports.jsx";
 import NotificationsCenter from "./components/HospitalDashboard/NotificationsCenter.jsx";
 import HospitalSettings from "./components/HospitalDashboard/HospitalSettings.jsx";
 import HospitalApp from "./components/HospitalDashboard/HospitalApp.jsx";
+import { Navigate } from "react-router-dom";
 
 /* Donor Dashboard layout */
 import DonorDashboard from "./pages/Dashboards/DonorDashboard";
@@ -166,7 +169,9 @@ function App() {
           <Route path="urgent-requests" element={<UrgentRequests />} />
           <Route path="home-visits" element={<HomeVisits />} />
           <Route path="phlebotomists" element={<Phlebotomists />} />
-          <Route path="organ-coordination" element={<OrganCoordination />} />
+          <Route path="organ-coordination" element={<Navigate to="/hospital/organ-coordination/living-donors" replace />} />
+          <Route path="organ-coordination/living-donors" element={<OrganCoordinationLiving />} />
+          <Route path="organ-coordination/after-death-pledges" element={<OrganCoordinationAfterDeath />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="analytics" element={<AnalyticsReports />} />
           <Route path="notifications" element={<NotificationsCenter />} />

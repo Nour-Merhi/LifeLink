@@ -38,111 +38,150 @@ export default function ViewTransactionModal({ onClose, transactionId }) {
         return method;
     };
 
+    const statusLabel = (status) => {
+        const s = (status || '').toLowerCase();
+        if (!s) return 'Pending';
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    const statusBadgeClass = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'completed') return 'badge-success';
+        if (s === 'pending') return 'badge-pending';
+        return 'badge-danger';
+    };
+
+    const money = (v) => {
+        const n = Number(v);
+        if (Number.isNaN(n)) return '$0';
+        return `$${n.toLocaleString()}`;
+    };
+
     return (
-        <div className="modal-overlay modal-overlay-edit" onClick={onClose}>
-            <div className="modal-container modal-container-edit" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-title">
-                    <h2>Transaction Details</h2>
-                    <button onClick={onClose}>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-container modal-modern" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="modal-modern-header">
+                    <div className="modal-modern-title">
+                        <h2>Transaction</h2>
+                        <div className="modal-modern-subtitle">
+                            <span>Transaction: {transactionId || transactionData?.code || transactionData?.id || 'N/A'}</span>
+                            {transactionData?.status && (
+                                <span className={`badge ${statusBadgeClass(transactionData.status)}`}>
+                                    {statusLabel(transactionData.status)}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <button className="modal-icon-btn" onClick={onClose} aria-label="Close">
                         <IoClose />
                     </button>
                 </div>
-                <div className="modal-form">
+
+                <div className="modal-modern-body">
                     {loading ? (
                         <div className="loader">
                             <SpinnerDotted size={60} thickness={125} speed={100} color="#f01010ff" />
                             <h3>Loading Transaction Details...</h3>
                         </div>
                     ) : error ? (
-                        <div className="error-message modal-error-container">
-                            {error}
-                        </div>
+                        <div className="error-message modal-error-container">{error}</div>
                     ) : transactionData ? (
-                        <div className="edit-modal-description">
-                            <div className="info-text" style={{ marginBottom: '20px' }}>
-                                <h3 style={{ marginBottom: '15px', color: '#2349C2' }}>Transaction Information</h3>
-                                
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Transaction ID:</strong>
-                                        <p>{transactionData.code || transactionData.id}</p>
+                        <>
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">
+                                    Transaction Information
+                                    <span className="muted">{transactionData.created_at ? new Date(transactionData.created_at).toLocaleDateString() : 'N/A'}</span>
+                                </h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Transaction ID</span>
+                                        <span className="value">{transactionData.code || transactionData.id || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Status:</strong>
-                                        <p>
-                                            <span className={`badge ${
-                                                transactionData.status === "completed" ? "badge-success" : 
-                                                transactionData.status === "pending" ? "badge-pending" : 
-                                                "badge-danger"
-                                            }`}>
-                                                {transactionData.status?.charAt(0).toUpperCase() + transactionData.status?.slice(1) || "Pending"}
+                                    <div className="modal-field">
+                                        <span className="label">Status</span>
+                                        <span className="value">
+                                            <span className={`badge ${statusBadgeClass(transactionData.status)}`}>
+                                                {statusLabel(transactionData.status)}
                                             </span>
-                                        </p>
+                                        </span>
                                     </div>
-                                    <div>
-                                        <strong>Amount:</strong>
-                                        <p>${parseFloat(transactionData.donation_amount || transactionData.amount || 0).toLocaleString()}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Amount</span>
+                                        <span className="value">{money(transactionData.donation_amount || transactionData.amount || 0)}</span>
                                     </div>
-                                    <div>
-                                        <strong>Payment Method:</strong>
-                                        <p>{formatPaymentMethod(transactionData.payment_method)}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Payment Method</span>
+                                        <span className="value">{formatPaymentMethod(transactionData.payment_method) || 'N/A'}</span>
                                     </div>
-                                    <div>
-                                        <strong>Donation Type:</strong>
-                                        <p>{transactionData.donation_type === 'one time' ? 'One Time' : 'Monthly'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Donation Type</span>
+                                        <span className="value">{transactionData.donation_type === 'one time' ? 'One Time' : (transactionData.donation_type ? 'Monthly' : 'N/A')}</span>
                                     </div>
-                                    <div>
-                                        <strong>Date:</strong>
-                                        <p>{transactionData.created_at ? new Date(transactionData.created_at).toLocaleDateString() : 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#2349C2' }}>Donor Information</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Name:</strong>
-                                        <p>{transactionData.name || (transactionData.donor?.user ? `${transactionData.donor.user.first_name || ''} ${transactionData.donor.user.last_name || ''}`.trim() : 'Anonymous')}</p>
-                                    </div>
-                                    <div>
-                                        <strong>Email:</strong>
-                                        <p>{transactionData.email || transactionData.donor?.user?.email || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <strong>Phone:</strong>
-                                        <p>{transactionData.phone || transactionData.donor?.user?.phone_nb || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <strong>Address:</strong>
-                                        <p>{transactionData.address || 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#2349C2' }}>Beneficiary Information</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <strong>Recipient:</strong>
-                                        <p>{transactionData.patientCase ? transactionData.patientCase.full_name : 'General Patient Fund'}</p>
-                                    </div>
-                                    {transactionData.patientCase && (
-                                        <>
-                                            <div>
-                                                <strong>Hospital:</strong>
-                                                <p>{transactionData.patientCase.hospital?.name || transactionData.patientCase.hospital_name || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <strong>Case Title:</strong>
-                                                <p>{transactionData.patientCase.case_title || 'N/A'}</p>
-                                            </div>
-                                        </>
-                                    )}
-                                    <div>
-                                        <strong>Preference:</strong>
-                                        <p>{transactionData.preference === 'anonymous' ? 'Anonymous' : transactionData.preference === 'stay_updated' ? 'Stay Updated' : 'N/A'}</p>
+                                    <div className="modal-field">
+                                        <span className="label">Preference</span>
+                                        <span className="value">{transactionData.preference === 'anonymous' ? 'Anonymous' : transactionData.preference === 'stay_updated' ? 'Stay Updated' : 'N/A'}</span>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ) : null}
+
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Donor</h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Name</span>
+                                        <span className="value">
+                                            {transactionData.name ||
+                                                (transactionData.donor?.user
+                                                    ? `${transactionData.donor.user.first_name || ''} ${transactionData.donor.user.last_name || ''}`.trim()
+                                                    : 'Anonymous')}
+                                        </span>
+                                    </div>
+                                    <div className="modal-field">
+                                        <span className="label">Email</span>
+                                        <span className="value">{transactionData.email || transactionData.donor?.user?.email || 'N/A'}</span>
+                                    </div>
+                                    <div className="modal-field">
+                                        <span className="label">Phone</span>
+                                        <span className="value">{transactionData.phone || transactionData.donor?.user?.phone_nb || 'N/A'}</span>
+                                    </div>
+                                    <div className="modal-field">
+                                        <span className="label">Address</span>
+                                        <span className="value">{transactionData.address || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-section">
+                                <h3 className="modal-section-title">Beneficiary</h3>
+                                <div className="modal-grid">
+                                    <div className="modal-field">
+                                        <span className="label">Recipient</span>
+                                        <span className="value">{transactionData.patientCase ? transactionData.patientCase.full_name : 'General Patient Fund'}</span>
+                                    </div>
+                                    {transactionData.patientCase && (
+                                        <>
+                                            <div className="modal-field">
+                                                <span className="label">Hospital</span>
+                                                <span className="value">{transactionData.patientCase.hospital?.name || transactionData.patientCase.hospital_name || 'N/A'}</span>
+                                            </div>
+                                            <div className="modal-field">
+                                                <span className="label">Case Title</span>
+                                                <span className="value">{transactionData.patientCase.case_title || 'N/A'}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="error-message modal-error-container">No transaction data available</div>
+                    )}
+                </div>
+
+                <div className="modal-modern-footer">
+                    <button type="button" onClick={onClose} className="btn-cancel">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>

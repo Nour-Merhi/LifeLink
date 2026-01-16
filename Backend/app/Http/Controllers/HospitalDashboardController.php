@@ -19,6 +19,423 @@ use Carbon\Carbon;
 
 class HospitalDashboardController extends Controller
 {
+    private function resolveHospitalId(Request $request, $hospitalId = null)
+    {
+        $hospitalId = $hospitalId ?? $request->input('hospital_id');
+
+        if (!$hospitalId && $request->user()) {
+            $user = $request->user();
+            $role = strtolower((string)($user->role ?? ''));
+            if ($role === 'manager' && $user->healthCenterManager) {
+                $hospitalId = $user->healthCenterManager->hospital_id;
+            }
+        }
+
+        return $hospitalId;
+    }
+
+    /**
+     * Living donors (hospital-scoped) for Organ Coordination page.
+     */
+    public function getLivingDonors(Request $request)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['message' => 'Hospital not found'], 404);
+            }
+
+            $livingDonors = LivingDonor::where('hospital_id', $hospitalId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $data = $livingDonors->map(function ($donor) use ($hospital) {
+                return [
+                    'id' => $donor->code,
+                    'full_name' => $donor->full_name,
+                    'email' => $donor->email,
+                    'phone_nb' => $donor->phone_nb,
+                    'blood_type' => $donor->blood_type,
+                    'age' => $donor->age,
+                    'gender' => $donor->gender,
+                    'address' => $donor->address,
+                    'organ' => $donor->organ,
+                    'donation_type' => $donor->donation_type,
+                    'medical_status' => $donor->medical_status,
+                    'ethics_status' => $donor->ethics_status,
+                    'hospital_selection' => $donor->hospital_selection,
+                    'hospital_id' => $donor->hospital_id,
+                    'hospital_name' => $hospital->name,
+                    'recipient_full_name' => $donor->recipient_full_name,
+                    'recipient_age' => $donor->recipient_age,
+                    'recipient_contact' => $donor->recipient_contact,
+                    'recipient_contact_type' => $donor->recipient_contact_type,
+                    'recipient_blood_type' => $donor->recipient_blood_type,
+                    'medical_conditions' => $donor->medical_conditions ?? [],
+                    'created_at' => $donor->created_at ? $donor->created_at->format('Y-m-d') : null,
+                ];
+            });
+
+            return response()->json([
+                'hospital' => ['id' => $hospital->id, 'name' => $hospital->name],
+                'living_donors' => $data,
+                'total' => $data->count(),
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital living donors:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'living_donors' => [],
+                'total' => 0,
+                'message' => 'Failed to fetch living donors'
+            ], 500);
+        }
+    }
+
+    /**
+     * After-death pledges (hospital-scoped) for Organ Coordination page.
+     */
+    public function getAfterDeathPledges(Request $request)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['message' => 'Hospital not found'], 404);
+            }
+
+            $pledges = AfterDeathPledge::where('hospital_id', $hospitalId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $data = $pledges->map(function ($pledge) use ($hospital) {
+                return [
+                    'id' => $pledge->code,
+                    'full_name' => $pledge->full_name,
+                    'email' => $pledge->email,
+                    'phone_nb' => $pledge->phone_nb,
+                    'blood_type' => $pledge->blood_type,
+                    'age' => $pledge->age,
+                    'gender' => $pledge->gender,
+                    'address' => $pledge->address,
+                    'pledged_organs' => $pledge->pledged_organs ?? [],
+                    'pledged_organs_string' => $pledge->pledged_organs_string,
+                    'status' => $pledge->status,
+                    'hospital_selection' => $pledge->hospital_selection,
+                    'hospital_id' => $pledge->hospital_id,
+                    'hospital_name' => $hospital->name,
+                    'emergency_contact_name' => $pledge->emergency_contact_name,
+                    'emergency_contact_phone' => $pledge->emergency_contact_phone,
+                    'marital_status' => $pledge->marital_status,
+                    'education_level' => $pledge->education_level,
+                    'professional_status' => $pledge->professional_status,
+                    'work_type' => $pledge->work_type,
+                    'mother_name' => $pledge->mother_name,
+                    'spouse_name' => $pledge->spouse_name,
+                    'id_photo' => $pledge->id_photo_path ? asset('storage/' . $pledge->id_photo_path) : null,
+                    'father_id_photo' => $pledge->father_id_photo_path ? asset('storage/' . $pledge->father_id_photo_path) : null,
+                    'mother_id_photo' => $pledge->mother_id_photo_path ? asset('storage/' . $pledge->mother_id_photo_path) : null,
+                    'created_at' => $pledge->created_at ? $pledge->created_at->format('Y-m-d') : null,
+                ];
+            });
+
+            return response()->json([
+                'hospital' => ['id' => $hospital->id, 'name' => $hospital->name],
+                'after_death_pledges' => $data,
+                'total' => $data->count(),
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital after-death pledges:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'after_death_pledges' => [],
+                'total' => 0,
+                'message' => 'Failed to fetch after-death pledges'
+            ], 500);
+        }
+    }
+
+    /**
+     * Show living donor details (hospital-scoped) for view modal.
+     */
+    public function showLivingDonor(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            $user = $request->user();
+            $managerName = null;
+            if ($user) {
+                $nameParts = array_filter([$user->first_name ?? null, $user->middle_name ?? null, $user->last_name ?? null]);
+                $managerName = $nameParts ? implode(' ', $nameParts) : null;
+            }
+
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+            if ((int)$donor->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            return response()->json([
+                'living_donor' => [
+                    'code' => $donor->code,
+                    'full_name' => $donor->full_name,
+                    'first_name' => $donor->first_name,
+                    'middle_name' => $donor->middle_name,
+                    'last_name' => $donor->last_name,
+                    'email' => $donor->email,
+                    'phone_nb' => $donor->phone_nb,
+                    'address' => $donor->address,
+                    'date_of_birth' => $donor->date_of_birth,
+                    'age' => $donor->age ?? ($donor->date_of_birth ? Carbon::parse($donor->date_of_birth)->age : null),
+                    'gender' => $donor->gender,
+                    'blood_type' => $donor->blood_type,
+                    'organ' => $donor->organ,
+                    'donation_type' => $donor->donation_type,
+                    'medical_conditions' => $donor->medical_conditions,
+                    'medical_status' => $donor->medical_status,
+                    'ethics_status' => $donor->ethics_status,
+                    'agree_interest' => $donor->agree_interest,
+                    'hospital_selection' => $donor->hospital_selection,
+                    'hospital_id' => $donor->hospital_id,
+                    'hospital_name' => $hospital ? $hospital->name : null,
+                    'manager_name' => $managerName,
+                    'recipient_full_name' => $donor->recipient_full_name,
+                    'recipient_age' => $donor->recipient_age,
+                    'recipient_contact' => $donor->recipient_contact,
+                    'recipient_contact_type' => $donor->recipient_contact_type,
+                    'recipient_blood_type' => $donor->recipient_blood_type,
+                    'id_picture' => $donor->id_picture ? asset('storage/' . $donor->id_picture) : null,
+                    'created_at' => $donor->created_at,
+                    'updated_at' => $donor->updated_at,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor not found'], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error showing hospital living donor:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to fetch living donor details'], 500);
+        }
+    }
+
+    /**
+     * Show after-death pledge details (hospital-scoped) for view modal.
+     */
+    public function showAfterDeathPledge(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            $user = $request->user();
+            $managerName = null;
+            if ($user) {
+                $nameParts = array_filter([$user->first_name ?? null, $user->middle_name ?? null, $user->last_name ?? null]);
+                $managerName = $nameParts ? implode(' ', $nameParts) : null;
+            }
+
+            $pledge = AfterDeathPledge::where('code', $code)->firstOrFail();
+            if ((int)$pledge->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            return response()->json([
+                'after_death_pledge' => [
+                    'code' => $pledge->code,
+                    'full_name' => $pledge->full_name,
+                    'first_name' => $pledge->first_name,
+                    'middle_name' => $pledge->middle_name,
+                    'last_name' => $pledge->last_name,
+                    'email' => $pledge->email,
+                    'phone_nb' => $pledge->phone_nb,
+                    'address' => $pledge->address,
+                    'age' => $pledge->age,
+                    'gender' => $pledge->gender,
+                    'blood_type' => $pledge->blood_type,
+                    'pledged_organs' => $pledge->pledged_organs,
+                    'pledged_organs_string' => $pledge->pledged_organs_string,
+                    'emergency_contact_name' => $pledge->emergency_contact_name,
+                    'emergency_contact_phone' => $pledge->emergency_contact_phone,
+                    'mother_name' => $pledge->mother_name,
+                    'spouse_name' => $pledge->spouse_name,
+                    'marital_status' => $pledge->marital_status,
+                    'education_level' => $pledge->education_level,
+                    'professional_status' => $pledge->professional_status,
+                    'work_type' => $pledge->work_type,
+                    'hospital_selection' => $pledge->hospital_selection,
+                    'hospital_id' => $pledge->hospital_id,
+                    'hospital_name' => $hospital ? $hospital->name : null,
+                    'manager_name' => $managerName,
+                    'status' => $pledge->status,
+                    'id_photo' => $pledge->id_photo_path ? asset('storage/' . $pledge->id_photo_path) : null,
+                    'father_id_photo' => $pledge->father_id_photo_path ? asset('storage/' . $pledge->father_id_photo_path) : null,
+                    'mother_id_photo' => $pledge->mother_id_photo_path ? asset('storage/' . $pledge->mother_id_photo_path) : null,
+                    'created_at' => $pledge->created_at,
+                    'updated_at' => $pledge->updated_at,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'After-death pledge not found'], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error showing hospital after-death pledge:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to fetch pledge details'], 500);
+        }
+    }
+
+    /**
+     * Update living donor (hospital-scoped).
+     */
+    public function updateLivingDonor(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+            if ((int)$donor->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $validated = $request->validate([
+                'medical_status' => 'nullable|in:not_started,in_progress,cleared,rejected',
+                'ethics_status' => 'nullable|in:pending,approved,rejected,N/A',
+            ]);
+
+            $donor->fill($validated);
+            $donor->save();
+
+            return response()->json([
+                'message' => 'Living donor updated',
+                'living_donor' => $donor->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating hospital living donor:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to update living donor'], 500);
+        }
+    }
+
+    /**
+     * Delete living donor (hospital-scoped).
+     */
+    public function deleteLivingDonor(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+            if ((int)$donor->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $donor->delete();
+
+            return response()->json(['message' => 'Living donor deleted'], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor not found'], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting hospital living donor:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to delete living donor'], 500);
+        }
+    }
+
+    /**
+     * Update after-death pledge (hospital-scoped).
+     */
+    public function updateAfterDeathPledge(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $pledge = AfterDeathPledge::where('code', $code)->firstOrFail();
+            if ((int)$pledge->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $validated = $request->validate([
+                'status' => 'nullable|in:active,cancelled',
+                'email' => 'nullable|email|max:255',
+                'phone_nb' => 'nullable|string|max:50',
+                'emergency_contact_name' => 'nullable|string|max:255',
+                'emergency_contact_phone' => 'nullable|string|max:50',
+                'pledged_organs' => 'nullable|array|min:1',
+                'pledged_organs.*' => 'in:all-organs,heart,corneas,liver,skin,kidneys,bones,lungs,valves,pancrease,tendons,intestines,blood-vessels,blood-vesseles',
+            ]);
+
+            $pledge->fill($validated);
+            $pledge->save();
+
+            return response()->json([
+                'message' => 'After-death pledge updated',
+                'after_death_pledge' => $pledge->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'After-death pledge not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating hospital after-death pledge:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to update after-death pledge'], 500);
+        }
+    }
+
+    /**
+     * Delete after-death pledge (hospital-scoped).
+     */
+    public function deleteAfterDeathPledge(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $pledge = AfterDeathPledge::where('code', $code)->firstOrFail();
+            if ((int)$pledge->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $pledge->delete();
+
+            return response()->json(['message' => 'After-death pledge deleted'], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'After-death pledge not found'], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting hospital after-death pledge:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to delete after-death pledge'], 500);
+        }
+    }
+
     /**
      * Get dashboard overview for a specific hospital
      * Returns comprehensive dashboard data including metrics, appointments, and events
@@ -28,15 +445,7 @@ class HospitalDashboardController extends Controller
         try {
             // TODO: Get hospital ID from authenticated user's hospital relationship
             // For now, get hospital from request parameter or input
-            $hospitalId = $hospitalId ?? $request->input('hospital_id');
-            
-            // If no hospital ID provided, try to get from authenticated user
-            if (!$hospitalId && $request->user()) {
-                $user = $request->user();
-                if ($user->role === 'manager' && $user->healthCenterManager) {
-                    $hospitalId = $user->healthCenterManager->hospital_id;
-                }
-            }
+            $hospitalId = $this->resolveHospitalId($request, $hospitalId);
             
             if (!$hospitalId) {
                 return response()->json([

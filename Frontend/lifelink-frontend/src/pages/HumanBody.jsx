@@ -11,7 +11,7 @@ export default function HumanBody() {
 
 
     return (
-        <div className="w-[320px] mx-auto">
+        <div className=" mx-auto linear-gray">
             {/* Inline SVG so <g id="..."> is targetable from CSS */}
             <div
                 className="w-full organ-map"

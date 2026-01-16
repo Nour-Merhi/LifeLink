@@ -338,7 +338,7 @@ export default function AliveOragnForm(){
 
                 setSuccess(true);
                 setTimeout(() => {
-                    navigate("/donation");
+                    navigate("/donation/alive-organ-donation");
                 }, 2000);
             } else {
                 // Prepare submission data without file
@@ -531,6 +531,7 @@ export default function AliveOragnForm(){
                                             style={{  
                                                 padding: '12px'   
                                             }}
+                                            required
                                         />
                                         <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
                                             Upload a clear picture of your ID (Max 5MB, JPEG/PNG/WebP)
@@ -905,8 +906,8 @@ export default function AliveOragnForm(){
                                     required 
                                 />
                                 <div>
-                                    <h3 className="text-bold">I understand this is an expression of interest only. Final approval is done by hospital doctors and legal authorities.</h3>
-                                    <h3 className="text-bold">By checking this box, I consent to being contacted by partner hospitals for further evaluation.</h3>
+                                    <h3 className="!font-semibold">I understand this is an expression of interest only. Final approval is done by hospital doctors and legal authorities.</h3>
+                                    <h3 className="!font-semibold">By checking this box, I consent to being contacted by partner hospitals for further evaluation.</h3>
                                 </div>
                                 </label>
                             </div>

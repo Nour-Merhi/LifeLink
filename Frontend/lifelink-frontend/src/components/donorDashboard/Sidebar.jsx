@@ -8,9 +8,11 @@ import { IoCalendar, IoHeart, IoGift, IoSettings } from "react-icons/io5";
 
 import { NavLink, useNavigate } from "react-router-dom";
 import api from "../../api/axios";
+import { useSystemSettings } from "../../context/SystemSettingsContext";
 
 export default function Sidebar(){
     const navigate = useNavigate();
+    const { systemLogo, platformName } = useSystemSettings();
 
     const handleLogout = async () => {
         try {
@@ -29,8 +31,8 @@ export default function Sidebar(){
     return (
         <>
         <div className="sidebar layout admin-sidebar ">
-            <button onClick={() => navigate("/home")} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }} className="ml-[-52px]">
-                <img src={lifelinkLogoBlack} alt="lifelink logo" />
+            <button onClick={() => navigate("/home")} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                <img src={systemLogo || lifelinkLogoBlack} alt={`${platformName || "LifeLink"} logo`} />
             </button>
 
             <div className="links">

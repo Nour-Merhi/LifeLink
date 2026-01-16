@@ -6,6 +6,7 @@ use App\Models\SystemSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\QueryException;
 
 class AdminSettingsController extends Controller
 {
@@ -23,7 +24,16 @@ class AdminSettingsController extends Controller
                 ], 403);
             }
 
-            $settings = SystemSettings::getSettings();
+            try {
+                $settings = SystemSettings::getSettings();
+            } catch (QueryException $qe) {
+                // Common local-dev issue: migrations not run / table missing
+                return response()->json([
+                    'message' => 'System settings storage is not available. Please run database migrations.',
+                    'hint' => 'Run: php artisan migrate',
+                    'error' => config('app.debug') ? $qe->getMessage() : null,
+                ], 503);
+            }
 
             // Format response to match frontend expectations
             return response()->json([
@@ -73,7 +83,8 @@ class AdminSettingsController extends Controller
                 ], 403);
             }
 
-            $validated = $request->validate([
+            try {
+                $validated = $request->validate([
                 'platform_name' => 'required|string|max:100',
                 'system_logo' => ['nullable', function ($attribute, $value, $fail) {
                     if ($value && !is_string($value)) {
@@ -99,7 +110,14 @@ class AdminSettingsController extends Controller
                 'contact_phone' => 'nullable|string|max:30',
                 'default_language' => 'required|string|in:en,ar,fr',
                 'timezone' => 'required|string|max:100',
-            ]);
+                ]);
+            } catch (QueryException $qe) {
+                return response()->json([
+                    'message' => 'System settings storage is not available. Please run database migrations.',
+                    'hint' => 'Run: php artisan migrate',
+                    'error' => config('app.debug') ? $qe->getMessage() : null,
+                ], 503);
+            }
 
             // Update settings
             $updateData = [
@@ -115,7 +133,15 @@ class AdminSettingsController extends Controller
                 $updateData['system_logo'] = $validated['system_logo'] ?: null;
             }
 
-            $settings = SystemSettings::updateSettings($updateData);
+            try {
+                $settings = SystemSettings::updateSettings($updateData);
+            } catch (QueryException $qe) {
+                return response()->json([
+                    'message' => 'System settings storage is not available. Please run database migrations.',
+                    'hint' => 'Run: php artisan migrate',
+                    'error' => config('app.debug') ? $qe->getMessage() : null,
+                ], 503);
+            }
 
             return response()->json([
                 'message' => 'General settings updated successfully',
@@ -163,19 +189,27 @@ class AdminSettingsController extends Controller
                 ], 403);
             }
 
-            $validated = $request->validate([
+            try {
+                $validated = $request->validate([
                 'min_days_between_donations' => 'required|integer|min:1|max:365',
                 'allowed_blood_types' => 'required|array|min:1',
                 'allowed_blood_types.*' => 'required|string|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
                 'emergency_request_expiry' => 'required|string|in:6h,12h,24h,48h',
-                'donor_age_min' => 'required|integer|min:18|max:100',
-                'donor_age_max' => 'required|integer|min:18|max:100',
+                'donor_age_min' => 'required|integer|min:16|max:100',
+                'donor_age_max' => 'required|integer|min:16|max:100',
             ], [
                 'allowed_blood_types.required' => 'At least one blood type must be selected.',
                 'allowed_blood_types.min' => 'At least one blood type must be selected.',
                 'donor_age_min.max' => 'Minimum age must be less than maximum age.',
                 'donor_age_max.min' => 'Maximum age must be greater than minimum age.',
-            ]);
+                ]);
+            } catch (QueryException $qe) {
+                return response()->json([
+                    'message' => 'System settings storage is not available. Please run database migrations.',
+                    'hint' => 'Run: php artisan migrate',
+                    'error' => config('app.debug') ? $qe->getMessage() : null,
+                ], 503);
+            }
 
             // Additional validation: min age must be less than max age
             if ($validated['donor_age_min'] >= $validated['donor_age_max']) {
@@ -197,7 +231,15 @@ class AdminSettingsController extends Controller
                 'donor_age_max' => $validated['donor_age_max'],
             ];
 
-            $settings = SystemSettings::updateSettings($updateData);
+            try {
+                $settings = SystemSettings::updateSettings($updateData);
+            } catch (QueryException $qe) {
+                return response()->json([
+                    'message' => 'System settings storage is not available. Please run database migrations.',
+                    'hint' => 'Run: php artisan migrate',
+                    'error' => config('app.debug') ? $qe->getMessage() : null,
+                ], 503);
+            }
 
             return response()->json([
                 'message' => 'Medical settings updated successfully',
