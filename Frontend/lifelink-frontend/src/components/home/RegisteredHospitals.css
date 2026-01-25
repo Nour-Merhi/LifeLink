@@ -310,17 +310,17 @@
         padding: 40px 20px;
     }
 
-    .partner-hospitals-grid {
-        grid-template-columns: 1fr;
-        gap: 25px;
-    }
-
     .partner-hospitals-title {
         font-size: 28px;
     }
 
     .partner-hospitals-description {
         font-size: 14px;
+    }
+}
+@media (max-width: 680px) {
+    .partner-hospitals-grid{
+        grid-template-columns: 1fr;
     }
 }
 
@@ -668,6 +668,16 @@
 
     .hospital-detail-services-list {
         grid-template-columns: 1fr;
+    }
+    .partner-hospitals-grid{
+        padding: 0 !important;
+    }
+    .partner-hospitals-footer{
+        margin-top: 0 !important;
+    }
+    .partner-hospitals-find-more-button{
+        padding: 10px 20px !important;
+        font-size: 13px !important;
     }
 }
 

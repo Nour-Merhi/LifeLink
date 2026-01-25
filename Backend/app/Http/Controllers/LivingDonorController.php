@@ -7,6 +7,12 @@ use App\Models\Hospital;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LivingOrganPledgeSubmitted;
+use App\Mail\LivingOrganAppointmentSuggestions;
+use App\Mail\LivingOrganAppointmentCompleted;
+use App\Mail\LivingOrganAppointmentCancelled;
+use App\Mail\LivingOrganMedicalClearedThankYou;
 
 class LivingDonorController extends Controller
 {
@@ -172,6 +178,18 @@ class LivingDonorController extends Controller
             // Create living donor
             $livingDonor = LivingDonor::create($livingDonorData);
 
+            // Step 1: Email donor after registration (thank you + wait for approval)
+            try {
+                if ($livingDonor->email) {
+                    Mail::to($livingDonor->email)->send(new LivingOrganPledgeSubmitted($livingDonor));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ pledge submitted email', [
+                    'living_donor_code' => $livingDonor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Living organ donation pledge submitted successfully.',
                 'living_donor' => $livingDonor
@@ -248,6 +266,8 @@ class LivingDonorController extends Controller
                     'phone_nb' => $donor->phone_nb,
                     'organ' => $donor->organ,
                     'medical_status' => $donor->medical_status,
+                    'appointment_status' => $donor->appointment_status,
+                    'selected_appointment_at' => $donor->selected_appointment_at ? $donor->selected_appointment_at->toISOString() : null,
                     'hospital_name' => $hospitalName,
                     'manager_name' => $managerName,
                     'ethics_status' => $donor->ethics_status,
@@ -324,6 +344,14 @@ class LivingDonorController extends Controller
                     'donation_type' => $donor->donation_type, // directed | non-directed
                     'medical_status' => $donor->medical_status,
                     'ethics_status' => $donor->ethics_status,
+                    'appointment_status' => $donor->appointment_status,
+                    'suggested_appointments' => $donor->suggested_appointments ?? [],
+                    'suggestions_sent_at' => $donor->suggestions_sent_at ? $donor->suggestions_sent_at->toISOString() : null,
+                    'selected_appointment_at' => $donor->selected_appointment_at ? $donor->selected_appointment_at->toISOString() : null,
+                    'selected_at' => $donor->selected_at ? $donor->selected_at->toISOString() : null,
+                    'appointment_completed_at' => $donor->appointment_completed_at ? $donor->appointment_completed_at->toISOString() : null,
+                    'appointment_cancelled_at' => $donor->appointment_cancelled_at ? $donor->appointment_cancelled_at->toISOString() : null,
+                    'appointment_cancel_reason' => $donor->appointment_cancel_reason,
                     'agree_interest' => $donor->agree_interest ?? null,
                     'hospital_selection' => $donor->hospital_selection,
                     'hospital_id' => $donor->hospital_id,
@@ -362,9 +390,13 @@ class LivingDonorController extends Controller
         try {
             $donor = LivingDonor::where('code', $code)->firstOrFail();
 
+            $oldEthics = $donor->ethics_status;
+            $oldAppointmentStatus = $donor->appointment_status;
+            $oldMedical = $donor->medical_status;
+
             $validated = $request->validate([
                 'medical_status' => 'nullable|in:not_started,in_progress,cleared,rejected',
-                'ethics_status' => 'nullable|in:pending,approved,N/A',
+                'ethics_status' => 'nullable|in:pending,approved,rejected,N/A',
                 'hospital_selection' => 'nullable|in:general,specific',
                 'hospital_id' => 'nullable|exists:hospitals,id',
             ]);
@@ -386,7 +418,49 @@ class LivingDonorController extends Controller
             }
 
             $donor->fill($validated);
+
+            // Step 2: If ethics approved, auto-clear medical state and move to scheduling
+            if (array_key_exists('ethics_status', $validated) && $validated['ethics_status'] === 'approved' && $oldEthics !== 'approved') {
+                // "cleared" here means allowed to proceed with appointment scheduling
+                $donor->medical_status = 'cleared';
+                $donor->appointment_status = 'awaiting_scheduling';
+            }
+
+            // If medical/ethics rejected -> cancel workflow (Step 6 email)
+            if (
+                (array_key_exists('ethics_status', $validated) && $validated['ethics_status'] === 'rejected') ||
+                (array_key_exists('medical_status', $validated) && $validated['medical_status'] === 'rejected')
+            ) {
+                $donor->appointment_status = 'cancelled';
+                if (!$donor->appointment_cancelled_at) $donor->appointment_cancelled_at = now();
+                $donor->appointment_cancel_reason = $donor->appointment_cancel_reason ?: 'Case rejected during review.';
+            }
+
             $donor->save();
+
+            // Final thank-you email when medical state becomes cleared
+            try {
+                if ($donor->medical_status === 'cleared' && $oldMedical !== 'cleared' && $donor->email) {
+                    Mail::to($donor->email)->send(new LivingOrganMedicalClearedThankYou($donor));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ medical cleared thank you email (admin update)', [
+                    'living_donor_code' => $donor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // If it got cancelled here, email donor (Step 6)
+            try {
+                if ($donor->appointment_status === 'cancelled' && $oldAppointmentStatus !== 'cancelled' && $donor->email) {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ appointment cancelled email (admin update)', [
+                    'living_donor_code' => $donor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'message' => 'Living donor pledge updated successfully.',
@@ -444,6 +518,135 @@ class LivingDonorController extends Controller
             return response()->json([
                 'message' => 'Failed to delete living donor pledge'
             ], 500);
+        }
+    }
+
+    /**
+     * Step 3: Admin suggests appointment options to the donor and emails them.
+     */
+    public function suggestAppointments(Request $request, string $code)
+    {
+        try {
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+
+            $validated = $request->validate([
+                'suggested_appointments' => 'required|array|min:1|max:10',
+                'suggested_appointments.*' => 'required|string',
+            ]);
+
+            if (($donor->ethics_status ?? '') !== 'approved') {
+                return response()->json(['message' => 'Ethics must be approved before suggesting appointments.'], 422);
+            }
+
+            // Normalize to ISO strings (no strict timezone conversion here; keep what frontend sends)
+            $slots = array_values(array_filter(array_map(function ($s) {
+                $v = trim((string)$s);
+                return $v !== '' ? $v : null;
+            }, $validated['suggested_appointments'])));
+
+            if (count($slots) === 0) {
+                return response()->json(['message' => 'Please provide at least one appointment option.'], 422);
+            }
+
+            $donor->suggested_appointments = $slots;
+            $donor->suggestions_sent_at = now();
+            $donor->appointment_status = 'awaiting_donor_choice';
+            $donor->save();
+
+            $frontend = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+            $dashboardUrl = $frontend . '/donor/my-appointments?focus=living&code=' . urlencode($donor->code);
+
+            try {
+                if ($donor->email) {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentSuggestions($donor, $slots, $dashboardUrl));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ appointment suggestions email', [
+                    'living_donor_code' => $donor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Appointment options saved and email sent to donor.',
+                'living_donor' => $donor->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor pledge not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error suggesting living donor appointments:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to suggest appointments'], 500);
+        }
+    }
+
+    /**
+     * Step 4/5/6: Admin updates appointment status (pending/in_progress/completed/cancelled) and triggers emails.
+     */
+    public function updateAppointmentStatus(Request $request, string $code)
+    {
+        try {
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+            $oldStatus = $donor->appointment_status;
+
+            $validated = $request->validate([
+                'appointment_status' => 'required|in:awaiting_donor_choice,in_progress,completed,cancelled,awaiting_scheduling,awaiting_approval',
+                'cancel_reason' => 'nullable|string|max:255',
+            ]);
+
+            $donor->appointment_status = $validated['appointment_status'];
+
+            if ($validated['appointment_status'] === 'in_progress') {
+                $donor->medical_status = 'in_progress';
+            }
+
+            if ($validated['appointment_status'] === 'completed') {
+                if (!$donor->appointment_completed_at) $donor->appointment_completed_at = now();
+            }
+
+            if ($validated['appointment_status'] === 'cancelled') {
+                if (!$donor->appointment_cancelled_at) $donor->appointment_cancelled_at = now();
+                $donor->appointment_cancel_reason = $validated['cancel_reason'] ?? ($donor->appointment_cancel_reason ?: 'Appointment cancelled.');
+            }
+
+            $donor->save();
+
+            // Step 5: completed email
+            if ($donor->appointment_status === 'completed' && $oldStatus !== 'completed' && $donor->email) {
+                try {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentCompleted($donor));
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to send living organ appointment completed email', [
+                        'living_donor_code' => $donor->code,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Step 6: cancelled email
+            if ($donor->appointment_status === 'cancelled' && $oldStatus !== 'cancelled' && $donor->email) {
+                try {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to send living organ appointment cancelled email', [
+                        'living_donor_code' => $donor->code,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Appointment status updated.',
+                'living_donor' => $donor->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor pledge not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating living donor appointment status:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to update appointment status'], 500);
         }
     }
 }

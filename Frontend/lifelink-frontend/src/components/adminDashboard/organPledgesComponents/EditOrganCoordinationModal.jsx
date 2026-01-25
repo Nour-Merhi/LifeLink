@@ -46,6 +46,12 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [details, setDetails] = useState(null);
+    const [activeTab, setActiveTab] = useState("status");
+    const [suggestedSlots, setSuggestedSlots] = useState(["", "", ""]);
+    const [apptSaving, setApptSaving] = useState(false);
+    const [apptError, setApptError] = useState("");
+    const [apptSuccess, setApptSuccess] = useState("");
+    const [cancelReason, setCancelReason] = useState("");
 
     const [hospitals, setHospitals] = useState([]);
     const [loadingHospitals, setLoadingHospitals] = useState(false);
@@ -143,6 +149,11 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
             emergency_contact_phone: details.emergency_contact_phone || "",
             pledged_organs: normalizeOrgans(details.pledged_organs),
         }));
+
+        if (isLiving) {
+            const existing = Array.isArray(details.suggested_appointments) ? details.suggested_appointments : [];
+            setSuggestedSlots([existing[0] || "", existing[1] || "", existing[2] || ""]);
+        }
     }, [details]);
 
     const onChange = (key, value) => {
@@ -235,6 +246,52 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
         }
     };
 
+    const suggestAppointments = async () => {
+        if (!isLiving) return;
+        setApptSaving(true);
+        setApptError("");
+        setApptSuccess("");
+        try {
+            const payload = {
+                suggested_appointments: suggestedSlots.filter((x) => String(x || "").trim().length > 0),
+            };
+            const url =
+                scope === "hospital"
+                    ? `/api/hospital/dashboard/organ-coordination/living-donors/${code}/appointments/suggestions`
+                    : `/api/admin/dashboard/living-donors/${code}/appointments/suggestions`;
+
+            const res = await api.put(url, payload);
+            setApptSuccess("Appointment options saved and emailed to donor.");
+            setDetails(res.data?.living_donor || res.data?.living_donor || details);
+            onSaved?.(res.data);
+        } catch (e) {
+            setApptError(e.response?.data?.message || "Failed to send appointment options.");
+        } finally {
+            setApptSaving(false);
+        }
+    };
+
+    const updateAppointmentStatus = async (newStatus) => {
+        if (!isLiving) return;
+        setApptSaving(true);
+        setApptError("");
+        setApptSuccess("");
+        try {
+            const url =
+                scope === "hospital"
+                    ? `/api/hospital/dashboard/organ-coordination/living-donors/${code}/appointments/status`
+                    : `/api/admin/dashboard/living-donors/${code}/appointments/status`;
+            const res = await api.put(url, { appointment_status: newStatus, cancel_reason: cancelReason || null });
+            setApptSuccess("Appointment status updated.");
+            setDetails(res.data?.living_donor || details);
+            onSaved?.(res.data);
+        } catch (e) {
+            setApptError(e.response?.data?.message || "Failed to update appointment status.");
+        } finally {
+            setApptSaving(false);
+        }
+    };
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container modal-modern" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
@@ -261,37 +318,144 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                         <div className="error-message modal-error-container">{error}</div>
                     ) : (
                         <>
-                            {isLiving ? (
-                                <div className="modal-section">
-                                    <h3 className="modal-section-title">Workflow Status</h3>
-                                    <div className="modal-grid">
-                                        <div className="modal-field">
-                                            <span className="label">Medical Status</span>
-                                            <select
-                                                className="value"
-                                                value={form.medical_status}
-                                                onChange={(e) => onChange("medical_status", e.target.value)}
-                                            >
-                                                <option value="not_started">Not Started</option>
-                                                <option value="in_progress">In Progress</option>
-                                                <option value="cleared">Cleared</option>
-                                                <option value="rejected">Rejected</option>
-                                            </select>
-                                        </div>
-                                        <div className="modal-field">
-                                            <span className="label">Ethics Status</span>
-                                            <select
-                                                className="value"
-                                                value={form.ethics_status}
-                                                onChange={(e) => onChange("ethics_status", e.target.value)}
-                                            >
-                                                <option value="pending">Pending</option>
-                                                <option value="approved">Approved</option>
-                                                <option value="N/A">N/A</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                            {isLiving && (
+                                <div className="donor-detail-tabs" style={{ marginBottom: 12 }}>
+                                    <button
+                                        type="button"
+                                        className={`tab-btn ${activeTab === "status" ? "active" : ""}`}
+                                        onClick={() => setActiveTab("status")}
+                                    >
+                                        Status
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`tab-btn ${activeTab === "appointments" ? "active" : ""}`}
+                                        onClick={() => setActiveTab("appointments")}
+                                    >
+                                        Appointments
+                                    </button>
                                 </div>
+                            )}
+                            {isLiving ? (
+                                <>
+                                    {activeTab === "status" && (
+                                        <div className="modal-section">
+                                            <h3 className="modal-section-title">Workflow Status</h3>
+                                            <div className="modal-grid">
+                                                <div className="modal-field">
+                                                    <span className="label">Medical Status</span>
+                                                    <select
+                                                        className="value"
+                                                        value={form.medical_status}
+                                                        onChange={(e) => onChange("medical_status", e.target.value)}
+                                                    >
+                                                        <option value="not_started">Not Started</option>
+                                                        <option value="in_progress">In Progress</option>
+                                                        <option value="cleared">Cleared</option>
+                                                        <option value="rejected">Rejected</option>
+                                                    </select>
+                                                </div>
+                                                <div className="modal-field">
+                                                    <span className="label">Ethics Status</span>
+                                                    <select
+                                                        className="value"
+                                                        value={form.ethics_status}
+                                                        onChange={(e) => onChange("ethics_status", e.target.value)}
+                                                    >
+                                                        <option value="pending">Pending</option>
+                                                        <option value="approved">Approved</option>
+                                                        <option value="rejected">Rejected</option>
+                                                        <option value="N/A">N/A</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {form.ethics_status === "approved" && (
+                                                <div className="modal-note" style={{ marginTop: 10 }}>
+                                                    Approved: go to the <b>Appointments</b> tab to suggest date/time options to the donor.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {activeTab === "appointments" && (
+                                        <div className="modal-section">
+                                            <h3 className="modal-section-title">Appointment Scheduling</h3>
+                                            <div className="modal-grid">
+                                                <div className="modal-field full-width">
+                                                    <span className="label">Current appointment status</span>
+                                                    <span className="value">{valueOrNA(details?.appointment_status)}</span>
+                                                </div>
+                                                <div className="modal-field full-width">
+                                                    <span className="label">Selected appointment</span>
+                                                    <span className="value">
+                                                        {details?.selected_appointment_at ? new Date(details.selected_appointment_at).toLocaleString() : "N/A"}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="modal-grid" style={{ marginTop: 10 }}>
+                                                <div className="modal-field full-width">
+                                                    <span className="label">Suggest up to 3 appointment options</span>
+                                                    <div className="value" style={{ display: "grid", gap: 10 }}>
+                                                        {suggestedSlots.map((v, idx) => (
+                                                            <input
+                                                                key={idx}
+                                                                type="text"
+                                                                className="value"
+                                                                value={v}
+                                                                onChange={(e) => {
+                                                                    const next = [...suggestedSlots];
+                                                                    next[idx] = e.target.value;
+                                                                    setSuggestedSlots(next);
+                                                                }}
+                                                                placeholder="Example: 2026-01-30T10:00"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <div className="modal-note" style={{ marginTop: 8 }}>
+                                                        Tip: you can paste ISO datetime strings (e.g. <code>2026-01-30T10:00</code>).
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {apptError && <div className="error-message modal-error-container">{apptError}</div>}
+                                            {apptSuccess && <div style={{ color: "#16a34a", marginTop: 10 }}>{apptSuccess}</div>}
+
+                                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+                                                <button type="button" className="btn-save" onClick={suggestAppointments} disabled={apptSaving}>
+                                                    {apptSaving ? "Sending..." : "Save & Email Options"}
+                                                </button>
+
+                                                <button type="button" className="btn-cancel" onClick={() => updateAppointmentStatus("in_progress")} disabled={apptSaving}>
+                                                    Mark In Progress
+                                                </button>
+                                                <button type="button" className="btn-cancel" onClick={() => updateAppointmentStatus("completed")} disabled={apptSaving}>
+                                                    Mark Completed
+                                                </button>
+                                            </div>
+
+                                            <div style={{ marginTop: 12 }}>
+                                                <div style={{ fontWeight: 700, marginBottom: 6 }}>Cancel appointment</div>
+                                                <input
+                                                    className="value"
+                                                    type="text"
+                                                    value={cancelReason}
+                                                    onChange={(e) => setCancelReason(e.target.value)}
+                                                    placeholder="Optional reason (shown in email)"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn-cancel"
+                                                    style={{ marginTop: 10 }}
+                                                    onClick={() => updateAppointmentStatus("cancelled")}
+                                                    disabled={apptSaving}
+                                                >
+                                                    Mark Cancelled
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <>
                                     <div className="modal-section">

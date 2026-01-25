@@ -383,6 +383,7 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     margin-bottom: -5px;
+    text-align: center;
 }
 
 .auth-container > p{

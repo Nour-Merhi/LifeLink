@@ -1,18 +1,24 @@
 import { useState, useEffect } from "react";
 import { LiaUserNurseSolid } from "react-icons/lia";
-import { FiCheckCircle, FiXCircle, FiMapPin } from "react-icons/fi";
-import api from "../../api/axios";
+import { FiCheckCircle, FiMapPin } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import PhlebotomistTable from "../adminDashboard/phlebotomistComponents/PhlebotomistTable";
+import AddPhlebotomistForm from "../adminDashboard/phlebotomistComponents/AddPhlebotomistForm";
+import api from "../../api/axios";
 
 export default function Phlebotomists() {
     const { user } = useAuth();
     const [phlebotomists, setPhlebotomists] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [addModalOpen, setAddModalOpen] = useState(false);
 
     // Get hospital ID from user's health center manager relationship
     const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    const hospitalName =
+        user?.health_center_manager?.hospital?.name ||
+        user?.healthCenterManager?.hospital?.name ||
+        null;
 
     useEffect(() => {
         if (user && hospitalId) {
@@ -79,6 +85,17 @@ export default function Phlebotomists() {
                     </div>
                     <p>Assign and track phlebotomists for home visits</p>
                 </div>
+                <div>
+                    <button
+                        className="submit-btn"
+                        type="button"
+                        onClick={() => setAddModalOpen(true)}
+                        disabled={!hospitalId}
+                        title={!hospitalId ? "Hospital ID not found" : "Add phlebotomist"}
+                    >
+                        Add Phlebotomist
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -109,7 +126,21 @@ export default function Phlebotomists() {
                 phlebotomists={phlebotomists}
                 loading={loading}
                 error={error}
+                onPhlebotomistsUpdate={fetchPhlebotomists}
+                viewBasePath="/hospital/phlebotomists"
             />
+
+            {addModalOpen && (
+                <AddPhlebotomistForm
+                    onClose={() => setAddModalOpen(false)}
+                    fixedHospitalId={hospitalId}
+                    fixedHospitalName={hospitalName}
+                    onPhlebotomistAdded={() => {
+                        setAddModalOpen(false);
+                        fetchPhlebotomists();
+                    }}
+                />
+            )}
         </section>
     );
 }

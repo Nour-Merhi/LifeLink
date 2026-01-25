@@ -7,9 +7,30 @@ import { SpinnerDotted } from 'spinners-react';
 import "../../styles/BloodDonation.css"
 
 
-export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [] }) {
+export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [], disableSelection = false }) {
     const isSearching = searchQuery && searchQuery.trim() !== "";
     
+    const toNumber = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const getSlotsCount = (h, type) => {
+      if (!h) return 0;
+      if (type === "urgent") {
+        if (h.urgent_slots !== undefined && h.urgent_slots !== null) return toNumber(h.urgent_slots);
+        if (h.available_slots !== undefined && h.available_slots !== null) return toNumber(h.available_slots);
+        return 0;
+      }
+      if (type === "regular") {
+        if (h.regular_slots !== undefined && h.regular_slots !== null) return toNumber(h.regular_slots);
+        if (h.available_slots !== undefined && h.available_slots !== null) return toNumber(h.available_slots);
+        return 0;
+      }
+      // fallback
+      return toNumber(h.available_slots);
+    };
+
     // Calculate hasResults based on current state
     const hasResults = isSearching 
         ? (showHospitals && showHospitals.length > 0)
@@ -28,6 +49,8 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
             // Determine appointment type: if hospital has urgent flag or appears in urgent list, use urgent, otherwise regular
             const isUrgent = h.has_urgent || urgentHospitals.some(uh => uh.id === h.id);
             const appointmentType = isUrgent ? 'urgent' : 'regular';
+            const slotsCount = getSlotsCount(h, appointmentType);
+            const isDisabled = disableSelection || slotsCount <= 0;
             
             return (
             <button
@@ -35,7 +58,13 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
               id="registered-hospital"
               className="hospital-info"
               type="button"
-              onClick={() => onSelect({ ...h, appointment_type: appointmentType })}
+              disabled={isDisabled}
+              aria-disabled={isDisabled}
+              style={isDisabled ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+              onClick={() => {
+                if (isDisabled) return;
+                onSelect({ ...h, appointment_type: appointmentType });
+              }}
             >
               <div className="info">
                 <h2>{h.name}</h2>
@@ -45,6 +74,10 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                     <small className="hosp-address" title={h.address}>{h.address}</small>
                   </div>
                 </div>
+              </div>
+              <div className="slots">
+                <h2>{slotsCount}</h2>
+                <small>Available Slots</small>
               </div>
             </button>
             );
@@ -88,13 +121,21 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                   const dueDateStr = h.urgent_due_date ? formatDueDate(h.urgent_due_date) : '';
                   const dueTimeStr = h.urgent_due_time ? formatDueTime(h.urgent_due_time) : '';
                   const dueDisplay = dueDateStr && dueTimeStr ? `${dueDateStr} at ${dueTimeStr}` : (dueDateStr || dueTimeStr || 'Urgent');
+                  const slotsCount = getSlotsCount(h, "urgent");
+                  const isDisabled = disableSelection || slotsCount <= 0;
 
                   return (
                     <button
                       key={h.id}
                       className="hospital-info"
                       type="button"
-                      onClick={() => onSelect({ ...h, appointment_type: 'urgent' })}
+                      disabled={isDisabled}
+                      aria-disabled={isDisabled}
+                      style={isDisabled ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+                      onClick={() => {
+                        if (isDisabled) return;
+                        onSelect({ ...h, appointment_type: 'urgent' });
+                      }}
                     >
                       <div className="hospital-icon">
                         <FaHospital />
@@ -106,7 +147,7 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                             {h.name}{" "}
                           </h2>
                           <span className="urgent-blood-types animate-pulse bg-red-500">
-                            Urgent: Due Today
+                            Urgent: {dueDisplay}
                           </span>
                         </div>
                         <div className="details">
@@ -128,7 +169,7 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                       </div>
 
                       <div className="slots">
-                        <h2>{h.urgent_slots !== undefined ? h.urgent_slots : (h.available_slots || 0)}</h2>
+                        <h2>{slotsCount}</h2>
                         <small>Available Slots</small>
                       </div>
                     </button>
@@ -151,12 +192,22 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                     });
                 
                 return hospitalsToShow.map((h) => (
+                (() => {
+                  const slotsCount = getSlotsCount(h, "regular");
+                  const isDisabled = disableSelection || slotsCount <= 0;
+                  return (
                 <button
                   key={h.id}
                   id="registered-hospital"
                   className="hospital-info"
                   type="button"
-                  onClick={() => onSelect({ ...h, appointment_type: 'regular' })}
+                  disabled={isDisabled}
+                  aria-disabled={isDisabled}
+                  style={isDisabled ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+                  onClick={() => {
+                    if (isDisabled) return;
+                    onSelect({ ...h, appointment_type: 'regular' });
+                  }}
                 >
                   <div className="hospital-icon">
                     <FaHospital />
@@ -182,11 +233,13 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
                     
 
                     <div className="slots">
-                        <h2>{h.regular_slots !== undefined ? h.regular_slots : (h.available_slots || 0)}</h2>
+                        <h2>{slotsCount}</h2>
                         <small>Available Slots</small>
                     </div>
                   </div>
                 </button>
+                  );
+                })()
                 ));
               })()}
               

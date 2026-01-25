@@ -87,7 +87,7 @@
 /* Articles Grid */
 .articles-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     padding-bottom: 50px;
 }
@@ -249,9 +249,17 @@
 }
 
 /* Responsive Design */
+@media (max-width: 1235px) {
+    .articles-section{
+        padding: 40px !important;
+    }
+}
 @media (max-width: 1024px) {
     .articles-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+    .articles-section{
+        padding: 20px !important;
     }
 }
 
@@ -569,11 +577,13 @@
 
 .related-article-content {
     padding: 1.25rem;
+    text-align: justify;
 }
 
 .related-article-content h4 {
     font-size: 1rem;
     font-weight: 600;
+    text-align: justify;
     color: #ffffff;
     margin: 0 0 0.5rem 0;
     line-height: 1.4;
@@ -587,6 +597,7 @@
     font-size: 0.875rem;
     color: #999;
     line-height: 1.5;
+    text-align: justify;
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;

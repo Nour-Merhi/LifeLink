@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IoAdd, IoRemove } from "react-icons/io5";
 import { FaPlus } from "react-icons/fa6";
 import QuestionSVG from "../../assets/illustrations/Question.svg";
+import AnimatedSection from "../common/AnimatedSection";
 import "./QuestionSection.css";
 
 export default function QuestionSection() {
@@ -35,7 +36,7 @@ export default function QuestionSection() {
     };
 
     return (
-        <section className="question-section">
+        <AnimatedSection className="question-section" animation="fade-up">
             <div className="question-section-background">
                 <img src={QuestionSVG} alt="Question mark illustration" className="question-section-illustration" />
             </div>
@@ -75,11 +76,9 @@ export default function QuestionSection() {
                             )}
                         </div>
                     ))}
-                </div>
-
-                
+                </div> 
             </div>
-        </section>
+        </AnimatedSection>
     );
 }
 

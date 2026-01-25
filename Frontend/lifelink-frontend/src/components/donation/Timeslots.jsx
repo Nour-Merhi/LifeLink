@@ -7,6 +7,7 @@ export default function Timeslots({
    timeslots, 
    selectedDate, 
    pageType, 
+   storagePrefix,
    thankMessHospital, 
    setThankMessHospital, 
    setStep, 
@@ -20,6 +21,24 @@ export default function Timeslots({
   const [selectedTime, setSelectedTime] = useState("");
 
   const navigate = useNavigate();
+
+  // Ensure we always work with an array (sometimes callers accidentally pass JSX or an object)
+  const slotsArray = useMemo(() => {
+    if (Array.isArray(timeslots)) return timeslots;
+    if (!timeslots) return [];
+    // Guard against React elements being passed by mistake
+    if (React.isValidElement(timeslots)) return [];
+    // Some backends may return an object map instead of an array
+    if (typeof timeslots === "object") {
+      try {
+        const values = Object.values(timeslots);
+        return Array.isArray(values) ? values.filter(Boolean) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [timeslots]);
 
   // Check if this is an urgent appointment (from prop or hospital object)
   const urgentAppointment = isUrgent || 
@@ -79,13 +98,13 @@ export default function Timeslots({
   // Filter slots by date and for urgent appointments, filter by time (within 24 hours)
   // Use useMemo to prevent infinite loops and avoid recalculating on every render
   const filterSlots = useMemo(() => {
-    if (!timeslots || timeslots.length === 0 || !selectedDate || !normalizedSelectedDate) {
+    if (!slotsArray || slotsArray.length === 0 || !selectedDate || !normalizedSelectedDate) {
       return [];
     }
     
     const now = new Date();
     
-    return (timeslots || []).filter(
+    return slotsArray.filter(
     (slot) => {
         if (!slot || !slot.date) return false;
         
@@ -112,7 +131,7 @@ export default function Timeslots({
       return true;
     }
   );
-  }, [timeslots, selectedDate, normalizedSelectedDate, urgentAppointment]);
+  }, [slotsArray, selectedDate, normalizedSelectedDate, urgentAppointment]);
   
   // Debug logging (only log when values actually change to avoid infinite loops)
   useEffect(() => {
@@ -122,19 +141,19 @@ export default function Timeslots({
         selectedDate,
         normalizedSelectedDate,
         urgentAppointment,
-        timeslotsLength: timeslots?.length || 0,
+        timeslotsLength: slotsArray?.length || 0,
         filterSlotsLength: filteredCount,
         hospitalAppointmentType: hospital?.appointment_type,
         isUrgent,
-        firstSlotDate: timeslots?.[0]?.date,
-        dateMatchIssue: timeslots?.[0]?.date && normalizeDate(timeslots[0].date) !== normalizedSelectedDate
+        firstSlotDate: slotsArray?.[0]?.date,
+        dateMatchIssue: slotsArray?.[0]?.date && normalizeDate(slotsArray[0].date) !== normalizedSelectedDate
       });
       
       // Log sample of slots to check date formats (only if there's a mismatch and debugging is needed)
       // Removed to reduce console noise - date filtering is handled in filterSlots useMemo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, urgentAppointment, timeslots?.length, hospital?.appointment_type]);
+  }, [selectedDate, urgentAppointment, slotsArray?.length, hospital?.appointment_type]);
 
   const onClose = () => {
     setThankMessHospital(false)
@@ -198,13 +217,15 @@ export default function Timeslots({
           type="button"
           className="confirm-time-btn"
           onClick={() => {
-            // Store time in localStorage for home bookings
+            // Store time in localStorage (scoped when possible)
+            const prefix = storagePrefix || (pageType === "home" ? "home_" : "hospital_");
+            const timeKey = prefix + "appointment_time";
             if(pageType === "home"){
-              localStorage.setItem("appointment_time", selectedTime);
+              localStorage.setItem(timeKey, selectedTime);
               console.log("→ navigating to home form");
               navigate("/donation/home-blood-form")
             }else if(pageType === "hospital"){
-              localStorage.setItem("appointment_time", selectedTime);
+              localStorage.setItem(timeKey, selectedTime);
               console.log("→ navigating to hospital form");
               navigate("/donation/hospital-blood-form")
             }

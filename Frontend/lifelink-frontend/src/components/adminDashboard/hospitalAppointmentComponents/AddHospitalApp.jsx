@@ -37,26 +37,6 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
         return `${year}-${month}-${day}`;
     };
 
-    // Get tomorrow's date in local timezone (YYYY-MM-DD format)
-    const getTomorrowDate = () => {
-        const now = new Date();
-        now.setDate(now.getDate() + 1);
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    // Get maximum time allowed (24 hours from now)
-    const getMaxTime = () => {
-        const now = new Date();
-        const maxTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Add 24 hours
-        const hours = String(maxTime.getHours()).padStart(2, '0');
-        const minutes = String(maxTime.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-    };
-
-
     const handleChange = (e) => {
         const { name, value } = e.target;
         
@@ -326,7 +306,7 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                                     <>
                                         <div className="form-group">
                                             <div>
-                                                <label htmlFor="due_date">Due Date (Today Only - Within 24 hours)</label>
+                                                <label htmlFor="due_date">Due Date</label>
                                                 <input
                                                     id="due_date"
                                                     type="date"
@@ -341,7 +321,7 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                                                 />
                                                 {errors.due_date && <small className="error-text">{errors.due_date}</small>}
                                                 <small className="info-text" style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                                                    Urgent appointments can only be scheduled for today within 24 hours
+                                                    Urgent appointments can only be scheduled for today within today's time
                                                 </small>
                                             </div>
                                             <div>
@@ -359,8 +339,8 @@ export default function AddHospitalApp({ onClose, hospitals = [], onAppointmentA
                                                 {errors.due_time && <small className="error-text">{errors.due_time}</small>}
                                                 <small className="info-text" style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                                                     {appointmentData.due_date === getTodayDate() 
-                                                        ? `Current time: ${getCurrentTime()} - Must be within 24 hours`
-                                                        : `Must be within 24 hours from release time`}
+                                                        ? `Current time: ${getCurrentTime()} - Must be within today's time`
+                                                        : `Must be within today's time from release time`}
                                                 </small>
                                             </div>
                                         </div>

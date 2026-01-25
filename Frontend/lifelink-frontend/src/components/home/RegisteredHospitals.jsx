@@ -4,9 +4,9 @@ import { MdOutlineLocationOn } from "react-icons/md";
 import { LuPhone } from "react-icons/lu";
 import { MdOutlineMail } from "react-icons/md";
 import { useHospitals } from "../../context/HospitalsContext";
-import "./RegisteredHospitals.css";
-
 import { useNavigate } from "react-router-dom";
+import AnimatedSection from "../common/AnimatedSection";
+import "./RegisteredHospitals.css";
 
 export default function RegisteredHospitals() {
     const navigate = useNavigate();
@@ -24,7 +24,7 @@ export default function RegisteredHospitals() {
     };
 
     return (
-        <div className="partner-hospitals-section">
+        <AnimatedSection className="partner-hospitals-section" animation="fade-up">
             <div className="partner-hospitals-header">
                 <h1 className="partner-hospitals-title">Partner Hospitals</h1>
                 <p className="partner-hospitals-description">
@@ -125,6 +125,6 @@ export default function RegisteredHospitals() {
                     Find More Partner Hospitals
                 </button>
             </div>
-        </div>
+        </AnimatedSection>
     );
 }

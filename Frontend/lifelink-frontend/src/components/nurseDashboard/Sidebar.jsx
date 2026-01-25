@@ -14,7 +14,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import api from "../../api/axios";
 import { useSystemSettings } from "../../context/SystemSettingsContext";
 
-export default function Sidebar(){
+export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {} } = {}){
     const navigate = useNavigate();
     const { systemLogo, platformName } = useSystemSettings();
 
@@ -31,40 +31,45 @@ export default function Sidebar(){
           navigate("/home");
         }
       };
+
+    const closeSidebar = () => {
+        try { setOpenSidebar(false); } catch (_) {}
+    };
     
     return (
         <>
-        <div className="sidebar layout admin-sidebar linear-light-blue">
+        {openSidebar && <div className="sidebar-backdrop" onClick={closeSidebar}></div>}
+        <div className={`sidebar layout admin-sidebar linear-light-blue ${openSidebar ? "open" : ""}`}>
             <button onClick={() => navigate("/home")} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
                 <img src={systemLogo || lifelinkLogoBlack} alt={`${platformName || "LifeLink"} logo`} />
             </button>
 
             <div className="links text-white">
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <GoHomeFill className="icon-size text-white"/>
                     <NavLink to="/nurse/home" className="text-white">Home</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <IoCalendarSharp className="icon-size text-white"/>
                     <NavLink to="/nurse/my-appointments" className="text-white">My Appointments</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <FaHouseUser className="icon-size text-white"/>
                     <NavLink to="/nurse/donor-requests" className="text-white">Donor Requests</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <FaHospital className="icon-size text-white"/>
                     <NavLink to="/nurse/hospital-info" className="text-white">Hospital Info</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <FaUserMd className="icon-size text-white"/>
                     <NavLink to="/nurse/manager-contact" className="text-white">Manager Contact</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <FaTrophy className="icon-size text-white"/>
                     <NavLink to="/nurse/leaderboard" className="text-white">Leaderboard</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <RiSettings5Fill className="icon-size text-white"/>
                     <NavLink to="/nurse/settings" className="text-white">Profile Settings</NavLink>
                 </div>

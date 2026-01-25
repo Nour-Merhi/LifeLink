@@ -4,23 +4,37 @@ import Searchbar from "./Searchbar"
 
 import { useState, useEffect } from "react"
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 
 export default function HospitalBloodBooking({ pageType }) {
   const prefix = pageType === "home" ? "home_" : "hospital_"
+  const { user } = useAuth();
+  const userScope = user?.id ? `u${user.id}_` : "guest_";
+  const storagePrefix = `${prefix}${userScope}`;
+  const scopedKey = (k) => `${storagePrefix}${k}`;
+  const legacyKey = (k) => `${prefix}${k}`;
 
-  const [step, setStep] = useState(() =>localStorage.getItem(prefix + "step") || "hospitals")
-  const [date, setDate] = useState(() => localStorage.getItem(prefix + "date") || null)
-  const [time, setTime] = useState(() => localStorage.getItem(prefix + "time") || null)
+  // Eligibility (56-day rule). If no last donation in backend → eligible.
+  const computeEligibility = () => {
+    const raw = user?.donor?.last_donation;
+    if (!raw) return { eligible: true, daysRemaining: 0, lastDonation: null };
+    const last = new Date(raw);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    last.setHours(0, 0, 0, 0);
+    const daysSince = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+    if (!Number.isFinite(daysSince)) return { eligible: true, daysRemaining: 0, lastDonation: null };
+    const remaining = Math.max(0, 56 - daysSince);
+    return { eligible: remaining === 0, daysRemaining: remaining, lastDonation: raw };
+  };
+  const eligibility = computeEligibility();
+  const isEligible = eligibility.eligible;
+
+  const [step, setStep] = useState("hospitals")
+  const [date, setDate] = useState(null)
+  const [time, setTime] = useState(null)
   
-  const [hospital, setHospital] = useState(()=> {
-     const stored = localStorage.getItem(prefix + "hospital");
-    try {
-      return stored ? JSON.parse(stored) : null;
-    } catch (e) {
-      console.warn("Invalid JSON in hospital localStorage:", stored);
-      return null;
-    }
-  });
+  const [hospital, setHospital] = useState(null);
 
   const [thankMessHospital, setThankMessHospital] = useState(false);
   const [showHospitals, setShowHospitals] = useState([]);
@@ -43,15 +57,71 @@ export default function HospitalBloodBooking({ pageType }) {
     appointment_time: time || '',
     appointment_date: date || '',
   })
+
+  // Rehydrate booking state from storage (scoped to user + booking type)
+  useEffect(() => {
+    const migrate = (k) => {
+      const sk = scopedKey(k);
+      const lk = legacyKey(k);
+      if (!localStorage.getItem(sk) && localStorage.getItem(lk)) {
+        localStorage.setItem(sk, localStorage.getItem(lk));
+        localStorage.removeItem(lk);
+      }
+    };
+
+    // Migrate legacy keys once per scope
+    ["step", "date", "time", "hospital"].forEach(migrate);
+
+    const storedStep = localStorage.getItem(scopedKey("step")) || "hospitals";
+    const storedDate = localStorage.getItem(scopedKey("date")) || null;
+    const storedTime = localStorage.getItem(scopedKey("time")) || null;
+    const storedHospital = localStorage.getItem(scopedKey("hospital"));
+
+    setStep(storedStep);
+    setDate(storedDate);
+    setTime(storedTime);
+
+    if (storedHospital) {
+      try {
+        setHospital(JSON.parse(storedHospital));
+      } catch (e) {
+        console.warn("Invalid JSON in hospital localStorage:", storedHospital);
+        setHospital(null);
+      }
+    } else {
+      setHospital(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storagePrefix]);
+
+  // If user is not eligible, prevent jumping to calendar (even via localStorage)
+  useEffect(() => {
+    if (isEligible) return;
+    if (step !== "hospitals") setStep("hospitals");
+    if (hospital) setHospital(null);
+    if (date) setDate(null);
+    if (time) setTime(null);
+    localStorage.removeItem(scopedKey("hospital"));
+    localStorage.removeItem(scopedKey("date"));
+    localStorage.removeItem(scopedKey("time"));
+    localStorage.removeItem(scopedKey("step"));
+    // legacy clean-up (if any)
+    localStorage.removeItem(legacyKey("hospital"));
+    localStorage.removeItem(legacyKey("date"));
+    localStorage.removeItem(legacyKey("time"));
+    localStorage.removeItem(legacyKey("step"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEligible]);
   
   useEffect(() => {
-    localStorage.setItem(prefix + "step", step)
-    if (hospital) localStorage.setItem(prefix + "hospital", JSON.stringify(hospital))
+    localStorage.setItem(scopedKey("step"), step)
+    if (hospital) localStorage.setItem(scopedKey("hospital"), JSON.stringify(hospital))
     if (date) {
-      localStorage.setItem(prefix + "date", date)
+      localStorage.setItem(scopedKey("date"), date)
     }
     if (time) localStorage.setItem(prefix + "time", time)
-  }, [step, hospital, date, time, prefix])
+    if (time) localStorage.setItem(scopedKey("time"), time)
+  }, [step, hospital, date, time, storagePrefix])
   
   // Clear date when hospital changes (especially important for urgent appointments)
   useEffect(() => {
@@ -64,44 +134,42 @@ export default function HospitalBloodBooking({ pageType }) {
     }
   }, [hospital?.id, hospital?.appointment_type])
       
-  //Getting Hospitals with Hospital Blood Donation appointments
+  const fetchHospitals = () => {
+    if (pageType !== "hospital") return;
+    setLoading(true);
+    setError("");
+
+    axios.get('http://localhost:8000/api/blood/hospital_donation')
+      .then((res) => {
+        const hospitalsData = res.data.hospitals || res.data || [];
+        const urgentData = res.data.urgent_hospitals || [];
+        const regularData = res.data.regular_hospitals || [];
+
+        const hospitalsArray = Array.isArray(hospitalsData) ? hospitalsData : [];
+        const urgentArray = Array.isArray(urgentData) ? urgentData : [];
+        const regularArray = Array.isArray(regularData) ? regularData : [];
+
+        setShowHospitals(hospitalsArray);
+        setUrgentHospitals(urgentArray);
+        setRegularHospitals(regularArray);
+        setFilteredHospitals(hospitalsArray);
+      })
+      .catch(err => {
+        console.error('Error fetching hospital appointment hospitals:', err);
+        setError(err.response?.data?.message || err.message || "Failed to load hospitals with hospital donation appointments");
+        setShowHospitals([]);
+        setUrgentHospitals([]);
+        setRegularHospitals([]);
+        setFilteredHospitals([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  // Fetch hospitals on mount + whenever we return to the hospitals step
   useEffect(() => {
-    if (pageType === "hospital") {
-      setLoading(true);
-      setError("");
-      
-      axios.get('http://localhost:8000/api/blood/hospital_donation')
-        .then((res) => {
-          console.log('Hospital donation API response:', res.data);
-          const hospitalsData = res.data.hospitals || res.data || [];
-          const urgentData = res.data.urgent_hospitals || [];
-          const regularData = res.data.regular_hospitals || [];
-          
-          const hospitalsArray = Array.isArray(hospitalsData) ? hospitalsData : [];
-          const urgentArray = Array.isArray(urgentData) ? urgentData : [];
-          const regularArray = Array.isArray(regularData) ? regularData : [];
-          
-          setShowHospitals(hospitalsArray);
-          setUrgentHospitals(urgentArray);
-          setRegularHospitals(regularArray);
-          setFilteredHospitals(hospitalsArray);
-          
-          if (hospitalsArray.length === 0) {
-            console.warn('No hospitals found with hospital donation appointments');
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching hospital appointment hospitals:', err);
-          console.error('Error response:', err.response);
-          setError(err.response?.data?.message || err.message || "Failed to load hospitals with hospital donation appointments");
-          setShowHospitals([]);
-          setUrgentHospitals([]);
-          setRegularHospitals([]);
-          setFilteredHospitals([]);
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [pageType])
+    if (step === "hospitals") fetchHospitals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageType, step]);
 
   // Fetch appointments when hospital is selected for hospital donation
   useEffect(() => {
@@ -192,9 +260,13 @@ export default function HospitalBloodBooking({ pageType }) {
         appointment_date: '',
       });
       // Clear localStorage
-      localStorage.removeItem(prefix + "date");
-      localStorage.removeItem(prefix + "time");
-      localStorage.removeItem(prefix + "hospital");
+      localStorage.removeItem(scopedKey("date"));
+      localStorage.removeItem(scopedKey("time"));
+      localStorage.removeItem(scopedKey("hospital"));
+      // Also clear legacy keys if present
+      localStorage.removeItem(legacyKey("date"));
+      localStorage.removeItem(legacyKey("time"));
+      localStorage.removeItem(legacyKey("hospital"));
     }
   }
 
@@ -219,22 +291,32 @@ export default function HospitalBloodBooking({ pageType }) {
       
       {/* Step 1: Hospitals list */} 
       {step === "hospitals" && ( 
-        <Hospitals 
+        <>
+          {!isEligible && (
+            <div style={{ margin: "10px 0 14px", padding: "12px 14px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", color: "#991b1b" }}>
+              You’re not eligible to donate yet. Please wait <strong>{eligibility.daysRemaining}</strong> more day{eligibility.daysRemaining !== 1 ? "s" : ""} before booking.
+            </div>
+          )}
+        <Hospitals
+          disableSelection={!isEligible}
           showHospitals={hospitalsToShow}
           urgentHospitals={pageType === "hospital" ? urgentHospitals : []}
           regularHospitals={pageType === "hospital" ? regularHospitals : []}
           searchQuery={ searchQuery }
           onSelect={(h) => { 
+            if (!isEligible) return;
             setHospital(h); 
             setStep("calendar"); 
           }}
         /> 
+        </>
       )} 
       
       {/* Step 2: Calendar step */} 
       {step === "calendar" && hospital && ( 
         <Calendar 
           pageType= {pageType}
+          storagePrefix={storagePrefix}
           hospital={hospital} 
           appointments={appointments}
           timeSlots={timeSlots}

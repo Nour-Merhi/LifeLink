@@ -11,6 +11,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import AdminDashboard from "./pages/Dashboards/AdminDashboard";
 import { QuizProvider } from "./store/quizStore";
 import Home from "./pages/Home";
+import ProductRewards from "./pages/ProductRewards.jsx";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import AfterDeathStepTwo from "./components/donation/afterLifeOrganForm/AfterDeathStepTwo.jsx";
@@ -32,6 +33,11 @@ import OrganPledges from "./components/adminDashboard/OrganPledges.jsx";
 import Articles from "./components/adminDashboard/Articles.jsx";
 import AdminSettings from "./components/adminDashboard/Settings.jsx";
 import AdminProfile from "./components/adminDashboard/AdminProfile.jsx";
+import AdminAnalytics from "./components/adminDashboard/Analytics.jsx";
+import AdminRewardShop from "./components/adminDashboard/RewardShop.jsx";
+import Certificates from "./components/adminDashboard/Certificates.jsx";
+import GenerateCertificate from "./components/adminDashboard/certificateComponents/GenerateCertificate.jsx";
+import QuizManagement from "./components/adminDashboard/QuizManagement.jsx";
 import Login from "./pages/Login";
 import Register from "./pages/Register"
 import axios from "axios";
@@ -42,13 +48,11 @@ import ArticleDetail from "./pages/ArticleDetail.jsx";
 
 /* Hospital Dashboard */
 import HospitalDashboardLayout from "./pages/Dashboards/HospitalDashboardLayout.jsx";
-import HospitalDashboard from "./components/HospitalDashboard/HospitalDashboard.jsx";
 import DonorManagement from "./components/HospitalDashboard/DonorManagement.jsx";
 import Appointments from "./components/HospitalDashboard/Appointments.jsx";
 import UrgentRequests from "./components/HospitalDashboard/UrgentRequests.jsx";
 import HomeVisits from "./components/HospitalDashboard/HomeVisits.jsx";
 import Phlebotomists from "./components/HospitalDashboard/Phlebotomists.jsx";
-import OrganCoordination from "./components/HospitalDashboard/OrganCoordination.jsx";
 import OrganCoordinationLiving from "./components/HospitalDashboard/OrganCoordinationLiving.jsx";
 import OrganCoordinationAfterDeath from "./components/HospitalDashboard/OrganCoordinationAfterDeath.jsx";
 import Inventory from "./components/HospitalDashboard/Inventory.jsx";
@@ -95,6 +99,8 @@ import HospitalDetailHome from "./pages/HospitalDetail";
 
 import "leaflet/dist/leaflet.css";
 import HumanBody from "./pages/HumanBody.jsx";
+import Chatbot from "./components/Chatbot.jsx"
+
 
 function App() {
   useEffect(() => {
@@ -120,6 +126,8 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Home />} />
         <Route path="/human-body" element={<HumanBody />} />
+        <Route path="/rewards" element={<ProductRewards />} />
+        <Route path="/chatbot" element={<Chatbot />}/>
         
         {/* Donation layout */}
         <Route path="/donation" element={<Donation />}>
@@ -142,8 +150,9 @@ function App() {
         
         {/* Admin Dashboard layout */}
         <Route path="/admin" element={<AdminDashboard />}>
-          <Route index element={<div className="admin-content"><h1>Admin Dashboard</h1><p>Select an option from the sidebar</p></div>} />
-          <Route path="dashboard" element={<div className="admin-content"><h1>Admin Dashboard</h1><p>Select an option from the sidebar</p></div>} />
+          <Route index element={<AdminAnalytics />} />
+          <Route path="dashboard" element={<AdminAnalytics />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="donors" element={<Donors />} />
           <Route path="donors/:donorCode" element={<DonorDetail />} />
           <Route path="hospitals" element={<Hospitals/>} />
@@ -156,19 +165,24 @@ function App() {
           <Route path="financials" element={<Financial />} />
           <Route path="notifications" element={<Notification />} />
           <Route path="articles" element={<Articles />} />
+          <Route path="reward-shop" element={<AdminRewardShop />} />
+          <Route path="certificates" element={<Certificates />} />
+          <Route path="certificates/generate" element={<GenerateCertificate />} />
+          <Route path="quiz-management" element={<QuizManagement />} />
           <Route path="platform-settings" element={<AdminSettings />} />
           <Route path="profile" element={<AdminProfile />} />
         </Route>
         
         {/* Hospital Dashboard layout */}
         <Route path="/hospital" element={<HospitalDashboardLayout />}>
-          <Route index element={<HospitalDashboard />} />
-          <Route path="dashboard" element={<HospitalDashboard />} />
+          <Route index element={<Navigate to="analytics" replace />} />
+          <Route path="dashboard" element={<Navigate to="/hospital/analytics" replace />} />
           <Route path="donors" element={<DonorManagement />} />
           <Route path="appointments" element={<Appointments />} />
           <Route path="urgent-requests" element={<UrgentRequests />} />
           <Route path="home-visits" element={<HomeVisits />} />
           <Route path="phlebotomists" element={<Phlebotomists />} />
+          <Route path="phlebotomists/:phlebotomistCode" element={<PhlebotomistDetail />} />
           <Route path="organ-coordination" element={<Navigate to="/hospital/organ-coordination/living-donors" replace />} />
           <Route path="organ-coordination/living-donors" element={<OrganCoordinationLiving />} />
           <Route path="organ-coordination/after-death-pledges" element={<OrganCoordinationAfterDeath />} />

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { FiTrash2 } from "react-icons/fi";
+import { FiTrash2, FiEdit } from "react-icons/fi";
 import { IoSearchSharp, IoClose } from "react-icons/io5";
 import { BsCalendar3, BsClock } from "react-icons/bs";
 import { MdLocationOn } from "react-icons/md";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
 export default function HomeAppRequestsTable({ hospitalId, loading = false, error = "", onAppointmentsUpdate }) {
     const [hospitalData, setHospitalData] = useState(null);
@@ -15,6 +16,13 @@ export default function HomeAppRequestsTable({ hospitalId, loading = false, erro
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [deleteError, setDeleteError] = useState("");
+    const [editSlotModal, setEditSlotModal] = useState(null); // { appointmentId, rawTime, displayTime, date }
+    const [editSlotTime, setEditSlotTime] = useState("");
+    const [editSlotLoading, setEditSlotLoading] = useState(false);
+    const [editSlotError, setEditSlotError] = useState("");
+    const [removeSlotConfirm, setRemoveSlotConfirm] = useState(null); // { appointmentId, rawTime, displayTime, date }
+    const [removeSlotLoading, setRemoveSlotLoading] = useState(false);
+    const [removeSlotError, setRemoveSlotError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
@@ -62,6 +70,72 @@ export default function HomeAppRequestsTable({ hospitalId, loading = false, erro
     const handleDeleteCancel = () => {
         setDeleteConfirm(null);
         setDeleteError("");
+    };
+
+    const openEditSlot = (e, slotDate, timeObj) => {
+        e.stopPropagation();
+        if (!timeObj?.available) return;
+        if (!timeObj?.appointment_id || !timeObj?.raw_time) return;
+        setEditSlotError("");
+        setEditSlotModal({
+            appointmentId: timeObj.appointment_id,
+            rawTime: timeObj.raw_time,
+            displayTime: timeObj.time,
+            date: slotDate,
+        });
+        setEditSlotTime(timeObj.raw_time);
+    };
+
+    const saveEditSlot = async () => {
+        if (!editSlotModal?.appointmentId || !editSlotModal?.rawTime) return;
+        setEditSlotLoading(true);
+        setEditSlotError("");
+        try {
+            await api.get("/sanctum/csrf-cookie");
+            await api.patch(`/api/admin/dashboard/appointments/${editSlotModal.appointmentId}/time-slots`, {
+                op: "update",
+                old_time: editSlotModal.rawTime,
+                new_time: editSlotTime,
+            });
+            setEditSlotModal(null);
+            fetchHomeAppointments();
+        } catch (err) {
+            setEditSlotError(err.response?.data?.message || "Failed to update time slot");
+        } finally {
+            setEditSlotLoading(false);
+        }
+    };
+
+    const openRemoveSlot = (e, slotDate, timeObj) => {
+        e.stopPropagation();
+        if (!timeObj?.available) return;
+        if (!timeObj?.appointment_id || !timeObj?.raw_time) return;
+        setRemoveSlotError("");
+        setRemoveSlotConfirm({
+            appointmentId: timeObj.appointment_id,
+            rawTime: timeObj.raw_time,
+            displayTime: timeObj.time,
+            date: slotDate,
+        });
+    };
+
+    const confirmRemoveSlot = async () => {
+        if (!removeSlotConfirm?.appointmentId || !removeSlotConfirm?.rawTime) return;
+        setRemoveSlotLoading(true);
+        setRemoveSlotError("");
+        try {
+            await api.get("/sanctum/csrf-cookie");
+            await api.patch(`/api/admin/dashboard/appointments/${removeSlotConfirm.appointmentId}/time-slots`, {
+                op: "remove",
+                old_time: removeSlotConfirm.rawTime,
+            });
+            setRemoveSlotConfirm(null);
+            fetchHomeAppointments();
+        } catch (err) {
+            setRemoveSlotError(err.response?.data?.message || "Failed to remove time slot");
+        } finally {
+            setRemoveSlotLoading(false);
+        }
     };
 
     const handleDeleteConfirm = async () => {
@@ -267,15 +341,54 @@ export default function HomeAppRequestsTable({ hospitalId, loading = false, erro
                                                         backgroundColor: time.available ? '#f0f4ff' : '#f5f5f5',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '5px',
+                                                        justifyContent: 'space-between',
+                                                        gap: '8px',
                                                         fontSize: '14px'
                                                     }}
                                                 >
-                                                    <BsClock />
-                                                    <span>{time.time}</span>
-                                                    {!time.available && (
-                                                        <span style={{ color: '#999', fontSize: '12px' }}>(Booked)</span>
-                                                    )}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                                        <BsClock />
+                                                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{time.time}</span>
+                                                        {!time.available && (
+                                                            <span style={{ color: '#999', fontSize: '12px' }}>(Booked)</span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <button
+                                                            type="button"
+                                                            title={time.available ? "Edit time" : "Cannot edit booked time"}
+                                                            onClick={(e) => openEditSlot(e, slot.date, time)}
+                                                            disabled={!time.available}
+                                                            style={{
+                                                                background: "none",
+                                                                border: "none",
+                                                                cursor: time.available ? "pointer" : "not-allowed",
+                                                                color: time.available ? "#2349C2" : "#bdbdbd",
+                                                                padding: 0,
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                            }}
+                                                        >
+                                                            <FiEdit />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            title={time.available ? "Remove this time" : "Cannot remove booked time"}
+                                                            onClick={(e) => openRemoveSlot(e, slot.date, time)}
+                                                            disabled={!time.available}
+                                                            style={{
+                                                                background: "none",
+                                                                border: "none",
+                                                                cursor: time.available ? "pointer" : "not-allowed",
+                                                                color: time.available ? "#E92C30" : "#bdbdbd",
+                                                                padding: 0,
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                            }}
+                                                        >
+                                                            <FiTrash2 />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -293,57 +406,90 @@ export default function HomeAppRequestsTable({ hospitalId, loading = false, erro
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Delete Appointments</h2>
-                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
+                <ConfirmDeleteDialog
+                    title="Delete Record"
+                    description={`You are going to delete all appointments for ${deleteConfirm.date}. Are you sure?`}
+                    details={`This will delete ${deleteConfirm.appointmentIds?.length || 0} appointment record(s).`}
+                    confirmText="Yes, Delete"
+                    cancelText="No, Keep It"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={handleDeleteCancel}
+                    onConfirm={handleDeleteConfirm}
+                />
+            )}
+
+            {/* Edit single time slot modal */}
+            {editSlotModal && (
+                <div className="modal-overlay modal-overlay-delete" onClick={() => !editSlotLoading && setEditSlotModal(null)}>
+                    <div className="modal-container modal-modern" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 520 }}>
+                        <div className="modal-modern-header">
+                            <div className="modal-modern-title">
+                                <h2>Edit Time</h2>
+                                <div className="modal-modern-subtitle">
+                                    <span className="muted">Date: {editSlotModal.date} • Current: {editSlotModal.displayTime}</span>
+                                </div>
+                            </div>
+                            <button className="modal-icon-btn" onClick={() => !editSlotLoading && setEditSlotModal(null)} aria-label="Close">
                                 <IoClose />
                             </button>
                         </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete all appointments for <strong>{deleteConfirm.date}</strong>?</p>
-                            <p className="modal-text-secondary">
-                                This will delete {deleteConfirm.appointmentIds?.length || 0} appointment record(s).
-                            </p>
-                            <span className="modal-warning-text">
-                                Note: This action cannot be undone if there are no active bookings.
-                            </span>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
+                        <div className="modal-modern-body">
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>New Time</label>
+                            <input
+                                type="time"
+                                value={editSlotTime}
+                                onChange={(e) => setEditSlotTime(e.target.value)}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px 12px",
+                                    border: "1px solid #e5e7eb",
+                                    borderRadius: 10,
+                                    outline: "none",
+                                }}
+                            />
+                            {editSlotError ? (
+                                <div className="error-message modal-error-container" style={{ marginTop: 12 }}>
+                                    {editSlotError}
                                 </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteCancel}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
+                            ) : null}
+                        </div>
+                        <div className="modal-modern-footer" style={{ justifyContent: "space-between" }}>
+                            <button className="btn-cancel" onClick={() => !editSlotLoading && setEditSlotModal(null)} disabled={editSlotLoading}>
+                                Cancel
+                            </button>
+                            <button
+                                className="submit-btn"
+                                style={{ background: "#2349C2" }}
+                                onClick={saveEditSlot}
+                                disabled={editSlotLoading}
+                            >
+                                {editSlotLoading ? (
+                                    <span style={{ display: "inline-flex", alignItems: "center" }}>
+                                        <SpinnerDotted size={18} thickness={120} speed={100} color="#fff" className="spinner-inline" />
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    "Save"
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Remove single time slot */}
+            {removeSlotConfirm && (
+                <ConfirmDeleteDialog
+                    title="Delete Record"
+                    description={`You are going to delete this time slot (${removeSlotConfirm.displayTime}) on ${removeSlotConfirm.date}. Are you sure?`}
+                    confirmText="Yes, Delete"
+                    cancelText="No, Keep It"
+                    loading={removeSlotLoading}
+                    error={removeSlotError}
+                    onClose={() => !removeSlotLoading && setRemoveSlotConfirm(null)}
+                    onConfirm={confirmRemoveSlot}
+                />
             )}
         </section>
     );

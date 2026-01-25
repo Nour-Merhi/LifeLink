@@ -2,7 +2,12 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import "../../styles/ProfileDropdown.css";
-import { IoPerson, IoSettings } from "react-icons/io5";
+import { FaHospital, FaUserNurse } from "react-icons/fa";
+import {
+  IoAnalytics,
+  IoPeople,
+  IoSettings,
+} from "react-icons/io5";
 import { FiLogOut } from "react-icons/fi";
 import profile from "../../assets/imgs/profile.svg";
 import api from "../../api/axios";
@@ -49,10 +54,31 @@ export default function AdminProfileDropdown() {
 
   const menuItems = [
     {
+      label: "Dashboard",
+      icon: <IoAnalytics />,
+      path: "/admin/dashboard",
+    },
+    {
+      label: "Donors",
+      icon: <IoPeople />,
+      path: "/admin/donors",
+    },
+    {
+      label: "Hospitals",
+      icon: <FaHospital />,
+      path: "/admin/hospitals",
+    },
+    {
+      label: "Phlebotomists",
+      icon: <FaUserNurse />,
+      path: "/admin/phlebotomists",
+    },
+    {
       label: "Settings",
       icon: <IoSettings />,
       path: "/admin/platform-settings",
     },
+
   ];
 
   const handleMenuItemClick = (path) => {

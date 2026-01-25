@@ -42,8 +42,12 @@ class HomeVisitController extends Controller
                     $appointmentDate ? Carbon::parse($appointmentDate)->timestamp : 0,
                     $appointmentTime ? $this->timeToTimestampForSort($appointmentTime) : 0
                 ];
-            })
-            ->values();
+            });
+            
+
+            $orders = $orders->sortByDesc(function($order) {
+                return $order->created_at;
+            })->values();
 
             // Transform to match frontend format
             $transformedOrders = $orders->map(function ($order) {
@@ -273,6 +277,8 @@ class HomeVisitController extends Controller
                             if (isset($timeSlot['is_available']) && !$timeSlot['is_available']) {
                                 $allTimeSlots[] = [
                                     'time' => $this->formatTime($timeSlotValue),
+                                    'raw_time' => $timeSlotValue,
+                                    'appointment_id' => $apt->id,
                                     'available' => false
                                 ];
                                 continue;
@@ -292,6 +298,8 @@ class HomeVisitController extends Controller
                         
                         $allTimeSlots[] = [
                             'time' => $this->formatTime($timeSlotValue),
+                            'raw_time' => $timeSlotValue,
+                            'appointment_id' => $apt->id,
                             'available' => !$isBooked
                         ];
                     }
@@ -302,15 +310,16 @@ class HomeVisitController extends Controller
             $uniqueSlots = [];
             $seen = [];
             foreach ($allTimeSlots as $slot) {
-                if (!in_array($slot['time'], $seen)) {
-                    $seen[] = $slot['time'];
+                $key = $slot['raw_time'] ?? $slot['time'];
+                if (!in_array($key, $seen)) {
+                    $seen[] = $key;
                     $uniqueSlots[] = $slot;
                 }
             }
 
             // Sort by time
             usort($uniqueSlots, function($a, $b) {
-                return strcmp($a['time'], $b['time']);
+                return strcmp(($a['raw_time'] ?? $a['time']), ($b['raw_time'] ?? $b['time']));
             });
 
             return [
@@ -391,6 +400,8 @@ class HomeVisitController extends Controller
                                     if (isset($timeSlot['is_available']) && !$timeSlot['is_available']) {
                                         $allTimeSlots[] = [
                                             'time' => $this->formatTime($timeSlotValue),
+                                            'raw_time' => $timeSlotValue,
+                                            'appointment_id' => $apt->id,
                                             'available' => false
                                         ];
                                         continue;
@@ -416,6 +427,8 @@ class HomeVisitController extends Controller
                                 
                                 $allTimeSlots[] = [
                                     'time' => $formattedTime,
+                                    'raw_time' => $timeSlotValue,
+                                    'appointment_id' => $apt->id,
                                     'available' => !$isBooked
                                 ];
                             }
@@ -426,15 +439,16 @@ class HomeVisitController extends Controller
                     $uniqueSlots = [];
                     $seen = [];
                     foreach ($allTimeSlots as $slot) {
-                        if (!in_array($slot['time'], $seen)) {
-                            $seen[] = $slot['time'];
+                        $key = $slot['raw_time'] ?? $slot['time'];
+                        if (!in_array($key, $seen)) {
+                            $seen[] = $key;
                             $uniqueSlots[] = $slot;
                         }
                     }
 
                     // Sort by time
                     usort($uniqueSlots, function($a, $b) {
-                        return strcmp($a['time'], $b['time']);
+                        return strcmp(($a['raw_time'] ?? $a['time']), ($b['raw_time'] ?? $b['time']));
                     });
 
                     return [

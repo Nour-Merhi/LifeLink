@@ -12,10 +12,18 @@ use App\Models\EmergencyRequest;
 use App\Models\BloodInventory;
 use App\Models\CustomNotification;
 use App\Models\MobilePhlebotomist;
+use App\Models\Message;
 use App\Models\LivingDonor;
 use App\Models\AfterDeathPledge;
+use App\Models\HospitalSetting;
+use App\Models\BloodType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
+use App\Mail\LivingOrganAppointmentSuggestions;
+use App\Mail\LivingOrganAppointmentCompleted;
+use App\Mail\LivingOrganAppointmentCancelled;
+use App\Mail\LivingOrganMedicalClearedThankYou;
 
 class HospitalDashboardController extends Controller
 {
@@ -32,6 +40,354 @@ class HospitalDashboardController extends Controller
         }
 
         return $hospitalId;
+    }
+
+    /**
+     * Hospital manager: view messages sent by their phlebotomists.
+     * Returns a list of phlebotomists (for tabs) and message feed.
+     */
+    public function getPhlebotomistMessages(Request $request, $hospitalId = null)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, $hospitalId);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $user = $request->user();
+            $role = strtolower((string)($user->role ?? ''));
+            if ($role !== 'manager') {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $hospital = Hospital::with(['healthCenterManager.user'])->find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['message' => 'Hospital not found'], 404);
+            }
+
+            // Ensure manager belongs to this hospital (prevent cross-hospital access)
+            if (!$user->healthCenterManager || (int)$user->healthCenterManager->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $managerUserId = $hospital->healthCenterManager?->user?->id;
+            if (!$managerUserId) {
+                return response()->json(['message' => 'Manager not found for this hospital'], 404);
+            }
+
+            $phlebotomists = MobilePhlebotomist::where('hospital_id', $hospitalId)
+                ->with('user')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $phlebotomistUsers = $phlebotomists
+                ->filter(fn ($p) => (bool) $p->user)
+                ->map(function ($p) {
+                    $u = $p->user;
+                    $nameParts = array_filter([$u->first_name ?? null, $u->middle_name ?? null, $u->last_name ?? null]);
+                    $name = trim(implode(' ', $nameParts)) ?: ($u->email ?? 'N/A');
+                    return [
+                        'phlebotomist_id' => $p->id,
+                        'user_id' => $u->id,
+                        'name' => $name,
+                        'email' => $u->email ?? null,
+                        'phone_nb' => $u->phone_nb ?? null,
+                    ];
+                })
+                ->values();
+
+            $senderUserIds = $phlebotomistUsers->pluck('user_id')->values();
+
+            // Messages between this manager and phlebotomists from the same hospital (bidirectional)
+            $messages = Message::where(function ($q) use ($managerUserId, $senderUserIds) {
+                    $q->where('receiver_id', $managerUserId)
+                      ->whereIn('sender_id', $senderUserIds);
+                })
+                ->orWhere(function ($q) use ($managerUserId, $senderUserIds) {
+                    $q->where('sender_id', $managerUserId)
+                      ->whereIn('receiver_id', $senderUserIds);
+                })
+                ->with(['sender', 'receiver'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $formattedMessages = $messages->map(function ($m) use ($managerUserId) {
+                $sender = $m->sender;
+                $senderName = 'N/A';
+                if ($sender) {
+                    $parts = array_filter([$sender->first_name ?? null, $sender->middle_name ?? null, $sender->last_name ?? null]);
+                    $senderName = trim(implode(' ', $parts)) ?: ($sender->email ?? 'N/A');
+                }
+
+                $receiver = $m->receiver;
+                $receiverName = 'N/A';
+                if ($receiver) {
+                    $parts = array_filter([$receiver->first_name ?? null, $receiver->middle_name ?? null, $receiver->last_name ?? null]);
+                    $receiverName = trim(implode(' ', $parts)) ?: ($receiver->email ?? 'N/A');
+                }
+
+                return [
+                    'id' => $m->id,
+                    'code' => $m->code,
+                    'sender_user_id' => $m->sender_id,
+                    'receiver_user_id' => $m->receiver_id,
+                    'senderName' => $senderName,
+                    'receiverName' => $receiverName,
+                    'subject' => $m->subject ?? 'N/A',
+                    'body' => $m->body ?? 'N/A',
+                    'created_at' => $m->created_at ? Carbon::parse($m->created_at)->toISOString() : null,
+                    'date' => $m->created_at ? Carbon::parse($m->created_at)->format('Y-m-d h:i A') : 'N/A',
+                    'read_at' => $m->read_at ? Carbon::parse($m->read_at)->format('Y-m-d h:i A') : null,
+                    'is_sent_by_me' => (int) $m->sender_id === (int) $managerUserId,
+                ];
+            });
+
+            return response()->json([
+                'phlebotomists' => $phlebotomistUsers,
+                'messages' => $formattedMessages,
+                'total' => $formattedMessages->count(),
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital phlebotomist messages:', [
+                'user_id' => $request->user()?->id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch messages',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Hospital manager: unread message count (from hospital phlebotomists).
+     * "Unread" = incoming to manager where read_at is null.
+     */
+    public function getUnreadPhlebotomistMessagesCount(Request $request, $hospitalId = null)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, $hospitalId);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $user = $request->user();
+            $role = strtolower((string)($user->role ?? ''));
+            if ($role !== 'manager') {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $hospital = Hospital::with(['healthCenterManager.user'])->find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['message' => 'Hospital not found'], 404);
+            }
+
+            if (!$user->healthCenterManager || (int)$user->healthCenterManager->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $managerUserId = $hospital->healthCenterManager?->user?->id;
+            if (!$managerUserId) {
+                return response()->json(['message' => 'Manager not found for this hospital'], 404);
+            }
+
+            $phlebUserIds = MobilePhlebotomist::where('hospital_id', $hospitalId)
+                ->pluck('user_id')
+                ->filter()
+                ->values();
+
+            $unreadCount = Message::where('receiver_id', $managerUserId)
+                ->whereIn('sender_id', $phlebUserIds)
+                ->whereNull('read_at')
+                ->count();
+
+            return response()->json([
+                'unread_count' => (int) $unreadCount,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching unread phlebotomist message count:', [
+                'user_id' => $request->user()?->id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch unread count',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Hospital manager: mark all incoming messages from hospital phlebotomists as read.
+     */
+    public function markPhlebotomistMessagesRead(Request $request, $hospitalId = null)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, $hospitalId);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $user = $request->user();
+            $role = strtolower((string)($user->role ?? ''));
+            if ($role !== 'manager') {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $hospital = Hospital::with(['healthCenterManager.user'])->find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['message' => 'Hospital not found'], 404);
+            }
+
+            if (!$user->healthCenterManager || (int)$user->healthCenterManager->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $managerUserId = $hospital->healthCenterManager?->user?->id;
+            if (!$managerUserId) {
+                return response()->json(['message' => 'Manager not found for this hospital'], 404);
+            }
+
+            $phlebUserIds = MobilePhlebotomist::where('hospital_id', $hospitalId)
+                ->pluck('user_id')
+                ->filter()
+                ->values();
+
+            $updated = Message::where('receiver_id', $managerUserId)
+                ->whereIn('sender_id', $phlebUserIds)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+
+            return response()->json([
+                'message' => 'Messages marked as read',
+                'updated' => (int) $updated,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error marking phlebotomist messages read:', [
+                'user_id' => $request->user()?->id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to mark messages as read',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Hospital manager: send a message to one of their phlebotomists (reply/new).
+     */
+    public function sendPhlebotomistMessage(Request $request, $hospitalId = null)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, $hospitalId);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $user = $request->user();
+            $role = strtolower((string)($user->role ?? ''));
+            if ($role !== 'manager') {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $hospital = Hospital::with(['healthCenterManager.user'])->find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['message' => 'Hospital not found'], 404);
+            }
+
+            if (!$user->healthCenterManager || (int)$user->healthCenterManager->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $managerUserId = $hospital->healthCenterManager?->user?->id;
+            if (!$managerUserId) {
+                return response()->json(['message' => 'Manager not found for this hospital'], 404);
+            }
+
+            $data = $request->validate([
+                'receiver_user_id' => 'required|integer|exists:users,id',
+                'subject' => 'required|string|max:255',
+                'body' => 'required|string|max:5000',
+            ]);
+
+            // Ensure receiver is a phlebotomist belonging to this hospital
+            $validReceiver = MobilePhlebotomist::where('hospital_id', $hospitalId)
+                ->whereHas('user', function ($q) use ($data) {
+                    $q->where('id', $data['receiver_user_id']);
+                })
+                ->exists();
+
+            if (!$validReceiver) {
+                return response()->json([
+                    'message' => 'Invalid receiver. You can only message phlebotomists in your hospital.',
+                ], 422);
+            }
+
+            $message = Message::create([
+                'sender_id' => $managerUserId,
+                'receiver_id' => (int) $data['receiver_user_id'],
+                'subject' => $data['subject'],
+                'body' => $data['body'],
+            ]);
+
+            $message->load(['sender', 'receiver']);
+
+            $sender = $message->sender;
+            $senderName = 'N/A';
+            if ($sender) {
+                $parts = array_filter([$sender->first_name ?? null, $sender->middle_name ?? null, $sender->last_name ?? null]);
+                $senderName = trim(implode(' ', $parts)) ?: ($sender->email ?? 'N/A');
+            }
+
+            $receiver = $message->receiver;
+            $receiverName = 'N/A';
+            if ($receiver) {
+                $parts = array_filter([$receiver->first_name ?? null, $receiver->middle_name ?? null, $receiver->last_name ?? null]);
+                $receiverName = trim(implode(' ', $parts)) ?: ($receiver->email ?? 'N/A');
+            }
+
+            return response()->json([
+                'message' => 'Message sent',
+                'data' => [
+                    'id' => $message->id,
+                    'code' => $message->code,
+                    'sender_user_id' => $message->sender_id,
+                    'receiver_user_id' => $message->receiver_id,
+                    'senderName' => $senderName,
+                    'receiverName' => $receiverName,
+                    'subject' => $message->subject ?? 'N/A',
+                    'body' => $message->body ?? 'N/A',
+                    'created_at' => $message->created_at ? Carbon::parse($message->created_at)->toISOString() : null,
+                    'date' => $message->created_at ? Carbon::parse($message->created_at)->format('Y-m-d h:i A') : 'N/A',
+                    'read_at' => $message->read_at ? Carbon::parse($message->read_at)->format('Y-m-d h:i A') : null,
+                    'is_sent_by_me' => true,
+                ],
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error sending hospital phlebotomist message:', [
+                'user_id' => $request->user()?->id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to send message',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
     }
 
     /**
@@ -68,6 +424,8 @@ class HospitalDashboardController extends Controller
                     'donation_type' => $donor->donation_type,
                     'medical_status' => $donor->medical_status,
                     'ethics_status' => $donor->ethics_status,
+                    'appointment_status' => $donor->appointment_status,
+                    'selected_appointment_at' => $donor->selected_appointment_at ? $donor->selected_appointment_at->toISOString() : null,
                     'hospital_selection' => $donor->hospital_selection,
                     'hospital_id' => $donor->hospital_id,
                     'hospital_name' => $hospital->name,
@@ -211,6 +569,14 @@ class HospitalDashboardController extends Controller
                     'medical_conditions' => $donor->medical_conditions,
                     'medical_status' => $donor->medical_status,
                     'ethics_status' => $donor->ethics_status,
+                    'appointment_status' => $donor->appointment_status,
+                    'suggested_appointments' => $donor->suggested_appointments ?? [],
+                    'suggestions_sent_at' => $donor->suggestions_sent_at,
+                    'selected_appointment_at' => $donor->selected_appointment_at,
+                    'selected_at' => $donor->selected_at,
+                    'appointment_completed_at' => $donor->appointment_completed_at,
+                    'appointment_cancelled_at' => $donor->appointment_cancelled_at,
+                    'appointment_cancel_reason' => $donor->appointment_cancel_reason,
                     'agree_interest' => $donor->agree_interest,
                     'hospital_selection' => $donor->hospital_selection,
                     'hospital_id' => $donor->hospital_id,
@@ -317,13 +683,58 @@ class HospitalDashboardController extends Controller
                 return response()->json(['message' => 'Forbidden'], 403);
             }
 
+            $oldEthics = $donor->ethics_status;
+            $oldAppointmentStatus = $donor->appointment_status;
+            $oldMedical = $donor->medical_status;
+
             $validated = $request->validate([
                 'medical_status' => 'nullable|in:not_started,in_progress,cleared,rejected',
                 'ethics_status' => 'nullable|in:pending,approved,rejected,N/A',
             ]);
 
             $donor->fill($validated);
+
+            // Step 2: If ethics approved, auto-clear medical state and move to scheduling
+            if (array_key_exists('ethics_status', $validated) && $validated['ethics_status'] === 'approved' && $oldEthics !== 'approved') {
+                $donor->medical_status = 'cleared';
+                $donor->appointment_status = 'awaiting_scheduling';
+            }
+
+            // If rejected -> cancel workflow
+            if (
+                (array_key_exists('ethics_status', $validated) && $validated['ethics_status'] === 'rejected') ||
+                (array_key_exists('medical_status', $validated) && $validated['medical_status'] === 'rejected')
+            ) {
+                $donor->appointment_status = 'cancelled';
+                if (!$donor->appointment_cancelled_at) $donor->appointment_cancelled_at = now();
+                $donor->appointment_cancel_reason = $donor->appointment_cancel_reason ?: 'Case rejected during review.';
+            }
+
             $donor->save();
+
+            // Final thank-you email when medical state becomes cleared
+            try {
+                if ($donor->medical_status === 'cleared' && $oldMedical !== 'cleared' && $donor->email) {
+                    Mail::to($donor->email)->send(new LivingOrganMedicalClearedThankYou($donor));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ medical cleared thank you email (hospital update)', [
+                    'living_donor_code' => $donor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Step 6 email (if it got cancelled here)
+            try {
+                if ($donor->appointment_status === 'cancelled' && $oldAppointmentStatus !== 'cancelled' && $donor->email) {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ appointment cancelled email (hospital update)', [
+                    'living_donor_code' => $donor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'message' => 'Living donor updated',
@@ -336,6 +747,148 @@ class HospitalDashboardController extends Controller
         } catch (\Exception $e) {
             \Log::error('Error updating hospital living donor:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['message' => 'Failed to update living donor'], 500);
+        }
+    }
+
+    /**
+     * Step 3 (hospital-scoped): Suggest appointment options and email donor.
+     */
+    public function suggestLivingDonorAppointments(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+            if ((int)$donor->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $validated = $request->validate([
+                'suggested_appointments' => 'required|array|min:1|max:10',
+                'suggested_appointments.*' => 'required|string',
+            ]);
+
+            if (($donor->ethics_status ?? '') !== 'approved') {
+                return response()->json(['message' => 'Ethics must be approved before suggesting appointments.'], 422);
+            }
+
+            $slots = array_values(array_filter(array_map(function ($s) {
+                $v = trim((string)$s);
+                return $v !== '' ? $v : null;
+            }, $validated['suggested_appointments'])));
+
+            if (count($slots) === 0) {
+                return response()->json(['message' => 'Please provide at least one appointment option.'], 422);
+            }
+
+            $donor->suggested_appointments = $slots;
+            $donor->suggestions_sent_at = now();
+            $donor->appointment_status = 'awaiting_donor_choice';
+            $donor->save();
+
+            $frontend = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+            $dashboardUrl = $frontend . '/donor/my-appointments?focus=living&code=' . urlencode($donor->code);
+
+            try {
+                if ($donor->email) {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentSuggestions($donor, $slots, $dashboardUrl));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Failed to send living organ appointment suggestions email (hospital)', [
+                    'living_donor_code' => $donor->code,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Appointment options saved and email sent to donor.',
+                'living_donor' => $donor->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error suggesting hospital living donor appointments:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to suggest appointments'], 500);
+        }
+    }
+
+    /**
+     * Step 4/5/6 (hospital-scoped): Update appointment status and trigger emails.
+     */
+    public function updateLivingDonorAppointmentStatus(Request $request, string $code)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, null);
+            if (!$hospitalId) {
+                return response()->json(['message' => 'Hospital ID required'], 400);
+            }
+
+            $donor = LivingDonor::where('code', $code)->firstOrFail();
+            if ((int)$donor->hospital_id !== (int)$hospitalId) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            $oldStatus = $donor->appointment_status;
+            $validated = $request->validate([
+                'appointment_status' => 'required|in:awaiting_donor_choice,in_progress,completed,cancelled,awaiting_scheduling,awaiting_approval',
+                'cancel_reason' => 'nullable|string|max:255',
+            ]);
+
+            $donor->appointment_status = $validated['appointment_status'];
+
+            if ($validated['appointment_status'] === 'in_progress') {
+                $donor->medical_status = 'in_progress';
+            }
+
+            if ($validated['appointment_status'] === 'completed') {
+                if (!$donor->appointment_completed_at) $donor->appointment_completed_at = now();
+            }
+
+            if ($validated['appointment_status'] === 'cancelled') {
+                if (!$donor->appointment_cancelled_at) $donor->appointment_cancelled_at = now();
+                $donor->appointment_cancel_reason = $validated['cancel_reason'] ?? ($donor->appointment_cancel_reason ?: 'Appointment cancelled.');
+            }
+
+            $donor->save();
+
+            if ($donor->appointment_status === 'completed' && $oldStatus !== 'completed' && $donor->email) {
+                try {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentCompleted($donor));
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to send living organ appointment completed email (hospital)', [
+                        'living_donor_code' => $donor->code,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            if ($donor->appointment_status === 'cancelled' && $oldStatus !== 'cancelled' && $donor->email) {
+                try {
+                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to send living organ appointment cancelled email (hospital)', [
+                        'living_donor_code' => $donor->code,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Appointment status updated.',
+                'living_donor' => $donor->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating hospital living donor appointment status:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to update appointment status'], 500);
         }
     }
 
@@ -863,6 +1416,518 @@ class HospitalDashboardController extends Controller
     }
 
     /**
+     * Hospital-scoped blood inventory summary for dashboard Inventory page.
+     * Returns all 8 blood types with quantity, threshold, and shortage status.
+     */
+    public function getInventory(Request $request, $hospitalId = null)
+    {
+        try {
+            $hospitalId = $this->resolveHospitalId($request, $hospitalId);
+            if (!$hospitalId) {
+                return response()->json(['success' => false, 'message' => 'Hospital ID required'], 400);
+            }
+
+            $hospital = Hospital::find($hospitalId);
+            if (!$hospital) {
+                return response()->json(['success' => false, 'message' => 'Hospital not found'], 404);
+            }
+
+            $settings = HospitalSetting::where('hospital_id', $hospitalId)->first();
+            $threshold = (int)($settings->auto_reorder_threshold ?? 15);
+            if ($threshold < 0) $threshold = 0;
+
+            $bloodTypes = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+
+            $rows = [];
+
+            // 1) Current blood stock (manual inventory editor) from blood_inventory table
+            // Sum quantities where status=available and compute nearest expiry from expiry_date.
+            $stockByType = collect();
+            $nearestStockExpiryByType = collect();
+            try {
+                $stockByType = BloodInventory::where('hospital_id', $hospitalId)
+                    ->where('status', 'available')
+                    ->join('blood_types', 'blood_inventory.blood_type_id', '=', 'blood_types.id')
+                    ->select('blood_types.type', 'blood_types.rh_factor', DB::raw('SUM(blood_inventory.quantity) as total'))
+                    ->groupBy('blood_types.type', 'blood_types.rh_factor')
+                    ->get()
+                    ->mapWithKeys(function($item) {
+                        $key = $item->type . $item->rh_factor;
+                        return [$key => (int)($item->total ?? 0)];
+                    });
+
+                $nearestStockExpiryByType = BloodInventory::where('hospital_id', $hospitalId)
+                    ->where('status', 'available')
+                    ->whereNotNull('expiry_date')
+                    ->join('blood_types', 'blood_inventory.blood_type_id', '=', 'blood_types.id')
+                    ->select('blood_types.type', 'blood_types.rh_factor', DB::raw('MIN(blood_inventory.expiry_date) as min_expiry'))
+                    ->groupBy('blood_types.type', 'blood_types.rh_factor')
+                    ->get()
+                    ->mapWithKeys(function($item) {
+                        $key = $item->type . $item->rh_factor;
+                        return [$key => $item->min_expiry];
+                    });
+            } catch (\Exception $e) {
+                $stockByType = collect();
+                $nearestStockExpiryByType = collect();
+            }
+
+            // 2) Registered donors for blood donations (home + hospital) in this hospital, grouped by donor blood type
+            $donorIdsByType = [];
+            foreach ($bloodTypes as $bt) {
+                $donorIdsByType[$bt] = [];
+            }
+
+            try {
+                $homeRows = DB::table('home_appointments')
+                    ->join('appointments', 'home_appointments.appointment_id', '=', 'appointments.id')
+                    ->join('donors', 'home_appointments.donor_id', '=', 'donors.id')
+                    ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
+                    ->where('home_appointments.hospital_id', $hospitalId)
+                    ->where('home_appointments.state', '!=', 'canceled')
+                    ->where('appointments.donation_type', 'like', '%Blood%')
+                    ->select('home_appointments.donor_id as donor_id', 'blood_types.type', 'blood_types.rh_factor')
+                    ->distinct()
+                    ->get();
+
+                foreach ($homeRows as $r) {
+                    $bt = $r->type . $r->rh_factor;
+                    if (!isset($donorIdsByType[$bt])) continue;
+                    $donorIdsByType[$bt][$r->donor_id] = true;
+                }
+
+                $hospitalRows = DB::table('hospital_appointments')
+                    ->join('appointments', 'hospital_appointments.appointment_id', '=', 'appointments.id')
+                    ->join('donors', 'hospital_appointments.donor_id', '=', 'donors.id')
+                    ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
+                    ->where('hospital_appointments.hospital_Id', $hospitalId)
+                    ->where('hospital_appointments.state', '!=', 'canceled')
+                    ->where('appointments.donation_type', 'like', '%Blood%')
+                    ->select('hospital_appointments.donor_id as donor_id', 'blood_types.type', 'blood_types.rh_factor')
+                    ->distinct()
+                    ->get();
+
+                foreach ($hospitalRows as $r) {
+                    $bt = $r->type . $r->rh_factor;
+                    if (!isset($donorIdsByType[$bt])) continue;
+                    $donorIdsByType[$bt][$r->donor_id] = true;
+                }
+            } catch (\Exception $e) {
+                // ignore and return zeros
+            }
+
+            $today = Carbon::today();
+            $warningDays = 7;
+
+            // --- Blood donation requests & usage (by donor blood type) ---
+            // We count bookings (requests) for blood donation and keep a collapsible list
+            // of completed bookings with donor + completion time + expiry + usage status.
+            $bloodDonationLike = '%Blood%';
+            $requestsByType = array_fill_keys($bloodTypes, 0);
+            $usedUnitsByType = array_fill_keys($bloodTypes, 0);
+            $unusedUnitsByType = array_fill_keys($bloodTypes, 0);
+            $availableUnitsByType = array_fill_keys($bloodTypes, 0); // unused + not expired
+            $expiredUnusedUnitsByType = array_fill_keys($bloodTypes, 0); // unused + expired
+            $nearestExpiryAvailableByType = array_fill_keys($bloodTypes, null); // min expires_at among unused + not expired
+            $completedListByType = array_fill_keys($bloodTypes, []);
+
+            try {
+                // Home bookings (counts)
+                $homeAgg = DB::table('home_appointments')
+                    ->join('appointments', 'home_appointments.appointment_id', '=', 'appointments.id')
+                    ->join('donors', 'home_appointments.donor_id', '=', 'donors.id')
+                    ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
+                    ->where('home_appointments.hospital_id', $hospitalId)
+                    ->where('home_appointments.state', '=', 'completed')
+                    ->where('appointments.donation_type', 'like', $bloodDonationLike)
+                    ->select(
+                        'blood_types.type',
+                        'blood_types.rh_factor',
+                        DB::raw('COUNT(*) as total_requests'),
+                        DB::raw("SUM(CASE WHEN COALESCE(home_appointments.blood_usage_status, 'unused') = 'used' THEN COALESCE(home_appointments.blood_units_collected, 1) ELSE 0 END) as used_units"),
+                        DB::raw("SUM(CASE WHEN COALESCE(home_appointments.blood_usage_status, 'unused') != 'used' THEN COALESCE(home_appointments.blood_units_collected, 1) ELSE 0 END) as unused_units"),
+                        DB::raw("SUM(CASE WHEN COALESCE(home_appointments.blood_usage_status, 'unused') != 'used' AND COALESCE(home_appointments.expires_at, DATE(DATE_ADD(COALESCE(home_appointments.completed_at, home_appointments.updated_at), INTERVAL 42 DAY))) > CURDATE() THEN COALESCE(home_appointments.blood_units_collected, 1) ELSE 0 END) as available_units"),
+                        DB::raw("SUM(CASE WHEN COALESCE(home_appointments.blood_usage_status, 'unused') != 'used' AND COALESCE(home_appointments.expires_at, DATE(DATE_ADD(COALESCE(home_appointments.completed_at, home_appointments.updated_at), INTERVAL 42 DAY))) <= CURDATE() THEN COALESCE(home_appointments.blood_units_collected, 1) ELSE 0 END) as expired_unused_units"),
+                        DB::raw("MIN(CASE WHEN COALESCE(home_appointments.blood_usage_status, 'unused') != 'used' AND COALESCE(home_appointments.expires_at, DATE(DATE_ADD(COALESCE(home_appointments.completed_at, home_appointments.updated_at), INTERVAL 42 DAY))) > CURDATE() THEN COALESCE(home_appointments.expires_at, DATE(DATE_ADD(COALESCE(home_appointments.completed_at, home_appointments.updated_at), INTERVAL 42 DAY))) ELSE NULL END) as nearest_available_expiry")
+                    )
+                    ->groupBy('blood_types.type', 'blood_types.rh_factor')
+                    ->get();
+
+                foreach ($homeAgg as $r) {
+                    $bt = ($r->type ?? '') . ($r->rh_factor ?? '');
+                    if (!isset($requestsByType[$bt])) continue;
+                    $requestsByType[$bt] += (int)($r->total_requests ?? 0);
+                    $usedUnitsByType[$bt] += (int)($r->used_units ?? 0);
+                    $unusedUnitsByType[$bt] += (int)($r->unused_units ?? 0);
+                    $availableUnitsByType[$bt] += (int)($r->available_units ?? 0);
+                    $expiredUnusedUnitsByType[$bt] += (int)($r->expired_unused_units ?? 0);
+                    if (!empty($r->nearest_available_expiry)) {
+                        $nearestExpiryAvailableByType[$bt] = $r->nearest_available_expiry;
+                    }
+                }
+
+                // Hospital bookings (counts)
+                $hospitalAgg = DB::table('hospital_appointments')
+                    ->join('appointments', 'hospital_appointments.appointment_id', '=', 'appointments.id')
+                    ->join('donors', 'hospital_appointments.donor_id', '=', 'donors.id')
+                    ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
+                    ->where('hospital_appointments.hospital_Id', $hospitalId)
+                    ->where('hospital_appointments.state', '=', 'completed')
+                    ->where('appointments.donation_type', 'like', $bloodDonationLike)
+                    ->select(
+                        'blood_types.type',
+                        'blood_types.rh_factor',
+                        DB::raw('COUNT(*) as total_requests'),
+                        DB::raw("SUM(CASE WHEN COALESCE(hospital_appointments.blood_usage_status, 'unused') = 'used' THEN COALESCE(hospital_appointments.blood_units_collected, 1) ELSE 0 END) as used_units"),
+                        DB::raw("SUM(CASE WHEN COALESCE(hospital_appointments.blood_usage_status, 'unused') != 'used' THEN COALESCE(hospital_appointments.blood_units_collected, 1) ELSE 0 END) as unused_units"),
+                        DB::raw("SUM(CASE WHEN COALESCE(hospital_appointments.blood_usage_status, 'unused') != 'used' AND COALESCE(hospital_appointments.expires_at, DATE(DATE_ADD(COALESCE(hospital_appointments.completed_at, hospital_appointments.updated_at), INTERVAL 42 DAY))) > CURDATE() THEN COALESCE(hospital_appointments.blood_units_collected, 1) ELSE 0 END) as available_units"),
+                        DB::raw("SUM(CASE WHEN COALESCE(hospital_appointments.blood_usage_status, 'unused') != 'used' AND COALESCE(hospital_appointments.expires_at, DATE(DATE_ADD(COALESCE(hospital_appointments.completed_at, hospital_appointments.updated_at), INTERVAL 42 DAY))) <= CURDATE() THEN COALESCE(hospital_appointments.blood_units_collected, 1) ELSE 0 END) as expired_unused_units"),
+                        DB::raw("MIN(CASE WHEN COALESCE(hospital_appointments.blood_usage_status, 'unused') != 'used' AND COALESCE(hospital_appointments.expires_at, DATE(DATE_ADD(COALESCE(hospital_appointments.completed_at, hospital_appointments.updated_at), INTERVAL 42 DAY))) > CURDATE() THEN COALESCE(hospital_appointments.expires_at, DATE(DATE_ADD(COALESCE(hospital_appointments.completed_at, hospital_appointments.updated_at), INTERVAL 42 DAY))) ELSE NULL END) as nearest_available_expiry")
+                    )
+                    ->groupBy('blood_types.type', 'blood_types.rh_factor')
+                    ->get();
+
+                foreach ($hospitalAgg as $r) {
+                    $bt = ($r->type ?? '') . ($r->rh_factor ?? '');
+                    if (!isset($requestsByType[$bt])) continue;
+                    $requestsByType[$bt] += (int)($r->total_requests ?? 0);
+                    $usedUnitsByType[$bt] += (int)($r->used_units ?? 0);
+                    $unusedUnitsByType[$bt] += (int)($r->unused_units ?? 0);
+                    $availableUnitsByType[$bt] += (int)($r->available_units ?? 0);
+                    $expiredUnusedUnitsByType[$bt] += (int)($r->expired_unused_units ?? 0);
+                    if (!empty($r->nearest_available_expiry)) {
+                        // Keep the earliest date across both booking types
+                        if (!$nearestExpiryAvailableByType[$bt] || $r->nearest_available_expiry < $nearestExpiryAvailableByType[$bt]) {
+                            $nearestExpiryAvailableByType[$bt] = $r->nearest_available_expiry;
+                        }
+                    }
+                }
+
+                // Completed bookings list (for collapsible UI)
+                // Keep it bounded to avoid huge responses (latest 200 per booking type).
+                $homeCompleted = DB::table('home_appointments')
+                    ->join('appointments', 'home_appointments.appointment_id', '=', 'appointments.id')
+                    ->join('donors', 'home_appointments.donor_id', '=', 'donors.id')
+                    ->join('users', 'donors.user_id', '=', 'users.id')
+                    ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
+                    ->where('home_appointments.hospital_id', $hospitalId)
+                    ->where('home_appointments.state', '=', 'completed')
+                    ->where('appointments.donation_type', 'like', $bloodDonationLike)
+                    ->orderBy('home_appointments.updated_at', 'desc')
+                    ->limit(200)
+                    ->select(
+                        'home_appointments.id as booking_id',
+                        'home_appointments.code as booking_code',
+                        DB::raw('COALESCE(home_appointments.completed_at, home_appointments.updated_at) as completed_at'),
+                        DB::raw('COALESCE(home_appointments.expires_at, DATE(DATE_ADD(COALESCE(home_appointments.completed_at, home_appointments.updated_at), INTERVAL 42 DAY))) as expires_at'),
+                        'home_appointments.appointment_time as appointment_time',
+                        'home_appointments.blood_units_collected as units_collected',
+                        'home_appointments.blood_usage_status as usage_status',
+                        'donors.id as donor_id',
+                        'donors.code as donor_code',
+                        'users.first_name',
+                        'users.middle_name',
+                        'users.last_name',
+                        'blood_types.type as bt_type',
+                        'blood_types.rh_factor as bt_rh'
+                    )
+                    ->get();
+
+                foreach ($homeCompleted as $r) {
+                    $bt = ($r->bt_type ?? '') . ($r->bt_rh ?? '');
+                    if (!isset($completedListByType[$bt])) continue;
+                    $nameParts = array_filter([$r->first_name ?? null, $r->middle_name ?? null, $r->last_name ?? null]);
+
+                    $expiresAt = $r->expires_at ?? null;
+                    $expiryStatus = 'none';
+                    $expiryDaysLeft = null;
+                    if ($expiresAt) {
+                        try {
+                            $expDate = Carbon::parse($expiresAt)->startOfDay();
+                            $expiryDaysLeft = $today->diffInDays($expDate, false);
+                            if ($expiryDaysLeft <= 0) {
+                                $expiryStatus = 'expired';
+                            } elseif ($expiryDaysLeft <= $warningDays) {
+                                $expiryStatus = 'warning';
+                            } else {
+                                $expiryStatus = 'ok';
+                            }
+                            $expiresAt = $expDate->toDateString();
+                        } catch (\Exception $e) {
+                            $expiresAt = null;
+                            $expiryStatus = 'none';
+                            $expiryDaysLeft = null;
+                        }
+                    }
+
+                    $completedListByType[$bt][] = [
+                        'booking_type' => 'home',
+                        'booking_id' => (int)($r->booking_id ?? 0),
+                        'booking_code' => $r->booking_code,
+                        'donor_id' => (int)($r->donor_id ?? 0),
+                        'donor_code' => $r->donor_code,
+                        'donor_name' => $nameParts ? implode(' ', $nameParts) : null,
+                        'blood_type' => $bt,
+                        'completed_at' => $r->completed_at,
+                        'expires_at' => $expiresAt,
+                        'expiry_status' => $expiryStatus, // ok|warning|expired|none
+                        'expiry_days_left' => $expiryDaysLeft,
+                        'appointment_time' => $r->appointment_time,
+                        'units_collected' => (int)($r->units_collected ?? 1),
+                        'usage_status' => $r->usage_status ?? 'unused',
+                    ];
+                }
+
+                $hospitalCompleted = DB::table('hospital_appointments')
+                    ->join('appointments', 'hospital_appointments.appointment_id', '=', 'appointments.id')
+                    ->join('donors', 'hospital_appointments.donor_id', '=', 'donors.id')
+                    ->join('users', 'donors.user_id', '=', 'users.id')
+                    ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
+                    ->where('hospital_appointments.hospital_Id', $hospitalId)
+                    ->where('hospital_appointments.state', '=', 'completed')
+                    ->where('appointments.donation_type', 'like', $bloodDonationLike)
+                    ->orderBy('hospital_appointments.updated_at', 'desc')
+                    ->limit(200)
+                    ->select(
+                        'hospital_appointments.id as booking_id',
+                        'hospital_appointments.code as booking_code',
+                        DB::raw('COALESCE(hospital_appointments.completed_at, hospital_appointments.updated_at) as completed_at'),
+                        DB::raw('COALESCE(hospital_appointments.expires_at, DATE(DATE_ADD(COALESCE(hospital_appointments.completed_at, hospital_appointments.updated_at), INTERVAL 42 DAY))) as expires_at'),
+                        'hospital_appointments.appointment_time as appointment_time',
+                        'hospital_appointments.blood_units_collected as units_collected',
+                        'hospital_appointments.blood_usage_status as usage_status',
+                        'donors.id as donor_id',
+                        'donors.code as donor_code',
+                        'users.first_name',
+                        'users.middle_name',
+                        'users.last_name',
+                        'blood_types.type as bt_type',
+                        'blood_types.rh_factor as bt_rh'
+                    )
+                    ->get();
+
+                foreach ($hospitalCompleted as $r) {
+                    $bt = ($r->bt_type ?? '') . ($r->bt_rh ?? '');
+                    if (!isset($completedListByType[$bt])) continue;
+                    $nameParts = array_filter([$r->first_name ?? null, $r->middle_name ?? null, $r->last_name ?? null]);
+
+                    $expiresAt = $r->expires_at ?? null;
+                    $expiryStatus = 'none';
+                    $expiryDaysLeft = null;
+                    if ($expiresAt) {
+                        try {
+                            $expDate = Carbon::parse($expiresAt)->startOfDay();
+                            $expiryDaysLeft = $today->diffInDays($expDate, false);
+                            if ($expiryDaysLeft <= 0) {
+                                $expiryStatus = 'expired';
+                            } elseif ($expiryDaysLeft <= $warningDays) {
+                                $expiryStatus = 'warning';
+                            } else {
+                                $expiryStatus = 'ok';
+                            }
+                            $expiresAt = $expDate->toDateString();
+                        } catch (\Exception $e) {
+                            $expiresAt = null;
+                            $expiryStatus = 'none';
+                            $expiryDaysLeft = null;
+                        }
+                    }
+
+                    $completedListByType[$bt][] = [
+                        'booking_type' => 'hospital',
+                        'booking_id' => (int)($r->booking_id ?? 0),
+                        'booking_code' => $r->booking_code,
+                        'donor_id' => (int)($r->donor_id ?? 0),
+                        'donor_code' => $r->donor_code,
+                        'donor_name' => $nameParts ? implode(' ', $nameParts) : null,
+                        'blood_type' => $bt,
+                        'completed_at' => $r->completed_at,
+                        'expires_at' => $expiresAt,
+                        'expiry_status' => $expiryStatus, // ok|warning|expired|none
+                        'expiry_days_left' => $expiryDaysLeft,
+                        'appointment_time' => $r->appointment_time,
+                        'units_collected' => (int)($r->units_collected ?? 1),
+                        'usage_status' => $r->usage_status ?? 'unused',
+                    ];
+                }
+            } catch (\Exception $e) {
+                // Keep zeros/defaults if any query fails
+            }
+
+            foreach ($bloodTypes as $bt) {
+                // Manual stock (from blood_inventory)
+                $availableStock = (int)($stockByType[$bt] ?? 0);
+                $shortage = 'sufficient';
+                if ($availableStock < $threshold) {
+                    $shortage = 'critical';
+                } elseif ($availableStock < ($threshold * 2)) {
+                    $shortage = 'low stock';
+                }
+
+                $nearestExpiry = $nearestStockExpiryByType[$bt] ?? null;
+                $expiryStatus = 'none';
+                $daysLeft = null;
+                if ($nearestExpiry) {
+                    try {
+                        $expDate = Carbon::parse($nearestExpiry)->startOfDay();
+                        $daysLeft = $today->diffInDays($expDate, false);
+                        if ($daysLeft <= 0) {
+                            $expiryStatus = 'expired';
+                        } elseif ($daysLeft <= $warningDays) {
+                            $expiryStatus = 'warning';
+                        } else {
+                            $expiryStatus = 'ok';
+                        }
+                        $nearestExpiry = $expDate->toDateString();
+                    } catch (\Exception $e) {
+                        $nearestExpiry = null;
+                        $expiryStatus = 'none';
+                        $daysLeft = null;
+                    }
+                }
+
+                $registeredDonors = isset($donorIdsByType[$bt]) ? count($donorIdsByType[$bt]) : 0;
+
+                $rows[] = [
+                    'blood_type' => $bt,
+                    'registered_donors' => $registeredDonors,
+                    'requests_total' => (int)($requestsByType[$bt] ?? 0),
+                    'available_stock' => $availableStock,
+                    'threshold' => $threshold,
+                    'shortage_status' => $shortage,
+                    'nearest_expiry_date' => $nearestExpiry,
+                    'expiry_status' => $expiryStatus, // none|ok|warning
+                    'expiry_days_left' => $daysLeft,
+                    'usage' => [
+                        'used_units' => (int)($usedUnitsByType[$bt] ?? 0),
+                        'unused_units' => (int)($unusedUnitsByType[$bt] ?? 0),
+                        'expired_unused_units' => (int)($expiredUnusedUnitsByType[$bt] ?? 0),
+                    ],
+                    'completed_donations' => $completedListByType[$bt] ?? [],
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'hospital' => [
+                    'id' => $hospital->id,
+                    'name' => $hospital->name,
+                ],
+                'threshold' => $threshold,
+                'inventory' => $rows,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching hospital inventory:', [
+                'hospital_id' => $hospitalId ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch inventory',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update hospital blood stock for each blood type (dashboard Inventory editor).
+     * This replaces existing AVAILABLE stock rows for the given blood type in this hospital
+     * with a single row containing the provided quantity + optional expiry_date.
+     */
+    public function updateInventory(Request $request, $hospitalId = null)
+    {
+        $hospitalId = $this->resolveHospitalId($request, $hospitalId);
+        if (!$hospitalId) {
+            return response()->json(['success' => false, 'message' => 'Hospital ID required'], 400);
+        }
+
+        $hospital = Hospital::find($hospitalId);
+        if (!$hospital) {
+            return response()->json(['success' => false, 'message' => 'Hospital not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'inventory' => 'required|array|min:1',
+            'inventory.*.blood_type' => 'required|string|max:5',
+            'inventory.*.quantity' => 'required|integer|min:0',
+            'inventory.*.expiry_date' => 'nullable|date',
+        ]);
+
+        $bloodTypesAllowed = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+
+        DB::beginTransaction();
+        try {
+            foreach ($validated['inventory'] as $row) {
+                $bt = strtoupper(trim($row['blood_type']));
+                if (!in_array($bt, $bloodTypesAllowed, true)) {
+                    throw new \InvalidArgumentException("Invalid blood type: {$bt}");
+                }
+
+                $type = str_replace(['+', '-'], '', $bt);
+                $rh = str_contains($bt, '+') ? '+' : '-';
+
+                $bloodType = BloodType::where('type', $type)->where('rh_factor', $rh)->first();
+                if (!$bloodType) {
+                    throw new \InvalidArgumentException("Blood type not found in DB: {$bt}");
+                }
+
+                // Replace existing stock rows for this blood type/hospital.
+                // We keep "used" history but fully replace current stock (available/expired).
+                BloodInventory::where('hospital_id', $hospitalId)
+                    ->where('blood_type_id', $bloodType->id)
+                    ->whereIn('status', ['available', 'expired'])
+                    ->delete();
+
+                $qty = (int)$row['quantity'];
+                if ($qty === 0) {
+                    continue;
+                }
+
+                $expiryDate = $row['expiry_date'] ?? null;
+                $status = 'available';
+                if ($expiryDate) {
+                    try {
+                        $exp = Carbon::parse($expiryDate)->startOfDay();
+                        if (Carbon::today()->greaterThanOrEqualTo($exp)) {
+                            $status = 'expired';
+                        }
+                        $expiryDate = $exp->toDateString();
+                    } catch (\Exception $e) {
+                        // If date can't be parsed, store null (treat as available)
+                        $expiryDate = null;
+                    }
+                }
+
+                BloodInventory::create([
+                    'hospital_id' => $hospitalId,
+                    'blood_type_id' => $bloodType->id,
+                    'quantity' => $qty,
+                    'expiry_date' => $expiryDate,
+                    'status' => $status,
+                    'note' => 'dashboard_inventory_update',
+                ]);
+            }
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Inventory updated successfully',
+            ], 200);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Error updating hospital inventory:', [
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => $e instanceof \InvalidArgumentException ? $e->getMessage() : 'Failed to update inventory',
+            ], 500);
+        }
+    }
+
+    /**
      * Get all appointments (home and hospital) for the authenticated hospital manager
      * Supports filtering by date range, donation type, urgency, and state
      */
@@ -1144,6 +2209,268 @@ class HospitalDashboardController extends Controller
                 'success' => false,
                 'message' => 'Failed to fetch appointments',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a single booking (home/hospital appointment record) for the authenticated hospital manager.
+     * This edits the booking state/time, not the underlying Appointment template.
+     */
+    public function updateAppointmentBooking(Request $request, string $type, int $id)
+    {
+        $validated = $request->validate([
+            'state' => 'sometimes|required|in:pending,completed,canceled',
+            'appointment_time' => 'sometimes|nullable|string|max:20',
+        ]);
+
+        $hospitalId = $this->resolveHospitalId($request, null);
+        if (!$hospitalId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hospital ID not found. Please ensure you are logged in as a hospital manager.',
+            ], 403);
+        }
+
+        $type = strtolower($type);
+        if (!in_array($type, ['home', 'hospital'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid booking type',
+            ], 422);
+        }
+
+        try {
+            if ($type === 'home') {
+                $booking = HomeAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
+            } else {
+                $booking = HospitalAppointment::where('hospital_Id', $hospitalId)->findOrFail($id);
+            }
+
+            if (array_key_exists('state', $validated)) {
+                $prevState = $booking->state;
+                $booking->state = $validated['state'];
+
+                // Store completion moment (do not rely on updated_at since other edits can change it)
+                if ($validated['state'] === 'completed' && $prevState !== 'completed') {
+                    $booking->completed_at = now();
+                    // expiry: collectedAt + 42 days (whole blood)
+                    try {
+                        $booking->expires_at = Carbon::parse($booking->completed_at)->addDays(42)->toDateString();
+                    } catch (\Exception $e) {
+                        $booking->expires_at = null;
+                    }
+                }
+                if ($validated['state'] !== 'completed') {
+                    $booking->completed_at = null;
+                    $booking->expires_at = null;
+                }
+            }
+            if (array_key_exists('appointment_time', $validated)) {
+                $booking->appointment_time = $validated['appointment_time'];
+            }
+            $booking->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking updated successfully',
+                'booking' => [
+                    'id' => $booking->id,
+                    'code' => $booking->code,
+                    'type' => $type,
+                    'state' => $booking->state,
+                    'appointment_time' => $booking->appointment_time,
+                    'completed_at' => $booking->completed_at,
+                    'expires_at' => $booking->expires_at,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking not found',
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error updating booking:', [
+                'type' => $type,
+                'id' => $id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update booking',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a single booking (home/hospital appointment record) for the authenticated hospital manager.
+     * This deletes the booking record, not the underlying Appointment template.
+     */
+    public function deleteAppointmentBooking(Request $request, string $type, int $id)
+    {
+        $hospitalId = $this->resolveHospitalId($request, null);
+        if (!$hospitalId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hospital ID not found. Please ensure you are logged in as a hospital manager.',
+            ], 403);
+        }
+
+        $type = strtolower($type);
+        if (!in_array($type, ['home', 'hospital'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid booking type',
+            ], 422);
+        }
+
+        try {
+            if ($type === 'home') {
+                $booking = HomeAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
+            } else {
+                $booking = HospitalAppointment::where('hospital_Id', $hospitalId)->findOrFail($id);
+            }
+
+            $booking->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking deleted successfully',
+                'deleted' => [
+                    'id' => $id,
+                    'type' => $type,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking not found',
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting booking:', [
+                'type' => $type,
+                'id' => $id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete booking',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update blood usage state for a completed booking (home/hospital).
+     * This is used by the Inventory page to mark collected units as used/unused.
+     */
+    public function updateBookingBloodUsage(Request $request, string $type, int $id)
+    {
+        $validated = $request->validate([
+            'usage_status' => 'required|in:used,unused',
+            'units_collected' => 'sometimes|integer|min:1|max:10',
+        ]);
+
+        $hospitalId = $this->resolveHospitalId($request, null);
+        if (!$hospitalId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hospital ID not found. Please ensure you are logged in as a hospital manager.',
+            ], 403);
+        }
+
+        $type = strtolower($type);
+        if (!in_array($type, ['home', 'hospital'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid booking type',
+            ], 422);
+        }
+
+        try {
+            if ($type === 'home') {
+                $booking = HomeAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
+            } else {
+                $booking = HospitalAppointment::where('hospital_Id', $hospitalId)->findOrFail($id);
+            }
+
+            // Restrict to completed bookings for blood donations
+            if (($booking->state ?? '') !== 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only completed bookings can be updated in inventory usage.',
+                ], 422);
+            }
+
+            // Optional: update units collected (defaults to 1)
+            if (array_key_exists('units_collected', $validated)) {
+                $booking->blood_units_collected = (int)$validated['units_collected'];
+            }
+
+            // Prevent expired blood units from being marked as "used"
+            // We treat a booking's expires_at as the unit/batch expiry.
+            $expiresAt = $booking->expires_at;
+            if (!$expiresAt && $booking->completed_at) {
+                try {
+                    $expiresAt = Carbon::parse($booking->completed_at)->addDays(42)->toDateString();
+                    $booking->expires_at = $expiresAt; // self-heal missing data
+                } catch (\Exception $e) {
+                    $expiresAt = null;
+                }
+            }
+            if ($validated['usage_status'] === 'used' && $expiresAt) {
+                try {
+                    $expDate = Carbon::parse($expiresAt)->startOfDay();
+                    if (Carbon::today()->greaterThanOrEqualTo($expDate)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This blood unit is expired and cannot be marked as used.',
+                        ], 422);
+                    }
+                } catch (\Exception $e) {
+                    // ignore parse errors
+                }
+            }
+
+            $booking->blood_usage_status = $validated['usage_status'];
+            if ($validated['usage_status'] === 'used') {
+                $booking->blood_used_at = now();
+            } else {
+                $booking->blood_used_at = null;
+            }
+
+            $booking->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usage updated',
+                'booking' => [
+                    'type' => $type,
+                    'id' => $booking->id,
+                    'code' => $booking->code,
+                    'blood_units_collected' => (int)($booking->blood_units_collected ?? 1),
+                    'blood_usage_status' => $booking->blood_usage_status ?? 'unused',
+                    'blood_used_at' => $booking->blood_used_at,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking not found',
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error updating booking blood usage:', [
+                'type' => $type,
+                'id' => $id,
+                'hospital_id' => $hospitalId,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update usage',
             ], 500);
         }
     }

@@ -3,8 +3,9 @@ import "../../styles/Navbar.css"
 import { MdOutlineNotificationsActive } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import AdminProfileDropdown from "./AdminProfileDropdown";
+import { FiMenu } from "react-icons/fi";
 
-export default function Navbar(){
+export default function Navbar({ openSidebar = false, setOpenSidebar = () => {} }){
     const { user } = useAuth();
 
     const getUserName = () => {
@@ -20,14 +21,22 @@ export default function Navbar(){
         return firstName || "Admin";
     };
 
+    const toggleSidebar = () => {
+        setOpenSidebar(!openSidebar);
+    }
+
     return(
         <>
             <div  className="navbar">
-                <h2>Welcome Back, {getDisplayName()}</h2>
+                <div className="flex flex-row items-center gap-5">
+                    <button onClick={toggleSidebar} className="sidebar-toggle">
+                        <FiMenu className="icon-size" />
+                    </button>
+                    <h2>Welcome Back, {getDisplayName()}</h2>
+                </div>
                 <div className="nav-info">
                     <MdOutlineNotificationsActive className="admin-icon"/>
                     <div className="admin-info">
-                        <AdminProfileDropdown />
                         <div className="admin-name">
                             <h3>{getUserName()}</h3>
                             <small>Administrator</small>

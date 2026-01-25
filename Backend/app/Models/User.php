@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
 
 use App\Models\Donor;
@@ -14,11 +15,12 @@ use App\Models\MobilePhlebotomists;
 use App\Models\SupportTicket;
 use App\Models\Message;
 use App\Models\HealthCenterManager;
+use App\Models\ChatSession;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'first_name',
@@ -86,5 +88,9 @@ class User extends Authenticatable
 
     public function receivedMessages(){
         return $this->hasMany(Message::class, 'receiver_id');
+    }
+
+    public function chatSessions(){
+        return $this->hasMany(ChatSession::class, 'user_id');
     }
 }

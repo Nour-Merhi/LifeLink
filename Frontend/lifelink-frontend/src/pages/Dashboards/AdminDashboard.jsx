@@ -3,9 +3,12 @@ import Sidebar from "../../components/adminDashboard/sidebar";
 import { Outlet } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Navigate } from "react-router-dom";
+import { useState } from "react";
+import "../../styles/Dashboard.css";
 
 export default function AdminDashboard(){
     const { user, loading } = useAuth()
+    const [openSidebar, setOpenSidebar] = useState(false);
 
     if (loading){
         return <div>Loading...</div>;
@@ -20,8 +23,8 @@ export default function AdminDashboard(){
     }
     return (
         <div className="admin-layout">
-            <Sidebar />
-            <Navbar />
+            <Sidebar openSidebar={openSidebar} setOpenSidebar={setOpenSidebar} />
+            <Navbar openSidebar={openSidebar} setOpenSidebar={setOpenSidebar} />
             <div className="admin-content">
                 <Outlet />
             </div>

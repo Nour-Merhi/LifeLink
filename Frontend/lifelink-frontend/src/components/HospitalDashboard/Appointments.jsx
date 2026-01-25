@@ -8,6 +8,9 @@ import CalendarView from "../../components/adminDashboard/homeVisitComponents/Ca
 import { SpinnerDotted } from 'spinners-react';
 import { RiDeleteBin6Line } from "react-icons/ri";
 import AssignPhlebotomistModal from "../../components/adminDashboard/homeVisitComponents/AssignPhlebotomistModal";
+import ConfirmDeleteDialog from "../common/ConfirmDeleteDialog";
+import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 
 export default function Appointments() {
@@ -17,6 +20,8 @@ export default function Appointments() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     const [dateRange, setDateRange] = useState("all"); // Changed default to "all" to show all appointments
     const [appointmentTypeFilters, setAppointmentTypeFilters] = useState([]); // Array: 'home', 'hospital'
     const [statusFilters, setStatusFilters] = useState([]); // Array: 'pending', 'completed', 'canceled'
@@ -30,11 +35,10 @@ export default function Appointments() {
     const [editLoading, setEditLoading] = useState(false);
     const [editError, setEditError] = useState("");
     const [editFormData, setEditFormData] = useState({
-        appointment_date: '',
         appointment_time: '',
         state: 'pending',
-        max_capacity: null
     });
+    const [showDonorMap, setShowDonorMap] = useState(false);
     const [expandedRequests, setExpandedRequests] = useState(new Set());
     
     // Phlebotomist assignment states (only for home appointments)
@@ -49,6 +53,11 @@ export default function Appointments() {
             fetchDonorRequests();
         }
     }, [dateRange, appointmentTypeFilters, statusFilters, user, hospitalId]);
+
+    // Reset pagination when filters/search/view changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, dateRange, appointmentTypeFilters, statusFilters, viewMode]);
 
     const fetchDonorRequests = () => {
         if (!hospitalId) {
@@ -91,13 +100,12 @@ export default function Appointments() {
 
     const handleEdit = (appointment) => {
         setEditFormData({
-            appointment_date: appointment.appointment_date || '',
             appointment_time: appointment.appointment_time || '',
             state: appointment.state || 'pending',
-            max_capacity: appointment.max_capacity || null
         });
         setEditModal(appointment);
         setEditError("");
+        setShowDonorMap(false);
     };
 
     const handleSaveEdit = async () => {
@@ -108,10 +116,14 @@ export default function Appointments() {
 
         try {
             await api.get("/sanctum/csrf-cookie");
+
+            // Update booking record (home/hospital) for this hospital
+            const response = await api.put(
+                `/api/hospital/dashboard/appointments/bookings/${editModal.type}/${editModal.id}`,
+                editFormData
+            );
             
-            const response = await api.put(`/api/admin/dashboard/appointments/${editModal.id}`, editFormData);
-            
-            if (response.data) {
+            if (response.data?.success) {
                 setEditModal(null);
                 fetchDonorRequests();
             }
@@ -125,7 +137,7 @@ export default function Appointments() {
 
     const handleDelete = (appointment) => {
         setDeleteConfirm({
-            appointmentIds: [appointment.id],
+            appointments: [appointment],
             count: 1,
             appointment: appointment
         });
@@ -133,7 +145,7 @@ export default function Appointments() {
     };
 
     const handleDeleteConfirm = async () => {
-        if (!deleteConfirm || !deleteConfirm.appointmentIds || deleteConfirm.appointmentIds.length === 0) {
+        if (!deleteConfirm || !deleteConfirm.appointments || deleteConfirm.appointments.length === 0) {
             setDeleteError("No appointments to delete");
             return;
         }
@@ -144,8 +156,8 @@ export default function Appointments() {
         try {
             await api.get("/sanctum/csrf-cookie");
             
-            const deletePromises = deleteConfirm.appointmentIds.map(appointmentId => 
-                api.delete(`/api/admin/dashboard/appointments/${appointmentId}`)
+            const deletePromises = deleteConfirm.appointments.map((apt) => 
+                api.delete(`/api/hospital/dashboard/appointments/bookings/${apt.type}/${apt.id}`)
             );
 
             const results = await Promise.allSettled(deletePromises);
@@ -186,6 +198,29 @@ export default function Appointments() {
     // Check if appointment is a home appointment
     const isHomeAppointment = (apt) => {
         return apt.donation_type && apt.donation_type.includes('Home');
+    };
+
+    const getDonorCoords = (apt) => {
+        const latRaw =
+            apt?.donor?.latitude ??
+            apt?.donor?.lat ??
+            apt?.donor_latitude ??
+            apt?.latitude ??
+            apt?.lat;
+        const lngRaw =
+            apt?.donor?.longitude ??
+            apt?.donor?.lng ??
+            apt?.donor_longitude ??
+            apt?.longitude ??
+            apt?.lng;
+
+        const lat = latRaw !== undefined && latRaw !== null ? Number(latRaw) : NaN;
+        const lng = lngRaw !== undefined && lngRaw !== null ? Number(lngRaw) : NaN;
+
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            return { lat, lng };
+        }
+        return null;
     };
 
     // Handle select/deselect for phlebotomist assignment (only home appointments)
@@ -273,6 +308,15 @@ export default function Appointments() {
         
         return true;
     });
+
+    // Pagination (table view)
+    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / itemsPerPage));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+    const startDisplay = filteredRequests.length === 0 ? 0 : startIndex + 1;
+    const endDisplay = Math.min(endIndex, filteredRequests.length);
 
     // Debug logging
     useEffect(() => {
@@ -545,7 +589,7 @@ export default function Appointments() {
             {!loading && !error && (viewMode === "calendar" ? (
                 <CalendarView 
                     orders={filteredRequests.map(apt => ({
-                        id: apt.id,
+                        id: `${apt.type}-${apt.code || apt.id}`,
                         date: apt.appointment_date,
                         time: apt.appointment_time || 'N/A',
                         name: `${apt.donor?.user?.first_name || ''} ${apt.donor?.user?.last_name || ''}`.trim() || 'Unknown Donor',
@@ -555,7 +599,7 @@ export default function Appointments() {
                         donationType: apt.donation_type
                     }))}
                     filteredOrders={filteredRequests.map(apt => ({
-                        id: apt.id,
+                        id: `${apt.type}-${apt.code || apt.id}`,
                         date: apt.appointment_date,
                         time: apt.appointment_time || 'N/A',
                         name: `${apt.donor?.user?.first_name || ''} ${apt.donor?.user?.last_name || ''}`.trim() || 'Unknown Donor',
@@ -643,14 +687,14 @@ export default function Appointments() {
                         </thead>
                         <tbody>
                             {filteredRequests.length > 0 ? (
-                                filteredRequests.map((apt) => {
+                                paginatedRequests.map((apt) => {
                                     const donationType = apt.donation_type || '';
                                     const isHome = donationType.includes('Home');
                                     const isHospital = donationType.includes('Hospital');
                                     const isHomeApt = isHomeAppointment(apt);
                                     
                                     return (
-                                        <tr key={apt.id}>
+                                        <tr key={`${apt.type}-${apt.code || apt.id}`}>
                                             {filteredRequests.some(a => isHomeAppointment(a)) && (
                                                 <td style={{ textAlign: 'center', width: '50px' }}>
                                                     {isHomeApt ? (
@@ -698,7 +742,7 @@ export default function Appointments() {
                                                 <span className={`badge status-${apt.state}`}>{apt.state}</span>
                                             </td>
                                             <td className="col-phlebotomist flex flex-col">
-                                                {apt.mobilePhlebotomist?.user?.first_name || 'Unassigned'} {apt.mobilePhlebotomist?.user?.last_name || 'Unassigned'} 
+                                                {apt.mobilePhlebotomist?.user?.first_name || 'Unassigned'} {apt.mobilePhlebotomist?.user?.last_name || ''} 
                                                 <span className="muted">+961 {apt.mobilePhlebotomist?.user?.phone_nb || 'N/A'}</span>
                                             </td>
                                             <td className="col-actions">
@@ -750,6 +794,42 @@ export default function Appointments() {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Pagination */}
+                    {filteredRequests.length > 0 && (
+                        <div className="pagination">
+                            <div className="showing">
+                                <small className="muted">
+                                    Showing {startDisplay} to {endDisplay} of {filteredRequests.length} appointments
+                                </small>
+                            </div>
+                            <div className="pagination-controls">
+                                <button
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={safeCurrentPage === 1}
+                                    className="pagination-btn"
+                                >
+                                    Previous
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                                    <button
+                                        key={pageNum}
+                                        onClick={() => setCurrentPage(pageNum)}
+                                        className={`pagination-btn ${safeCurrentPage === pageNum ? 'active' : ''}`}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={safeCurrentPage === totalPages}
+                                    className="pagination-btn"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )
             )}
@@ -860,34 +940,41 @@ export default function Appointments() {
 
             {/* Edit Modal */}
             {editModal && (
-                <div className="modal-overlay modal-overlay-delete" onClick={() => !editLoading && setEditModal(null)}>
-                    <div className="modal-container modal-container-delete" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-title">
-                            <h2>Edit Appointment</h2>
-                            <button onClick={() => !editLoading && setEditModal(null)} disabled={editLoading}>
+                <div className="modal-overlay" onClick={() => !editLoading && setEditModal(null)}>
+                    <div
+                        className="modal-container modal-modern"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        style={{ maxWidth: 560 }}
+                    >
+                        <div className="modal-modern-header">
+                            <div className="modal-modern-title">
+                                <h2>Edit Appointment</h2>
+                                <div className="modal-modern-subtitle">
+                                    <span className="muted">
+                                        {`${editModal.donor?.user?.first_name || ''} ${editModal.donor?.user?.last_name || ''}`.trim() || 'Unknown Donor'}
+                                        {editModal.donation_type ? ` • ${editModal.donation_type}` : ''}
+                                        {editModal.appointment_date ? ` • ${editModal.appointment_date}` : ''}
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                className="modal-icon-btn"
+                                onClick={() => !editLoading && setEditModal(null)}
+                                aria-label="Close"
+                                disabled={editLoading}
+                            >
                                 <IoClose />
                             </button>
                         </div>
-                        <div className="modal-form">
+
+                        <div className="modal-modern-body">
+                            <div className="modal-note" style={{ marginBottom: 12 }}>
+                                <strong>Booking:</strong> {editModal.code || editModal.id}
+                            </div>
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                        Appointment Date <span style={{ color: 'red' }}>*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={editFormData.appointment_date}
-                                        onChange={(e) => setEditFormData({...editFormData, appointment_date: e.target.value})}
-                                        style={{
-                                            width: '100%',
-                                            padding: '8px 12px',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '6px',
-                                            fontSize: '14px'
-                                        }}
-                                        required
-                                    />
-                                </div>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         Appointment Time
@@ -895,7 +982,7 @@ export default function Appointments() {
                                     <input
                                         type="time"
                                         value={editFormData.appointment_time}
-                                        onChange={(e) => setEditFormData({...editFormData, appointment_time: e.target.value})}
+                                        onChange={(e) => setEditFormData({ ...editFormData, appointment_time: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '8px 12px',
@@ -905,13 +992,14 @@ export default function Appointments() {
                                         }}
                                     />
                                 </div>
+
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         Status <span style={{ color: 'red' }}>*</span>
                                     </label>
                                     <select
                                         value={editFormData.state}
-                                        onChange={(e) => setEditFormData({...editFormData, state: e.target.value})}
+                                        onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '8px 12px',
@@ -926,24 +1014,55 @@ export default function Appointments() {
                                         <option value="canceled">Canceled</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                        Max Capacity
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={editFormData.max_capacity || ''}
-                                        onChange={(e) => setEditFormData({...editFormData, max_capacity: e.target.value ? parseInt(e.target.value) : null})}
-                                        min="1"
-                                        style={{
-                                            width: '100%',
-                                            padding: '8px 12px',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '6px',
-                                            fontSize: '14px'
-                                        }}
-                                    />
-                                </div>
+
+                                {isHomeAppointment(editModal) && (
+                                    <div style={{ marginTop: 4 }}>
+                                        <button
+                                            type="button"
+                                            className="btn-cancel"
+                                            onClick={() => setShowDonorMap((prev) => !prev)}
+                                            style={{ width: "100%" }}
+                                        >
+                                            {showDonorMap ? "Hide Donor Location Map" : "Show Donor Location Map"}
+                                        </button>
+
+                                        {showDonorMap ? (
+                                            (() => {
+                                                const coords = getDonorCoords(editModal);
+                                                if (!coords) {
+                                                    return (
+                                                        <div className="modal-note" style={{ marginTop: 10 }}>
+                                                            Donor coordinates are not available for this appointment.
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div style={{ marginTop: 10, height: 280, borderRadius: 12, overflow: "hidden" }}>
+                                                        <MapContainer
+                                                            center={[coords.lat, coords.lng]}
+                                                            zoom={15}
+                                                            style={{ height: "100%", width: "100%" }}
+                                                            scrollWheelZoom={true}
+                                                        >
+                                                            <TileLayer
+                                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                                            />
+                                                            <CircleMarker center={[coords.lat, coords.lng]} radius={10} pathOptions={{ color: "#F12C31" }}>
+                                                                <Popup>
+                                                                    {`${editModal.donor?.user?.first_name || ''} ${editModal.donor?.user?.last_name || ''}`.trim() ||
+                                                                        "Donor"}{" "}
+                                                                    location
+                                                                </Popup>
+                                                            </CircleMarker>
+                                                        </MapContainer>
+                                                    </div>
+                                                );
+                                            })()
+                                        ) : null}
+                                    </div>
+                                )}
                             </div>
 
                             {editError && (
@@ -951,32 +1070,32 @@ export default function Appointments() {
                                     {editError}
                                 </div>
                             )}
+                        </div>
 
-                            <div className="form-actions form-actions-modal" style={{ marginTop: '20px' }}>
-                                <button 
-                                    type="button" 
-                                    onClick={() => setEditModal(null)}
-                                    disabled={editLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleSaveEdit}
-                                    disabled={editLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {editLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
+                        <div className="modal-modern-footer">
+                            <button
+                                type="button"
+                                onClick={() => !editLoading && setEditModal(null)}
+                                disabled={editLoading}
+                                className="btn-cancel"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveEdit}
+                                disabled={editLoading}
+                                className="submit-btn"
+                            >
+                                {editLoading ? (
+                                    <span style={{ display: "inline-flex", alignItems: "center" }}>
+                                        <SpinnerDotted size={18} thickness={120} speed={100} color="#fff" className="spinner-inline" />
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    "Save Changes"
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -984,62 +1103,21 @@ export default function Appointments() {
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Delete Appointment</h2>
-                            <button onClick={() => !deleteLoading && setDeleteConfirm(null)} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete this appointment?</p>
-                            {deleteConfirm.appointment && (
-                                <p style={{ marginTop: '10px' }}>
-                                    <strong>Request ID:</strong> {deleteConfirm.appointment.code || deleteConfirm.appointment.id}
-                                </p>
-                            )}
-                            <p className="modal-text-secondary" style={{ marginTop: '10px' }}>
-                                This action cannot be undone.
-                            </p>
-                            <span className="modal-warning-text">
-                                Note: This action cannot be undone if there are no active bookings.
-                            </span>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setDeleteConfirm(null)}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Record"
+                    description="You are going to delete this regular appointment. Are you sure?"
+                    details={
+                        deleteConfirm?.appointment
+                            ? `Request ID: ${deleteConfirm.appointment.code || deleteConfirm.appointment.id}`
+                            : undefined
+                    }
+                    confirmText="Yes, Delete"
+                    cancelText="No, Keep It"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={() => !deleteLoading && setDeleteConfirm(null)}
+                    onConfirm={handleDeleteConfirm}
+                />
             )}
             
         </section>

@@ -11,8 +11,10 @@ use App\Models\AfterDeathPledge;
 use App\Models\XpTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use App\Services\XpService;
+use App\Mail\LivingOrganAppointmentCancelled;
 
 class DonorDashboardController extends Controller
 {
@@ -660,12 +662,13 @@ class DonorDashboardController extends Controller
             }
 
             $appointments = collect([]);
+            $organAppointments = [];
 
             // Home appointments (only pending)
             try {
                 $homeAppointments = HomeAppointment::where('donor_id', $donor->id)
                     ->where('state', 'pending')
-                    ->with(['appointment.hospital', 'hospital'])
+                    ->with(['appointment.hospital', 'hospital', 'mobilePhlebotomist.user'])
                     ->orderBy('created_at', 'desc')
                     ->get();
 
@@ -695,6 +698,18 @@ class DonorDashboardController extends Controller
                             $appointmentTime = 'N/A';
                         }
 
+                        $phlebName = null;
+                        $phlebPhone = null;
+                        $phlebCode = null;
+                        if ($appt->mobilePhlebotomist) {
+                            $phlebCode = $appt->mobilePhlebotomist->code ?? null;
+                            $phlebUser = $appt->mobilePhlebotomist->user;
+                            if ($phlebUser) {
+                                $phlebName = trim(($phlebUser->first_name ?? '') . ' ' . ($phlebUser->last_name ?? '')) ?: null;
+                                $phlebPhone = $phlebUser->phone_nb ?? null;
+                            }
+                        }
+
                         $appointments->push([
                             'id' => $appt->id,
                             'code' => $appt->code ?? 'N/A',
@@ -703,6 +718,11 @@ class DonorDashboardController extends Controller
                             'date' => $appointmentDate->format('M d, Y'),
                             'time' => $appointmentTime,
                             'status' => ucfirst($appt->state ?? 'pending'),
+                            'phlebotomist' => [
+                                'name' => $phlebName,
+                                'phone' => $phlebPhone,
+                                'code' => $phlebCode,
+                            ],
                         ]);
                     } catch (\Exception $e) {
                         \Log::warning('Error processing home appointment for my appointments:', [
@@ -786,8 +806,29 @@ class DonorDashboardController extends Controller
                 }
             })->values();
 
+            // Living organ appointment suggestions (for donor panel)
+            if ($user->email) {
+                $livingDonors = LivingDonor::where('email', $user->email)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+
+                $organAppointments = $livingDonors->map(function (LivingDonor $ld) {
+                    return [
+                        'code' => $ld->code,
+                        'organ' => $ld->organ,
+                        'ethics_status' => $ld->ethics_status,
+                        'medical_status' => $ld->medical_status,
+                        'appointment_status' => $ld->appointment_status,
+                        'suggested_appointments' => $ld->suggested_appointments ?? [],
+                        'selected_appointment_at' => $ld->selected_appointment_at ? $ld->selected_appointment_at->toISOString() : null,
+                        'created_at' => $ld->created_at ? $ld->created_at->toISOString() : null,
+                    ];
+                })->values();
+            }
+
             return response()->json([
                 'appointments' => $appointments,
+                'organ_appointments' => $organAppointments,
                 'total' => $appointments->count()
             ], 200);
 
@@ -804,6 +845,69 @@ class DonorDashboardController extends Controller
                 'message' => 'Failed to fetch appointments',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
             ], 500);
+        }
+    }
+
+    /**
+     * Step 4: Donor chooses one suggested appointment time for a living donor pledge.
+     */
+    public function chooseLivingDonorAppointment(Request $request, string $code)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+            if (strtolower($user->role ?? '') !== 'donor') {
+                return response()->json(['message' => 'Unauthorized. Only donors can access this endpoint.'], 403);
+            }
+
+            $validated = $request->validate([
+                'selected_appointment_at' => 'required|string',
+            ]);
+
+            $livingDonor = LivingDonor::where('code', $code)->firstOrFail();
+
+            // Ensure this pledge belongs to the logged-in donor
+            if (strtolower((string)$livingDonor->email) !== strtolower((string)$user->email)) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
+            if (($livingDonor->appointment_status ?? '') === 'cancelled') {
+                return response()->json(['message' => 'This appointment workflow is cancelled.'], 422);
+            }
+            if (($livingDonor->appointment_status ?? '') === 'completed') {
+                return response()->json(['message' => 'This appointment is already completed.'], 422);
+            }
+
+            $suggested = $livingDonor->suggested_appointments ?? [];
+            $choice = trim((string)$validated['selected_appointment_at']);
+            if (!in_array($choice, $suggested, true)) {
+                return response()->json(['message' => 'Selected appointment must be one of the suggested options.'], 422);
+            }
+
+            $livingDonor->selected_appointment_at = Carbon::parse($choice);
+            $livingDonor->selected_at = now();
+            $livingDonor->appointment_status = 'in_progress';
+            $livingDonor->medical_status = 'in_progress';
+            $livingDonor->save();
+
+            return response()->json([
+                'message' => 'Appointment choice saved.',
+                'living_donor' => $livingDonor->fresh(),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Living donor pledge not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('Error choosing living donor appointment:', [
+                'user_id' => Auth::id(),
+                'code' => $code,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Failed to choose appointment'], 500);
         }
     }
 

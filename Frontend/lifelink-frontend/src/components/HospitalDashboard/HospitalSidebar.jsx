@@ -1,15 +1,14 @@
 import lifelinkLogo from "../../assets/imgs/Logo.png";
-import { GoHomeFill } from "react-icons/go";
-import { IoPerson } from "react-icons/io5";
-import { IoCalendarOutline } from "react-icons/io5";
-import { LiaUserNurseSolid } from "react-icons/lia";
-import { MdOutlineHealthAndSafety } from "react-icons/md";
+import { IoPeople } from "react-icons/io5";
+import { IoCalendar, IoSettings } from "react-icons/io5";
 import { PiHeartbeatFill } from "react-icons/pi";
-import { FiBarChart2 } from "react-icons/fi";
 import { MdNotificationsActive } from "react-icons/md";
-import { RiSettings5Fill } from "react-icons/ri";
 import { FiLogOut } from "react-icons/fi";
 import { IoIosArrowDown, IoIosArrowUp } from "react-icons/io";
+import { BiSolidShieldPlus } from "react-icons/bi";
+import { FaUserNurse } from "react-icons/fa";
+import { IoAnalytics } from "react-icons/io5";
+
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import api from "../../api/axios";
@@ -48,7 +47,7 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
         {openSidebar && <div className="sidebar-backdrop" onClick={() => setOpenSidebar(false)}></div>}
         <div className={`sidebar linear-hospital layout admin-sidebar ${openSidebar ? "open" : ""}`}>
             
-            <img src={systemLogo || lifelinkLogo} alt={`${platformName || "LifeLink"} logo`} />
+            <img onClick={() => navigate("/home")} cursor="pointer" src={systemLogo || lifelinkLogo} alt={`${platformName || "LifeLink"} logo`} />
 
             <div className="links text-white">
                 <div className="link-item" onClick = {
@@ -57,8 +56,8 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                         setOpenMenuOrgan(false)
                     )
                 }>
-                    <GoHomeFill className="icon-size text-white"/>
-                    <NavLink to="/hospital/dashboard">Dashboard</NavLink>
+                    <IoAnalytics className="icon-size text-white"/>
+                    <NavLink to="/hospital/analytics">Analytics</NavLink>
                 </div>
 
                 <div className="link-item" onClick = {
@@ -67,7 +66,7 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                         setOpenMenuOrgan(false)
                     )
                 }>
-                    <IoPerson className="icon-size text-white"/>
+                    <IoPeople className="icon-size text-white"/>
                     <NavLink to="/hospital/donors">Donor Management</NavLink>
                 </div>
 
@@ -77,13 +76,13 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                         setOpenMenuOrgan(false)
                     )
                 }>
-                    <LiaUserNurseSolid className="icon-size text-white"/>
+                    <FaUserNurse className="icon-size text-white"/>
                     <NavLink to="/hospital/phlebotomists">Phlebotomists</NavLink>
                 </div>
 
                 <div className="link-item" style={{ position: 'relative', flexDirection: 'column', alignItems: 'stretch' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <IoCalendarOutline className="icon-size text-white"/>
+                        <IoCalendar className="icon-size text-white"/>
                         <div 
                             className="drop-down-title" 
                             onClick={
@@ -136,7 +135,7 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                
                 <div className="link-item" style={{ position: 'relative', flexDirection: 'column', alignItems: 'stretch' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <MdOutlineHealthAndSafety className="icon-size text-white"/>
+                        <BiSolidShieldPlus className="icon-size text-white"/>
                         <div 
                             className="drop-down-title" 
                             onClick={
@@ -186,18 +185,8 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                         setOpenMenuOrgan(false)
                     )
                 }>
-                    <FiBarChart2 className="icon-size text-white"/>
-                    <NavLink to="/hospital/analytics">Analytics & Reports</NavLink>
-                </div>
-
-                <div className="link-item" onClick = {
-                    () => (
-                        setOpenMenuBlood(false),
-                        setOpenMenuOrgan(false)
-                    )
-                }>
                     <MdNotificationsActive className="icon-size text-white"/>
-                    <NavLink to="/hospital/notifications">Notifications</NavLink>
+                    <NavLink to="/hospital/notifications">Message Center</NavLink>
                 </div>
                 
                 <div className="link-item" onClick = {
@@ -206,7 +195,7 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                         setOpenMenuOrgan(false)
                     )
                 }>
-                    <RiSettings5Fill className="icon-size text-white"/>
+                    <IoSettings className="icon-size text-white"/>
                     <NavLink to="/hospital/settings">Hospital Settings</NavLink>
                 </div>
             </div>

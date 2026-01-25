@@ -10,9 +10,13 @@ import { MdHealthAndSafety } from "react-icons/md";
 import { RiHandHeartFill } from "react-icons/ri";
 import { BiHomeSmile } from "react-icons/bi";
 
-export default function Sidebar() {
+export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {} } = {}) {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const closeSidebar = () => {
+    try { setOpenSidebar(false); } catch (_) {}
+  };
 
   const handleDonationClick = (e) => {
     if (!user) {
@@ -23,7 +27,9 @@ export default function Sidebar() {
 
   return (
 
-    <div className="sidebar pl-3 pr-3">
+    <>
+    {openSidebar && <div className="sidebar-backdrop" onClick={closeSidebar}></div>}
+    <div className={`sidebar pl-3 pr-3 ${openSidebar ? "open" : ""}`} id="sidebar-donation">
       <div className="top">
         <img src={lifelinklogo} alt="lifelink logo" className="!my-2 !mx-1 max-w-[120px]" />
         <h1>Donation Center</h1>
@@ -36,7 +42,7 @@ export default function Sidebar() {
 
         <NavLink 
           to="home-blood-donation" 
-          onClick={handleDonationClick}
+          onClick={(e) => { handleDonationClick(e); closeSidebar(); }}
           className={({ isActive }) =>
             `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} ${isActive ? "bg-gradient-to-r from-red-600 to-red-800 text-white" : "text-black"}`
           }   
@@ -58,7 +64,7 @@ export default function Sidebar() {
 
 
         <NavLink to="hospital-blood-donation"
-        onClick={handleDonationClick}
+        onClick={(e) => { handleDonationClick(e); closeSidebar(); }}
         className={({ isActive }) =>
             `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
@@ -83,7 +89,7 @@ export default function Sidebar() {
         <h2>ORGAN DONATION</h2>
 
         <NavLink to="/donation/alive-organ-donation"
-        onClick={handleDonationClick}
+        onClick={(e) => { handleDonationClick(e); closeSidebar(); }}
          className={({ isActive }) =>
             `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
@@ -104,7 +110,7 @@ export default function Sidebar() {
         </NavLink>
 
         <NavLink to="/donation/after-death-donation"
-        onClick={handleDonationClick}
+        onClick={(e) => { handleDonationClick(e); closeSidebar(); }}
           className={({ isActive }) =>
             `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
@@ -129,7 +135,7 @@ export default function Sidebar() {
         <h2>FINANCIAL SUPPORT</h2>
 
         <NavLink to="/donation/financial-support"
-        onClick={handleDonationClick}
+        onClick={(e) => { handleDonationClick(e); closeSidebar(); }}
           className={({ isActive }) =>
             `option rounded-[15px] ${!user ? "disabled-option" : "hover:bg-gray-300"} 
             ${isActive ? 
@@ -151,7 +157,7 @@ export default function Sidebar() {
       </div>
 
       <hr id="bottom-hr" />
-      <NavLink to="/home" id="home" className="option">
+      <NavLink to="/home" id="home" className="option" onClick={closeSidebar}>
         <div id="home-icon" className="icon">
           <BiHomeSmile />
         </div>
@@ -160,5 +166,6 @@ export default function Sidebar() {
         </div>
       </NavLink>
     </div>
+    </>
   );
 }

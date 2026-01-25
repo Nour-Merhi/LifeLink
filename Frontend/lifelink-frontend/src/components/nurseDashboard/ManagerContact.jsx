@@ -162,12 +162,6 @@ export default function ManagerContact(){
                     >
                         Messages
                     </button>
-                    <button
-                        className={activeTab === "Schedule" ? "tab-active-nurse" : "tab-inactive"}
-                        onClick={() => setActiveTab("Schedule")}
-                    >
-                        Schedule
-                    </button>
                 </div>
                 <button 
                     className="new-message-btn"
@@ -395,12 +389,6 @@ export default function ManagerContact(){
                         </div>
                     )}
                 </>
-            )}
-
-            {activeTab === "Schedule" && (
-                <div className="donor-container schedule-placeholder">
-                    <p>Schedule feature coming soon</p>
-                </div>
             )}
         </div>
     )

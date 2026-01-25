@@ -6,11 +6,13 @@ import {
     IoCallOutline, 
     IoLocationOutline,
     IoTimeOutline,
-    IoDocumentTextOutline,
-    IoDocumentOutline,
     IoChatbubbleOutline,
     IoArrowBack
 } from "react-icons/io5";
+import { FaGamepad, FaTrophy, FaChartLine } from "react-icons/fa";
+import { AiFillThunderbolt } from "react-icons/ai";
+import { IoMdCheckmark } from "react-icons/io";
+import { RiLock2Fill } from "react-icons/ri";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
 
@@ -21,6 +23,12 @@ export default function DonorDetail() {
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("activity");
     const [donorData, setDonorData] = useState(null);
+    const [gamingData, setGamingData] = useState(null);
+    const [gamingLoading, setGamingLoading] = useState(false);
+    const [gamingError, setGamingError] = useState("");
+    const [rewardsData, setRewardsData] = useState(null);
+    const [rewardsLoading, setRewardsLoading] = useState(false);
+    const [rewardsError, setRewardsError] = useState("");
 
     useEffect(() => {
         fetchDonorDetails();
@@ -63,6 +71,56 @@ export default function DonorDetail() {
                 return 'badge-danger';
             default:
                 return 'badge-pending';
+        }
+    };
+
+    const formatGameType = (gameType) => {
+        const names = {
+            'tictactoe': 'Tic Tac Toe',
+            'hangman': 'Hangman',
+            'memory': 'Memory Game'
+        };
+        const s = String(gameType || '').toLowerCase();
+        return names[s] || (s ? s.charAt(0).toUpperCase() + s.slice(1) : 'N/A');
+    };
+
+    const fetchGamingDetails = async () => {
+        if (!donorCode) return;
+        setGamingLoading(true);
+        setGamingError("");
+        try {
+            const res = await api.get(`/api/admin/dashboard/donors/${donorCode}/quiz-history`);
+            setGamingData(res.data || null);
+        } catch (err) {
+            setGamingError(err.response?.data?.message || "Failed to fetch gaming details");
+            setGamingData(null);
+        } finally {
+            setGamingLoading(false);
+        }
+    };
+
+    const fetchRewardsSummary = async () => {
+        if (!donorCode) return;
+        setRewardsLoading(true);
+        setRewardsError("");
+        try {
+            const res = await api.get(`/api/admin/dashboard/donors/${donorCode}/rewards`);
+            setRewardsData(res.data || null);
+        } catch (err) {
+            setRewardsError(err.response?.data?.message || "Failed to fetch rewards");
+            setRewardsData(null);
+        } finally {
+            setRewardsLoading(false);
+        }
+    };
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        if (tab === "gaming" && !gamingData && !gamingLoading) {
+            fetchGamingDetails();
+        }
+        if (tab === "rewards" && !rewardsData && !rewardsLoading) {
+            fetchRewardsSummary();
         }
     };
 
@@ -116,7 +174,6 @@ export default function DonorDetail() {
                         </div>
                     </div>
                     <div className="donor-actions">
-                        <button className="btn-message">Message</button>
                         <button className="btn-suspend">Suspend</button>
                     </div>
                 </div>
@@ -200,31 +257,24 @@ export default function DonorDetail() {
             <div className="donor-detail-tabs">
                 <button 
                     className={`tab-button ${activeTab === 'activity' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('activity')}
+                    onClick={() => handleTabChange('activity')}
                 >
                     <IoTimeOutline />
                     <span>Activity & Donations</span>
                 </button>
                 <button 
-                    className={`tab-button ${activeTab === 'medical' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('medical')}
+                    className={`tab-button ${activeTab === 'rewards' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('rewards')}
                 >
-                    <IoDocumentTextOutline />
-                    <span>Medical Summary</span>
+                    <FaTrophy />
+                    <span>Level & Rewards</span>
                 </button>
                 <button 
-                    className={`tab-button ${activeTab === 'documents' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('documents')}
+                    className={`tab-button ${activeTab === 'gaming' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('gaming')}
                 >
-                    <IoDocumentOutline />
-                    <span>Documents</span>
-                </button>
-                <button 
-                    className={`tab-button ${activeTab === 'communications' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('communications')}
-                >
-                    <IoChatbubbleOutline />
-                    <span>Communications</span>
+                    <FaGamepad />
+                    <span>Gaming Details</span>
                 </button>
             </div>
 
@@ -267,34 +317,311 @@ export default function DonorDetail() {
                     </div>
                 )}
 
-                {activeTab === 'medical' && (
-                    <div className="medical-summary">
-                        <h3>Medical Conditions</h3>
-                        {medical_conditions && Object.keys(medical_conditions).length > 0 ? (
-                            <div className="medical-conditions-list">
-                                {Object.entries(medical_conditions)
-                                    .filter(([key, value]) => value === true)
-                                    .map(([condition, _], idx) => (
-                                        <span key={idx} className="badge badge-orange">
-                                            {condition.charAt(0).toUpperCase() + condition.slice(1).replace(/_/g, ' ')}
-                                        </span>
-                                    ))}
+                {activeTab === 'rewards' && (
+                    <div >
+                        {rewardsLoading ? (
+                            <div className="flex items-center justify-center h-40">
+                                <p className="text-gray-500">Loading rewards...</p>
                             </div>
+                        ) : rewardsError ? (
+                            <div className="text-red-500">{rewardsError}</div>
+                        ) : !rewardsData ? (
+                            <div className="muted">No rewards data available</div>
                         ) : (
-                            <p className="muted">No medical conditions recorded</p>
+                            (() => {
+                                const levelProgress = rewardsData.level_progress || {};
+                                const certificates = Array.isArray(rewardsData.certificates) ? rewardsData.certificates : [];
+                                const unlockedCount = certificates.filter((c) => c.unlocked).length;
+
+                                return (
+                                    <>
+                                        <div className="dashboard-title" style={{ marginBottom: "12px" }}>
+                                            <div className="icon-title">
+                                                <FaTrophy />
+                                                <h2 className="!text-xl !font-bold">Level & Rewards Summary</h2>
+                                            </div>
+                                            <p className="text-gray-500 !text-sm">Quick summary of this donor's current progress</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                                            <div className="p-4 rounded-xl bg-white border border-gray-500">
+                                                <div className="text-sm text-gray-500">Current Level</div>
+                                                <div className="text-2xl font-bold text-purple-600">Level {levelProgress.current_level ?? "N/A"}</div>
+                                            </div>
+                                            <div className="p-4 rounded-xl bg-white border border-gray-500">
+                                                <div className="text-sm text-gray-500">Total XP</div>
+                                                <div className="text-2xl font-bold text-blue-600">{levelProgress.current_xp ?? "N/A"}</div>
+                                            </div>
+                                            <div className="p-4 rounded-xl bg-white border border-gray-500">
+                                                <div className="text-sm text-gray-500">Unlocked Certificates</div>
+                                                <div className="text-2xl font-bold text-green-600">{unlockedCount}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 p-4 rounded-xl bg-white border border-gray-500">
+                                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                                <div className="text-sm text-gray-600">
+                                                    XP until next level:{" "}
+                                                    <span className="font-semibold">{levelProgress.xp_until_next_level ?? "N/A"}</span>
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    Next level:{" "}
+                                                    <span className="font-semibold">Level {levelProgress.next_level ?? "N/A"}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                );
+                            })()
                         )}
                     </div>
                 )}
 
-                {activeTab === 'documents' && (
-                    <div className="documents-section">
-                        <p className="muted">No documents uploaded</p>
-                    </div>
-                )}
+                {activeTab === 'gaming' && (
+                    <div >
+                        {gamingLoading ? (
+                            <div className="flex items-center justify-center h-40">
+                                <p className="text-gray-500">Loading gaming details...</p>
+                            </div>
+                        ) : gamingError ? (
+                            <div className="text-red-500">{gamingError}</div>
+                        ) : !gamingData ? (
+                            <div className="muted">No gaming data available</div>
+                        ) : (
+                            (() => {
+                                const {
+                                    current_level: donor_xp_level,
+                                    completed_levels = [],
+                                    total_xp = 0,
+                                    session_logs = [],
+                                    minigame_stats = {},
+                                    minigame_logs = []
+                                } = gamingData;
 
-                {activeTab === 'communications' && (
-                    <div className="communications-section">
-                        <p className="muted">No communications recorded</p>
+                                const totalLevels = 10;
+                                const completedQuizLevels = Array.isArray(completed_levels) ? completed_levels : [];
+                                const quizMaxCompleted = completedQuizLevels.length ? Math.max(...completedQuizLevels) : 0;
+                                const quizCurrentLevel = Math.min(totalLevels, Math.max(1, quizMaxCompleted + 1));
+                                const quizProgressPercentage = Math.min(
+                                  100,
+                                  Math.max(0, (completedQuizLevels.length / totalLevels) * 100)
+                                );
+
+                                return (
+                                    <>
+                                        <div className="dashboard-title" style={{ marginBottom: 12 }}>
+                                            <div className="icon-title">
+                                                <FaGamepad />
+                                                <h2 className="!text-xl !font-bold">Gaming Details</h2>
+                                            </div>
+                                            <p className="text-gray-500 !text-sm">Quiz progress, minigame stats, and history</p>
+                                        </div>
+
+                                        {/* Current Level & Progress */}
+                                        <div className="p-4 rounded-xl bg-white border border-gray-500 mb-4">
+                                            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                                                <div>
+                                                     <h2 className="text-xl font-bold text-gray-800">Quiz Level {quizCurrentLevel}</h2>
+                                                     <p className="text-gray-600 !text-sm">Current Quiz Level (1–10)</p>
+                                                </div>
+                                                <div className="text-right">
+                                                     <div className="text-2xl font-bold text-purple-600">{completedQuizLevels.length}/{totalLevels}</div>
+                                                     <div className="text-sm text-gray-600 !text-sm">Quiz levels completed</div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                                                    <span>Quiz completion</span>
+                                                    <span>{quizProgressPercentage.toFixed(1)}%</span>
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-3">
+                                                    <div
+                                                        className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                                                          style={{ width: `${quizProgressPercentage}%` }}
+                                                    ></div>
+                                                </div>
+                                                 <p className="text-sm text-gray-500 mt-2 !text-sm">
+                                                   Donor XP: <span className="font-semibold">{total_xp}</span> • Donor Level:{" "}
+                                                   <span className="font-semibold">Level {donor_xp_level ?? "N/A"}</span>
+                                                 </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Levels Overview */}
+                                        <div className="p-4 rounded-xl bg-white border border-gray-500 mb-4">
+                                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                <FaTrophy className="text-yellow-500" />
+                                                Completed Levels
+                                            </h3>
+                                            <div className="grid grid-cols-5 gap-3">
+                                                {Array.from({ length: totalLevels }, (_, i) => {
+                                                    const level = i + 1;
+                                                    const isCompleted = completedQuizLevels.includes(level);
+                                                    const isCurrent = level === quizCurrentLevel;
+                                                    return (
+                                                        <div
+                                                            key={level}
+                                                            className={`p-3 rounded-lg border-2 text-center ${
+                                                                isCompleted
+                                                                    ? 'bg-green-50 border-green-500'
+                                                                    : isCurrent
+                                                                    ? 'bg-purple-50 border-purple-500'
+                                                                    : 'bg-gray-50 border-gray-300'
+                                                            }`}
+                                                        >
+                                                            <div className="text-xl mb-1">
+                                                                {isCompleted ? (
+                                                                    <IoMdCheckmark className="text-green-600 mx-auto" />
+                                                                ) : (
+                                                                    <RiLock2Fill className="text-gray-400 mx-auto" />
+                                                                )}
+                                                            </div>
+                                                            <div className={`font-bold ${isCompleted ? 'text-green-700' : isCurrent ? 'text-purple-700' : 'text-gray-500'}`}>
+                                                                L{level}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Minigame Statistics */}
+                                        <div className="p-4 rounded-xl bg-white border border-gray-500 mb-4">
+                                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                <AiFillThunderbolt className="text-purple-500" />
+                                                Minigame Statistics
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                {Object.entries(minigame_stats || {}).map(([gameType, stats]) => (
+                                                    <div
+                                                        key={gameType}
+                                                        className={`p-3 rounded-lg border ${
+                                                            stats?.unlocked ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200 opacity-70'
+                                                        }`}
+                                                    >
+                                                        <div className="font-bold text-gray-800 mb-2">{formatGameType(gameType)}</div>
+                                                        <div className="text-sm text-gray-700 space-y-1">
+                                                            <div className="flex justify-between"><span>Plays</span><span className="font-semibold">{stats?.total_plays ?? 0}</span></div>
+                                                            <div className="flex justify-between"><span>Wins</span><span className="font-semibold text-green-600">{stats?.wins ?? 0}</span></div>
+                                                            <div className="flex justify-between"><span>Losses</span><span className="font-semibold text-red-600">{stats?.losses ?? 0}</span></div>
+                                                            <div className="flex justify-between"><span>Win Rate</span><span className="font-semibold">{stats?.win_rate ?? 0}%</span></div>
+                                                            <div className="flex justify-between border-t pt-1 mt-1"><span>Total XP</span><span className="font-semibold text-blue-600">+{stats?.total_xp ?? 0}</span></div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {Object.keys(minigame_stats || {}).length === 0 && (
+                                                    <div className="muted">No minigame stats available</div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Session Logs */}
+                                        <div className="p-4 rounded-xl bg-white border border-gray-500 mb-4">
+                                            <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                <FaChartLine className="text-blue-500" />
+                                                Quiz History
+                                            </h3>
+                                            {Array.isArray(session_logs) && session_logs.length > 0 ? (
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full">
+                                                        <thead>
+                                                            <tr className="border-b-2 border-gray-200">
+                                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
+                                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Level</th>
+                                                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Correct</th>
+                                                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Wrong</th>
+                                                                <th className="text-right py-3 px-4 font-semibold text-gray-700">XP Earned</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {session_logs.map((log, index) => (
+                                                                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                                                                    <td className="py-3 px-4 text-gray-700">
+                                                                        {new Date(log.created_at || log.date).toLocaleDateString('en-US', {
+                                                                            year: 'numeric',
+                                                                            month: 'short',
+                                                                            day: 'numeric',
+                                                                        })}
+                                                                    </td>
+                                                                    <td className="py-3 px-4">
+                                                                        <span className="inline-block bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">
+                                                                            Level {log.level}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-center">
+                                                                        <span className="text-green-600 font-semibold">{log.correct_answers ?? 0}</span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-center">
+                                                                        <span className="text-red-600 font-semibold">{log.wrong_answers ?? 0}</span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-right">
+                                                                        <span className="text-blue-600 font-semibold">+{log.total_xp ?? 0} XP</span>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-8 text-gray-500">
+                                                    <p className="!text-lg">No quiz history yet.</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Minigame Logs */}
+                                        {Array.isArray(minigame_logs) && minigame_logs.length > 0 && (
+                                            <div className="p-4 rounded-xl bg-white border border-gray-500 ">
+                                                <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                    <AiFillThunderbolt className="text-purple-500" />
+                                                    Minigame History
+                                                </h3>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full">
+                                                        <thead>
+                                                            <tr className="border-b-2 border-gray-200">
+                                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
+                                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Game</th>
+                                                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Plays</th>
+                                                                <th className="text-center py-3 px-4 font-semibold text-gray-700">Wins</th>
+                                                                <th className="text-right py-3 px-4 font-semibold text-gray-700">XP Earned</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {minigame_logs.map((log, index) => (
+                                                                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                                                                    <td className="py-3 px-4 text-gray-700">
+                                                                        {new Date(log.created_at || log.date).toLocaleDateString('en-US', {
+                                                                            year: 'numeric',
+                                                                            month: 'short',
+                                                                            day: 'numeric',
+                                                                        })}
+                                                                    </td>
+                                                                    <td className="py-3 px-4">
+                                                                        <span className="inline-block bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">
+                                                                            {formatGameType(log.game_type)}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-center">
+                                                                        <span className="text-gray-700 font-semibold">{log.plays ?? 0}</span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-center">
+                                                                        <span className="text-green-600 font-semibold">{log.wins ?? 0}</span>
+                                                                    </td>
+                                                                    <td className="py-3 px-4 text-right">
+                                                                        <span className="text-blue-600 font-semibold">+{log.xp_earned ?? 0} XP</span>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()
+                        )}
                     </div>
                 )}
             </div>

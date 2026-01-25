@@ -3,16 +3,20 @@ import { RiArticleLine } from "react-icons/ri";
 import { IoArrowForward } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";
 import { useArticles } from "../../context/ArticlesContext";
+import api from "../../api/axios";
 import "../../styles/Articles.css";
 
 export default function ArticlesSection() {
   const navigate = useNavigate();
-  const { articles, loading } = useArticles();
+  const { articles, loading, error, fetchArticles } = useArticles();
   const [visibleArticles, setVisibleArticles] = useState([]);
   const articleRefs = useRef([]);
 
-  // Limit to 6 articles for home page
   const displayedArticles = articles.slice(0, 6);
+
+  useEffect(() => {
+    fetchArticles(true);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -44,7 +48,7 @@ export default function ArticlesSection() {
   }, [displayedArticles]);
 
   return (
-    <section className="bg-gradient-to-r from-black to-gray-900 text-white px-45 py-16">
+    <section className="bg-gradient-to-r from-black to-gray-900 text-white px-35 py-16 articles-section">
       <div className="mb-12 max-w-4xl text-center mx-auto">
         <p className="text-gray-400 mb-2 text-sm uppercase tracking-wider">
           News
@@ -62,15 +66,23 @@ export default function ArticlesSection() {
           <div className="text-center py-12">
             <p className="text-gray-400">Loading articles...</p>
           </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400">{error}</p>
+          </div>
         ) : displayedArticles.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {displayedArticles.map((article, index) => {
               const articleId = article.id;
               const isVisible = visibleArticles.includes(articleId);
-              // Use placeholder image if no image is provided
-              const imageSrc = article.image 
-                ? (article.image.startsWith('http') ? article.image : `/image.png`)
-                : '/image.png';
+              const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
+
+              // Resolve backend image URLs (uploads/articles/...) correctly
+              const imageSrc = article.image
+                ? (String(article.image).startsWith("http")
+                    ? article.image
+                    : `${baseURL}${String(article.image).startsWith("/") ? "" : "/"}${article.image}`)
+                : "/image.png";
               
               return (
                 <article

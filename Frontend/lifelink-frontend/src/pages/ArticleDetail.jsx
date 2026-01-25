@@ -62,6 +62,14 @@ export default function ArticleDetail() {
         return `${minutes} min read`;
     };
 
+    const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
+    const resolveImageSrc = (image) => {
+        if (!image) return "/image.png";
+        const img = String(image);
+        if (img.startsWith("http")) return img;
+        return `${baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
+    };
+
     // Format content for display (convert plain text to HTML paragraphs)
     const formatContent = (content) => {
         if (!content) return '';
@@ -113,13 +121,11 @@ export default function ArticleDetail() {
         );
     }
 
-    const imageSrc = article.image 
-        ? (article.image.startsWith('http') ? article.image : `/image.png`)
-        : '/image.png';
+    const imageSrc = resolveImageSrc(article.image);
     const publishedDate = article.published_at || article.created_at;
     const authorName = article.author 
-        ? `${article.author.first_name || ''} ${article.author.last_name || ''}`.trim() || 'Anonymous'
-        : 'Anonymous';
+        ? `${article.author.first_name || ''} ${article.author.last_name || ''}`.trim() || 'AI'
+        : 'AI';
     const readTime = calculateReadTime(article.content);
     const formattedContent = formatContent(article.content);
 
@@ -221,9 +227,7 @@ export default function ArticleDetail() {
                             <h2>Related Articles</h2>
                             <div className="related-articles-grid">
                                 {relatedArticles.map((relatedArticle) => {
-                                    const relatedImageSrc = relatedArticle.image 
-                                        ? (relatedArticle.image.startsWith('http') ? relatedArticle.image : `/image.png`)
-                                        : '/image.png';
+                                    const relatedImageSrc = resolveImageSrc(relatedArticle.image);
                                     
                                     return (
                                         <div 

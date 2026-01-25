@@ -476,7 +476,10 @@ export default function Settings() {
                                 border: '2px solid #B3B3B3',
                                 borderRadius: '5px',
                                 backgroundColor: '#f9f9f9'
-                            }}>
+                            }}
+                            
+                            className="blood-type-selection"
+                            >
                                 {bloodTypes.map(bloodType => (
                                     <label 
                                         key={bloodType}

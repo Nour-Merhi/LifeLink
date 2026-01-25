@@ -4,12 +4,19 @@ import { IoArrowForward } from "react-icons/io5";
 import { FiSearch } from "react-icons/fi";
 import Navbar from "../components/Navbar";
 import { useArticles } from "../context/ArticlesContext";
+import api from "../api/axios";
 import "../styles/Articles.css";
 
 export default function ArticlePage() {
     const [searchTerm, setSearchTerm] = useState("");
-    const { articles, loading, error } = useArticles();
+    const { articles, loading, error, fetchArticles } = useArticles();
     const navigate = useNavigate();
+
+    // Force refresh so newly published articles show immediately (no 5-min cache delay)
+    useEffect(() => {
+        fetchArticles(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Filter articles based on search term
     const filteredArticles = articles.filter(article =>
@@ -17,6 +24,14 @@ export default function ArticlePage() {
         article.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         article.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
+    const resolveImageSrc = (image) => {
+        if (!image) return "/image.png";
+        const img = String(image);
+        if (img.startsWith("http")) return img;
+        return `${baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
+    };
 
     return (
         <>
@@ -65,9 +80,7 @@ export default function ArticlePage() {
                         <div className="articles-grid">
                             {filteredArticles.length > 0 ? (
                                 filteredArticles.map((article) => {
-                                    const imageSrc = article.image 
-                                        ? (article.image.startsWith('http') ? article.image : `/image.png`)
-                                        : '/image.png';
+                                    const imageSrc = resolveImageSrc(article.image);
                                     const publishedDate = article.published_at || article.created_at;
                                     
                                     return (

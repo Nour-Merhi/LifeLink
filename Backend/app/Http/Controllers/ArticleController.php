@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
+use App\Services\DeepSeekService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -306,6 +307,230 @@ class ArticleController extends Controller
                 'error' => $e->getMessage()
             ]);
             throw new \Exception('Failed to save image: ' . $e->getMessage());
+        }
+    }
+
+    public function generateAIArticle(Request $request){
+        try {
+            // New flow: frontend sends only { category: blood|organ|health }
+            // Backward compatible flow: if title/description are provided, keep the old behavior.
+            $validated = $request->validate([
+                'category' => 'required|string|in:blood,organ,health',
+                // Back-compat inputs (optional)
+                'title' => 'sometimes|string|max:255',
+                'description' => 'sometimes|string|max:1000',
+                'content' => 'nullable|string',
+            ]);
+
+            $category = strtolower(trim($validated['category']));
+
+            $hasLegacyInputs = isset($validated['title']) || isset($validated['description']) || isset($validated['content']);
+
+            if ($hasLegacyInputs) {
+                // Legacy: generate only content
+                if (empty($validated['title']) || empty($validated['description'])) {
+                    return response()->json([
+                        'message' => 'Validation failed',
+                        'errors' => [
+                            'title' => ['title is required when using the legacy AI generation mode'],
+                            'description' => ['description is required when using the legacy AI generation mode'],
+                        ],
+                    ], 422);
+                }
+
+                $generatedContent = DeepSeekService::generateArticleContent(
+                    $validated['title'],
+                    $validated['description'],
+                    $category,
+                    $validated['content'] ?? null
+                );
+
+                if (!$generatedContent) {
+                    return response()->json([
+                        'message' => 'Failed to generate article content from AI provider.'
+                    ], 502);
+                }
+
+                $article = Article::create([
+                    'title' => $validated['title'],
+                    'description' => $validated['description'],
+                    'content' => $generatedContent,
+                    'category' => $category,
+                    'is_published' => false,
+                    'author_id' => null,
+                    'published_at' => null,
+                ]);
+
+                return response()->json([
+                    'message' => 'Article generated successfully',
+                    'mode' => 'legacy_content_only',
+                    'content' => $generatedContent,
+                    'article' => $article,
+                ], 201);
+            }
+
+            // New: generate full JSON article
+            $aiRaw = DeepSeekService::generateArticleJsonByCategory($category);
+
+            if (!$aiRaw) {
+                if (empty(config('services.deepseek.key'))) {
+                    return response()->json([
+                        'message' => 'DeepSeek API key is not configured. Please set DEEPKEY_API_KEY or DEEPSEEK_API_KEY in your Backend .env file, then run: php artisan config:clear',
+                    ], 500);
+                }
+                return response()->json([
+                    'message' => 'Failed to generate article from AI provider.'
+                ], 502);
+            }
+
+            $json = $this->extractFirstJsonObject($aiRaw);
+            if ($json === null) {
+                return response()->json([
+                    'message' => 'AI response did not contain valid JSON.',
+                    'raw' => $aiRaw,
+                ], 502);
+            }
+
+            $articleData = json_decode($json, true);
+            if (!is_array($articleData)) {
+                return response()->json([
+                    'message' => 'AI returned invalid JSON.',
+                    'raw_json' => $json,
+                ], 502);
+            }
+
+            $normalized = $this->normalizeAndValidateAiArticleJson($articleData, $category);
+            if ($normalized === null) {
+                return response()->json([
+                    'message' => 'AI JSON is missing required fields.',
+                    'raw_json' => $json,
+                ], 502);
+            }
+
+            // Create article from the JSON (review/publish later)
+            $article = Article::create([
+                'title' => $normalized['title'],
+                'description' => $normalized['description'],
+                'content' => $normalized['content'],
+                'category' => $normalized['category'],
+                'is_published' => false,
+                'author_id' => null,
+                'published_at' => null,
+            ]);
+
+            return response()->json([
+                'message' => 'Article generated successfully',
+                'mode' => 'json_from_category',
+                'article_json' => $normalized,
+                'article' => $article,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Error generating article:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json(['message' => 'Failed to generate article: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Best-effort extraction of the first JSON object from an LLM response.
+     */
+    private function extractFirstJsonObject(string $text): ?string
+    {
+        $text = trim($text);
+
+        // Fast path: already valid JSON object
+        $decoded = json_decode($text, true);
+        if (is_array($decoded)) {
+            return $text;
+        }
+
+        $start = strpos($text, '{');
+        $end = strrpos($text, '}');
+        if ($start === false || $end === false || $end <= $start) {
+            return null;
+        }
+
+        $candidate = substr($text, $start, ($end - $start) + 1);
+        $decoded2 = json_decode($candidate, true);
+        if (!is_array($decoded2)) {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Ensure required keys exist and normalize category.
+     * Returns normalized array or null if invalid.
+     */
+    private function normalizeAndValidateAiArticleJson(array $data, string $requestedCategory): ?array
+    {
+        $title = isset($data['title']) ? trim((string) $data['title']) : '';
+        $description = isset($data['description']) ? trim((string) $data['description']) : '';
+        $content = isset($data['content']) ? trim((string) $data['content']) : '';
+        $category = isset($data['category']) ? strtolower(trim((string) $data['category'])) : $requestedCategory;
+
+        // Force the stored category to the requested one (prevents model drifting)
+        $category = $requestedCategory;
+
+        if ($title === '' || $description === '' || $content === '') {
+            return null;
+        }
+
+        if (!in_array($category, ['blood', 'organ', 'health'], true)) {
+            return null;
+        }
+
+        // Basic length sanity (avoid empty/garbage)
+        if (mb_strlen($title) > 255) {
+            $title = mb_substr($title, 0, 255);
+        }
+        if (mb_strlen($description) > 1000) {
+            $description = mb_substr($description, 0, 1000);
+        }
+
+        return [
+            'title' => $title,
+            'category' => $category,
+            'description' => $description,
+            'content' => $content,
+        ];
+    }
+
+    public function publishAIArticle($id){
+        try{
+            $article = Article::where('id', $id)->firstOrFail();
+            $article->update([
+                'is_published' => true,
+                'published_at' => Carbon::now(),
+            ]);
+            return response()->json(['message' => 'Article published successfully'], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error publishing article:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json(['message' => 'Failed to publish article: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function getAIArticles(){
+        try{
+            $articles = Article::whereNull('author_id')
+                ->orderBy('created_at', 'desc')
+                ->get();
+            return response()->json(['articles' => $articles, 'total' => $articles->count()], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error getting AI articles:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json(['message' => 'Failed to get AI articles: ' . $e->getMessage()], 500);
         }
     }
 }

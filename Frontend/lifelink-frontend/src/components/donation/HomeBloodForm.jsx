@@ -16,10 +16,20 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
 
     // Get booking data from localStorage
     const getBookingData = () => {
-        const prefix = pageType === "home" ? "home_" : "hospital_";
-        const storedHospital = localStorage.getItem(prefix + "hospital");
-        const appointmentDate = localStorage.getItem(prefix + "date") || localStorage.getItem("date");
-        const appointmentTime = localStorage.getItem("appointment_time");
+        const basePrefix = pageType === "home" ? "home_" : "hospital_";
+        const userScope = user?.id ? `u${user.id}_` : "guest_";
+        const prefix = `${basePrefix}${userScope}`;
+
+        // Backward-compat: fall back to legacy unscoped keys if scoped are missing
+        const storedHospital = localStorage.getItem(prefix + "hospital") || localStorage.getItem(basePrefix + "hospital");
+        const appointmentDate =
+            localStorage.getItem(prefix + "date") ||
+            localStorage.getItem(basePrefix + "date") ||
+            localStorage.getItem("date");
+        const appointmentTime =
+            localStorage.getItem(prefix + "appointment_time") ||
+            localStorage.getItem(basePrefix + "appointment_time") ||
+            localStorage.getItem("appointment_time");
         
         let hospital = null;
         try {
@@ -83,6 +93,7 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
         };
         
         const userData = getUserData();
+        const lastDonationLocked = Boolean(user?.donor?.last_donation);
         
         if (savedData) {
             try {
@@ -119,6 +130,9 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
                     emerg_contact: parsed.emerg_contact || '',
                     emerg_phone: parsed.emerg_phone || '',
                     medical_conditions: parsed.medical_conditions || {},
+                    // If backend already has last donation, always lock & use it
+                    last_donation: lastDonationLocked ? (userData.last_donation || '') : (parsed.last_donation || userData.last_donation || ''),
+                    last_donation_locked: lastDonationLocked,
                     // Booking data takes precedence
                     ...bookingData
                 };
@@ -139,6 +153,8 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
             emerg_contact: '',
             emerg_phone: '',
             medical_conditions: {},
+            last_donation: userData.last_donation || '',
+            last_donation_locked: lastDonationLocked,
             // Booking data
             ...bookingData
         };
@@ -196,6 +212,7 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
                     };
                     
                     const userData = getUserData();
+                    const lastDonationLocked = Boolean(user?.donor?.last_donation);
                     setHomeBloodFormData({
                         ...userData,
                         address: '',
@@ -205,6 +222,8 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
                         emerg_contact: '',
                         emerg_phone: '',
                         medical_conditions: {},
+                        last_donation: lastDonationLocked ? (userData.last_donation || '') : (userData.last_donation || ''),
+                        last_donation_locked: lastDonationLocked,
                         ...bookingData
                     });
                     return;
@@ -256,6 +275,7 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
         };
         
         const userData = getUserData();
+        const lastDonationLocked = Boolean(user?.donor?.last_donation);
         
         // Only update fields that are empty, don't override user's manual entries
         // But always update email to ensure it matches current user
@@ -271,6 +291,8 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
                     emerg_contact: '',
                     emerg_phone: '',
                     medical_conditions: {},
+                    last_donation: lastDonationLocked ? (userData.last_donation || '') : (userData.last_donation || ''),
+                    last_donation_locked: lastDonationLocked,
                     ...bookingData
                 };
             }
@@ -286,7 +308,9 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
             date_of_birth: prev.date_of_birth || userData.date_of_birth || '',
             gender: prev.gender || userData.gender || '',
             blood_type: prev.blood_type || userData.blood_type || '',
-            last_donation: prev.last_donation || userData.last_donation || '',
+            // If backend already has last donation, always lock & use it (don't allow form overrides)
+            last_donation: lastDonationLocked ? (userData.last_donation || '') : (prev.last_donation || userData.last_donation || ''),
+            last_donation_locked: lastDonationLocked,
                 // Booking data always updates (hospital_id, hospital_name, appointment_date, appointment_time)
             ...bookingData
             };
@@ -324,6 +348,7 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
                 homeBloodFormData = { homeBloodFormData }
                 setHomeBloodFormData = { setHomeBloodFormData }
                 pageType = { pageType }
+                lockLastDonation={Boolean(homeBloodFormData?.last_donation_locked)}
             />
         }
 

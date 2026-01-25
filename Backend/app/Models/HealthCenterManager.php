@@ -18,12 +18,16 @@ class HealthCenterManager extends Model
     protected $fillable = [
         'position',
         'office_location',
+        'working_dates',
         'start_time',
         'end_time',
-        'working_hours',
         'user_id',
         'hospital_id',
         'code', 
+    ];
+
+    protected $casts = [
+        'working_dates' => 'array',
     ];
 
     protected static function booted()

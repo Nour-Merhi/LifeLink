@@ -4,6 +4,7 @@ import { IoArrowForward } from "react-icons/io5";
 
 import GameAnimation from "../../assets/illustrations/GameAnimation_1.svg";
 import BackgroundWave from "../../assets/imgs/wave/Background_game_wave.svg";
+import AnimatedSection from "../common/AnimatedSection";
 import "./GameSection.css";
 
 export default function GameSection() {
@@ -59,7 +60,7 @@ export default function GameSection() {
     };
 
     return (
-        <section className="game-section">
+        <AnimatedSection className="game-section" animation="fade-up">
             <div className="question-section-action">
                     <button className="question-ask-button" onClick={handleAskQuestion}>
                         Ask Question
@@ -118,7 +119,7 @@ export default function GameSection() {
                     </div>
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     );
 }
 

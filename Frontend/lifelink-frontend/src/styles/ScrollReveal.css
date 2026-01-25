@@ -1,0 +1,43 @@
+/* Scroll-reveal: IntersectionObserver-triggered section animations */
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-reveal--visible {
+  opacity: 1;
+  transform: translateY(0) translateX(0);
+}
+
+/* Variants */
+.scroll-reveal--fade-up {
+  transform: translateY(36px);
+}
+.scroll-reveal--fade-up.scroll-reveal--visible {
+  transform: translateY(0);
+}
+
+.scroll-reveal--fade-in {
+  transform: none;
+}
+.scroll-reveal--fade-in.scroll-reveal--visible {
+  opacity: 1;
+}
+
+.scroll-reveal--slide-left {
+  transform: translateX(-40px);
+}
+.scroll-reveal--slide-left.scroll-reveal--visible {
+  transform: translateX(0);
+}
+
+.scroll-reveal--slide-right {
+  transform: translateX(40px);
+}
+.scroll-reveal--slide-right.scroll-reveal--visible {
+  transform: translateX(0);
+}

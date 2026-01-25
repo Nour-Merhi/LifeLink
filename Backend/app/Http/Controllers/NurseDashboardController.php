@@ -7,6 +7,8 @@ use App\Models\HomeAppointment;
 use App\Models\HomeAppointmentRating;
 use App\Models\Message;
 use App\Models\Hospital;
+use App\Models\BloodInventory;
+use App\Models\Appointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -15,6 +17,46 @@ use Illuminate\Support\Facades\DB;
 
 class NurseDashboardController extends Controller
 {
+    private function resolvePhlebotomistAndManagerUserId(Request $request): array
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return [null, null, response()->json(['message' => 'Unauthenticated. Please log in to access this endpoint.'], 401)];
+        }
+
+        $userRole = strtolower($user->role ?? '');
+        if ($userRole !== 'phlebotomist' && $userRole !== 'admin') {
+            return [null, null, response()->json([
+                'message' => 'Unauthorized. Only admins and phlebotomists can access this endpoint.',
+                'user_role' => $user->role
+            ], 403)];
+        }
+
+        if ($userRole !== 'phlebotomist') {
+            // Admins: not supported here
+            return [null, null, response()->json(['message' => 'Admins should use admin endpoints.'], 403)];
+        }
+
+        $phlebotomist = MobilePhlebotomist::where('user_id', $user->id)->first();
+        if (!$phlebotomist) {
+            return [null, null, response()->json([
+                'message' => 'Phlebotomist record not found. Please complete your profile registration.',
+                'error' => 'phlebotomist_not_found'
+            ], 404)];
+        }
+
+        $hospital = Hospital::with('healthCenterManager.user')->find($phlebotomist->hospital_id);
+        if (!$hospital || !$hospital->healthCenterManager || !$hospital->healthCenterManager->user) {
+            return [null, null, response()->json([
+                'message' => 'Manager not found for this hospital.',
+                'error' => 'manager_not_found'
+            ], 404)];
+        }
+
+        $managerUserId = $hospital->healthCenterManager->user->id;
+        return [$user, $managerUserId, null];
+    }
+
     /**
      * Get nurse dashboard data (home page)
      */
@@ -324,6 +366,10 @@ class NurseDashboardController extends Controller
                 // Address
                 $address = $appt->address ?? 'N/A';
 
+                // Coordinates (preferred for map directions)
+                $lat = $appt->latitude ?? null;
+                $lng = $appt->longitude ?? null;
+
                 // Date
                 $date = 'N/A';
                 if ($appt->appointment && $appt->appointment->appointment_date) {
@@ -378,15 +424,14 @@ class NurseDashboardController extends Controller
                 }
 
                 // Status - map database states to frontend status
+                // Frontend expects: Pending | Confirmed | Completed | Cancelled
                 $state = strtolower($appt->state ?? 'pending');
-                $status = 'Pending';
-                if ($state === 'completed') {
-                    $status = 'Completed';
-                } elseif ($state === 'canceled' || $state === 'cancelled') {
-                    $status = 'Cancelled';
-                } else {
-                    $status = 'Pending';
-                }
+                $status = match ($state) {
+                    'completed' => 'Completed',
+                    'confirmed' => 'Confirmed',
+                    'canceled', 'cancelled' => 'Cancelled',
+                    default => 'Pending',
+                };
 
                 return [
                     'id' => $appt->id,
@@ -394,6 +439,8 @@ class NurseDashboardController extends Controller
                     'gender' => $gender,
                     'bloodType' => $bloodType,
                     'address' => $address,
+                    'latitude' => $lat,
+                    'longitude' => $lng,
                     'date' => $date,
                     'time' => $time,
                     'phone' => $phone,
@@ -418,6 +465,118 @@ class NurseDashboardController extends Controller
 
             return response()->json([
                 'message' => 'Failed to fetch appointments',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a home appointment status for the logged-in phlebotomist.
+     * Used by nurse dashboard "Mark Complete" / "Cancel" actions.
+     */
+    public function updateMyAppointmentStatus(Request $request, $appointmentId)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated. Please log in.'], 401);
+            }
+
+            $userRole = strtolower($user->role ?? '');
+            if ($userRole !== 'phlebotomist' && $userRole !== 'admin') {
+                return response()->json([
+                    'message' => 'Unauthorized. Only admins and phlebotomists can access this endpoint.',
+                    'user_role' => $user->role
+                ], 403);
+            }
+
+            $validated = $request->validate([
+                'state' => 'required|in:pending,confirmed,completed,canceled,cancelled',
+            ]);
+
+            $phlebotomistId = null;
+            if ($userRole === 'phlebotomist') {
+                $phlebotomist = MobilePhlebotomist::where('user_id', $user->id)->first();
+                if (!$phlebotomist) {
+                    return response()->json([
+                        'message' => 'Phlebotomist record not found. Please complete your profile registration.',
+                        'error' => 'phlebotomist_not_found'
+                    ], 404);
+                }
+                $phlebotomistId = $phlebotomist->id;
+            }
+
+            $homeAppointment = HomeAppointment::where('id', $appointmentId)->firstOrFail();
+
+            // Phlebotomists can only update their own assigned appointments
+            if ($phlebotomistId !== null && (int)$homeAppointment->phlebotomist_id !== (int)$phlebotomistId) {
+                return response()->json(['message' => 'Forbidden. Appointment not assigned to you.'], 403);
+            }
+
+            $oldState = strtolower($homeAppointment->state ?? 'pending');
+            $newState = strtolower($validated['state']);
+            if ($newState === 'cancelled') $newState = 'canceled';
+
+            // Do not allow invalid backward transitions (basic guard)
+            if ($oldState === 'completed' && $newState !== 'completed') {
+                return response()->json(['message' => 'Completed appointments cannot be changed.'], 422);
+            }
+
+            $homeAppointment->state = $newState;
+
+            // Track completed_at/expires_at for inventory logic
+            if ($newState === 'completed') {
+                if (!$homeAppointment->completed_at) {
+                    $homeAppointment->completed_at = now();
+                }
+                if (!$homeAppointment->expires_at) {
+                    $homeAppointment->expires_at = Carbon::parse($homeAppointment->completed_at)->addDays(42)->toDateString();
+                }
+            } else {
+                // If not completed, keep these null
+                $homeAppointment->completed_at = null;
+                $homeAppointment->expires_at = null;
+            }
+
+            $homeAppointment->save();
+
+            // If appointment is finished (completed/canceled), free up the phlebotomist.
+            // This must work even if an admin triggers the status change.
+            if (in_array($newState, ['completed', 'canceled'], true) && $homeAppointment->phlebotomist_id) {
+                $p = MobilePhlebotomist::find($homeAppointment->phlebotomist_id);
+                if ($p) {
+                    // Enforce: inactive => unavailable; otherwise available when finished.
+                    if (strtolower((string)($p->status ?? '')) === 'inactive') {
+                        $p->availability = 'unavailable';
+                    } else {
+                        $p->availability = 'available';
+                    }
+                    $p->save();
+                }
+            }
+
+            return response()->json([
+                'message' => 'Appointment status updated.',
+                'appointment' => [
+                    'id' => $homeAppointment->id,
+                    'state' => $homeAppointment->state,
+                    'completed_at' => $homeAppointment->completed_at,
+                    'expires_at' => $homeAppointment->expires_at,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Appointment not found'], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error('Error updating nurse appointment status:', [
+                'user_id' => Auth::id(),
+                'appointment_id' => $appointmentId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'message' => 'Failed to update appointment status',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
             ], 500);
         }
@@ -672,49 +831,78 @@ class NurseDashboardController extends Controller
                 ], 404);
             }
 
-            // Format hospital data for frontend
-            $hospitalData = [
-                'id' => $hospital->id,
-                'code' => $hospital->code ?? 'N/A',
-                'name' => $hospital->name ?? 'N/A',
-                'email' => $hospital->email ?? 'N/A',
-                'phone_nb' => $hospital->phone_nb ?? 'N/A',
-                'address' => $hospital->address ?? 'N/A',
-                'latitude' => $hospital->latitude ?? null,
-                'longitude' => $hospital->longitude ?? null,
-                'status' => $hospital->status ?? 'verified',
-                'created_at' => $hospital->created_at ? $hospital->created_at->toISOString() : null,
-            ];
+            // Load more relationships to better match admin hospital details
+            $hospital->loadMissing([
+                'healthCenterManager.user',
+                'mobilePhlebotomist.user',
+            ]);
 
-            // Add health center manager information
-            $manager = $hospital->healthCenterManager;
-            if ($manager && $manager->user) {
-                $managerUser = $manager->user;
-                $firstName = $managerUser->first_name ?? '';
-                $middleName = $managerUser->middle_name ?? '';
-                $lastName = $managerUser->last_name ?? '';
-                $managerName = trim("{$firstName} {$middleName} {$lastName}") ?: 'N/A';
-                
-                $hospitalData['health_center_manager'] = [
-                    'id' => $manager->id,
-                    'code' => $manager->code ?? 'N/A',
-                    'position' => $manager->position ?? 'N/A',
-                    'office_location' => $manager->office_location ?? 'N/A',
-                    'start_time' => $manager->start_time ?? 'N/A',
-                    'end_time' => $manager->end_time ?? 'N/A',
-                    'user' => [
-                        'id' => $managerUser->id,
-                        'name' => $managerName,
-                        'email' => $managerUser->email ?? 'N/A',
-                        'phone_nb' => $managerUser->phone_nb ?? 'N/A',
-                    ]
-                ];
-            } else {
-                $hospitalData['health_center_manager'] = null;
+            // Count requests (appointments created by this hospital)
+            $requestsCount = Appointment::where('hospital_id', $hospital->id)->count();
+
+            // Blood stock grouped by blood type (available inventory)
+            $bloodStocks = BloodInventory::where('hospital_id', $hospital->id)
+                ->where('status', 'available')
+                ->with('bloodType')
+                ->get()
+                ->groupBy(function ($item) {
+                    return $item->bloodType ? $item->bloodType->type . $item->bloodType->rh_factor : 'Unknown';
+                })
+                ->map(function ($items) {
+                    return $items->sum('quantity');
+                })
+                ->toArray();
+
+            // Calculate shortage state for each blood type
+            $shortageStates = [];
+            foreach ($bloodStocks as $bloodType => $quantity) {
+                if ($quantity < 5) {
+                    $shortageStates[$bloodType] = 'critical';
+                } elseif ($quantity >= 5 && $quantity <= 10) {
+                    $shortageStates[$bloodType] = 'low stock';
+                } else {
+                    $shortageStates[$bloodType] = 'sufficient';
+                }
             }
 
-            // Note: blood_stock is not included here as it might require separate logic
-            // The frontend handles the case when blood_stock is not present
+            // Ensure all blood types exist in the response
+            $allBloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+            $completeBloodStocks = [];
+            $completeShortageStates = [];
+            foreach ($allBloodTypes as $bt) {
+                $completeBloodStocks[$bt] = $bloodStocks[$bt] ?? 0;
+                $completeShortageStates[$bt] = $shortageStates[$bt] ?? 'critical';
+            }
+
+            // Calculate basic hospital stats (mirrors admin details)
+            $stats = [
+                'total_appointments' => $hospital->appointments()->count(),
+                'hospital_appointments' => $hospital->hospitalAppointments()->count(),
+                'home_appointments' => $hospital->homeAppointments()->count(),
+                'total_phlebotomists' => $hospital->mobilePhlebotomist()->count(),
+                'emergency_requests' => $hospital->emergencyRequests()->count(),
+                'pending_appointments' => $hospital->appointments()->where('state', 'pending')->count(),
+                'completed_appointments' => $hospital->appointments()->where('state', 'completed')->count(),
+                'requests' => $requestsCount,
+            ];
+
+            // Manager additional info
+            $managerInfo = null;
+            if ($hospital->healthCenterManager) {
+                $managerInfo = [
+                    'position' => $hospital->healthCenterManager->position,
+                    'office_location' => $hospital->healthCenterManager->office_location,
+                    'working_hours' => $hospital->healthCenterManager->working_hours,
+                ];
+            }
+
+            // Convert to array and attach computed fields
+            $hospitalData = $hospital->toArray();
+            $hospitalData['stats'] = $stats;
+            $hospitalData['manager_additional_info'] = $managerInfo;
+            $hospitalData['requests'] = $requestsCount;
+            $hospitalData['blood_stock'] = $completeBloodStocks;
+            $hospitalData['shortage_states'] = $completeShortageStates;
 
             return response()->json([
                 'hospital' => $hospitalData,
@@ -987,6 +1175,66 @@ class NurseDashboardController extends Controller
     }
 
     /**
+     * Phlebotomist: unread count of incoming messages from manager.
+     * "Unread" = receiver is me AND sender is manager AND read_at is null.
+     */
+    public function getUnreadMessagesCount(Request $request)
+    {
+        try {
+            [$user, $managerUserId, $earlyResponse] = $this->resolvePhlebotomistAndManagerUserId($request);
+            if ($earlyResponse) return $earlyResponse;
+
+            $count = Message::where('receiver_id', $user->id)
+                ->where('sender_id', $managerUserId)
+                ->whereNull('read_at')
+                ->count();
+
+            return response()->json(['unread_count' => (int) $count], 200);
+        } catch (\Exception $e) {
+            Log::error('Error fetching nurse unread messages count:', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to fetch unread count',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * Phlebotomist: mark incoming manager->me messages as read.
+     */
+    public function markMessagesRead(Request $request)
+    {
+        try {
+            [$user, $managerUserId, $earlyResponse] = $this->resolvePhlebotomistAndManagerUserId($request);
+            if ($earlyResponse) return $earlyResponse;
+
+            $updated = Message::where('receiver_id', $user->id)
+                ->where('sender_id', $managerUserId)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+
+            return response()->json([
+                'message' => 'Messages marked as read',
+                'updated' => (int) $updated,
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error marking nurse messages as read:', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to mark messages as read',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
+    }
+
+    /**
      * Send a message from the logged-in phlebotomist to their manager
      */
     public function sendMessage(Request $request)
@@ -1165,8 +1413,13 @@ class NurseDashboardController extends Controller
                 ], 404);
             }
 
-            // Update phlebotomist status to onDuty
-            $phlebotomist->availability = 'onDuty';
+            // Update phlebotomist availability to onDuty
+            // Enforce: inactive => unavailable
+            if (strtolower((string)($phlebotomist->status ?? '')) === 'inactive') {
+                $phlebotomist->availability = 'unavailable';
+            } else {
+                $phlebotomist->availability = 'onDuty';
+            }
             $phlebotomist->save();
 
             // Update appointment status to confirmed
@@ -1222,15 +1475,33 @@ class NurseDashboardController extends Controller
                 ], 403);
             }
 
+            $scope = strtolower((string) $request->query('scope', 'all')); // 'all' | 'hospital'
+            if (!in_array($scope, ['all', 'hospital'], true)) {
+                $scope = 'all';
+            }
+
+            // If hospital-scoped, restrict to the logged-in phlebotomist's hospital.
+            $scopedHospitalId = null;
+            $scopedHospitalName = null;
+            if ($scope === 'hospital' && $userRole === 'phlebotomist') {
+                $mePhleb = MobilePhlebotomist::where('user_id', $user->id)->with('hospital')->first();
+                if ($mePhleb) {
+                    $scopedHospitalId = $mePhleb->hospital_id;
+                    $scopedHospitalName = $mePhleb->hospital ? ($mePhleb->hospital->name ?? null) : null;
+                }
+            }
+
             // ----------------
             // Top Raters
             // ----------------
-            $topRatersRows = DB::table('home_appointment_ratings as r')
+            $topRatersQuery = DB::table('home_appointment_ratings as r')
                 ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
-                ->join('mobile_phlebotomists as mp', 'mp.id', '=', 'ha.phlebotomist_id')
+                // IMPORTANT: use the snapshot phlebotomist_id on the rating so ratings never "move"
+                // if the appointment gets reassigned later.
+                ->join('mobile_phlebotomists as mp', 'mp.id', '=', 'r.phlebotomist_id')
                 ->join('users as u', 'u.id', '=', 'mp.user_id')
                 ->leftJoin('hospitals as h', 'h.id', '=', 'mp.hospital_id')
-                ->whereNotNull('ha.phlebotomist_id')
+                ->whereNotNull('r.phlebotomist_id')
                 ->where('ha.state', '=', 'completed')
                 ->selectRaw('
                     mp.id as phlebotomist_id,
@@ -1246,8 +1517,13 @@ class NurseDashboardController extends Controller
                 ->orderByDesc('avg_rating')
                 ->orderByDesc('ratings_count')
                 ->orderByDesc('completed_rated_count')
-                ->limit(25)
-                ->get();
+                ->limit(25);
+
+            if ($scopedHospitalId !== null) {
+                $topRatersQuery->where('mp.hospital_id', '=', $scopedHospitalId);
+            }
+
+            $topRatersRows = $topRatersQuery->get();
 
             $top_raters = collect($topRatersRows)->values()->map(function ($row, $idx) {
                 return [
@@ -1265,7 +1541,7 @@ class NurseDashboardController extends Controller
             // ----------------
             // Top Workers (most completed home appointments)
             // ----------------
-            $topWorkersRows = DB::table('home_appointments as ha')
+            $topWorkersQuery = DB::table('home_appointments as ha')
                 ->join('mobile_phlebotomists as mp', 'mp.id', '=', 'ha.phlebotomist_id')
                 ->join('users as u', 'u.id', '=', 'mp.user_id')
                 ->leftJoin('hospitals as h', 'h.id', '=', 'mp.hospital_id')
@@ -1286,8 +1562,13 @@ class NurseDashboardController extends Controller
                 ->orderByDesc('completed_count')
                 ->orderByDesc('ratings_count')
                 ->orderByDesc('avg_rating')
-                ->limit(25)
-                ->get();
+                ->limit(25);
+
+            if ($scopedHospitalId !== null) {
+                $topWorkersQuery->where('mp.hospital_id', '=', $scopedHospitalId);
+            }
+
+            $topWorkersRows = $topWorkersQuery->get();
 
             $top_workers = collect($topWorkersRows)->values()->map(function ($row, $idx) {
                 return [
@@ -1310,7 +1591,7 @@ class NurseDashboardController extends Controller
                     // My Top-Raters stats + rank
                     $myRatersAgg = DB::table('home_appointment_ratings as r')
                         ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
-                        ->where('ha.phlebotomist_id', '=', $me->id)
+                        ->where('r.phlebotomist_id', '=', $me->id)
                         ->where('ha.state', '=', 'completed')
                         ->selectRaw('ROUND(AVG(r.rating), 2) as avg_rating, COUNT(r.id) as ratings_count')
                         ->first();
@@ -1321,10 +1602,15 @@ class NurseDashboardController extends Controller
                     if ($myCnt > 0) {
                         $ratersAgg = DB::table('home_appointment_ratings as r')
                             ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
-                            ->whereNotNull('ha.phlebotomist_id')
+                            ->whereNotNull('r.phlebotomist_id')
                             ->where('ha.state', '=', 'completed')
-                            ->groupBy('ha.phlebotomist_id')
-                            ->selectRaw('ha.phlebotomist_id as phlebotomist_id, ROUND(AVG(r.rating), 2) as avg_rating, COUNT(r.id) as ratings_count');
+                            ->groupBy('r.phlebotomist_id')
+                            ->selectRaw('r.phlebotomist_id as phlebotomist_id, ROUND(AVG(r.rating), 2) as avg_rating, COUNT(r.id) as ratings_count');
+                        if ($scopedHospitalId !== null) {
+                            // Hospital scope must also follow the rating snapshot
+                            $ratersAgg->join('mobile_phlebotomists as mp', 'mp.id', '=', 'r.phlebotomist_id')
+                                ->where('mp.hospital_id', '=', $scopedHospitalId);
+                        }
 
                         $better = DB::query()->fromSub($ratersAgg, 't')
                             ->where(function ($q) use ($myAvg, $myCnt) {
@@ -1358,6 +1644,10 @@ class NurseDashboardController extends Controller
                             ->where('ha.state', '=', 'completed')
                             ->groupBy('ha.phlebotomist_id')
                             ->selectRaw('ha.phlebotomist_id as phlebotomist_id, COUNT(ha.id) as completed_count, COUNT(r.id) as ratings_count, ROUND(AVG(r.rating), 2) as avg_rating');
+                        if ($scopedHospitalId !== null) {
+                            $workersAgg->join('mobile_phlebotomists as mp', 'mp.id', '=', 'ha.phlebotomist_id')
+                                ->where('mp.hospital_id', '=', $scopedHospitalId);
+                        }
 
                         $betterW = DB::query()->fromSub($workersAgg, 't')
                             ->where(function ($q) use ($myCompleted, $myWorkersRatings, $myWorkersAvg) {
@@ -1394,6 +1684,8 @@ class NurseDashboardController extends Controller
             }
 
             return response()->json([
+                'scope' => $scope,
+                'scope_hospital' => $scopedHospitalName,
                 'top_raters' => $top_raters,
                 'top_workers' => $top_workers,
                 'my_stats' => $myStats,

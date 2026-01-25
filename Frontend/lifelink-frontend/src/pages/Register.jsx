@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
@@ -8,6 +8,8 @@ const Register = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [emailWarning, setEmailWarning] = useState("");
+  const [emailDomainWarning, setEmailDomainWarning] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
@@ -29,16 +31,81 @@ const Register = () => {
     city: "",
   });
 
+  const emailCheckTimerRef = useRef(null);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
     setError(""); // Clear error on input change
+
+    if (name === "email") {
+      setEmailWarning(getEmailWarning(value));
+      setEmailDomainWarning("");
+    }
 
     // Check password requirements when password changes
     if (name === "password") {
       checkPasswordRequirements(value);
     }
   };
+
+  const getEmailWarning = (email) => {
+    const val = String(email || "").trim();
+    if (!val) return "";
+
+    // Basic format check (same idea as <input type="email"> but more explicit)
+    const basic = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!basic.test(val)) {
+      return "This email doesn't look valid. If it's incorrect, no emails will be sent to it.";
+    }
+
+    // Extra lightweight domain sanity check (still not a guarantee of deliverability)
+    const domain = val.split("@")[1] || "";
+    if (domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) {
+      return "This email domain looks invalid. If it's incorrect, no emails will be sent to it.";
+    }
+
+    return "";
+  };
+
+  const checkEmailDomain = async (email) => {
+    const val = String(email || "").trim();
+    if (!val) return;
+
+    // If format is clearly invalid, don't call the backend
+    const basic = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!basic.test(val)) return;
+
+    try {
+      const res = await api.get("/api/email/check", { params: { email: val } });
+      const hasDns = Boolean(res?.data?.has_dns);
+      if (!hasDns) {
+        setEmailDomainWarning(
+          "This email domain doesn't seem to exist (no DNS/MX records). If it's incorrect, emails may not reach you."
+        );
+      } else {
+        setEmailDomainWarning("");
+      }
+    } catch {
+      // Don't block registration if check fails
+      setEmailDomainWarning("");
+    }
+  };
+
+  // Debounced email domain check while typing
+  useEffect(() => {
+    if (emailCheckTimerRef.current) clearTimeout(emailCheckTimerRef.current);
+    if (!formData.email) return;
+
+    emailCheckTimerRef.current = setTimeout(() => {
+      checkEmailDomain(formData.email);
+    }, 700);
+
+    return () => {
+      if (emailCheckTimerRef.current) clearTimeout(emailCheckTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.email]);
 
   const checkPasswordRequirements = (password) => {
     const checks = {
@@ -156,9 +223,29 @@ const Register = () => {
               placeholder="Email"
               value={formData.email}
               onChange={handleChange}
+              onBlur={(e) => {
+                // Browser validity check for extra reliability
+                const val = e.target.value;
+                if (val && !e.target.validity.valid) {
+                  setEmailWarning("This email doesn't look valid. If it's incorrect, no emails will be sent to it.");
+                } else {
+                  setEmailWarning(getEmailWarning(val));
+                }
+                checkEmailDomain(val);
+              }}
               required
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600"
             />
+            {emailWarning ? (
+              <div className="mt-2 p-2 rounded-lg text-[12px] bg-yellow-50 border border-yellow-300 text-yellow-800">
+                {emailWarning}
+              </div>
+            ) : null}
+            {emailDomainWarning ? (
+              <div className="mt-2 p-2 rounded-lg text-[12px] bg-yellow-50 border border-yellow-300 text-yellow-800">
+                {emailDomainWarning}
+              </div>
+            ) : null}
 
             <div>
               <div className="relative">

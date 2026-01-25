@@ -6,9 +6,21 @@ import { GrMapLocation } from "react-icons/gr";
 import { FaInfoCircle } from "react-icons/fa";
 import { FaClipboardList } from "react-icons/fa6";
 import { FaMapMarkerAlt } from "react-icons/fa";
+import { IoClose } from "react-icons/io5";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
 import "../../styles/Dashboard.css";
 import api from "../../api/axios";
+
+// Fix for default marker icons in Leaflet with React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
 
 export default function MyAppointments(){
     const [activeTab, setActiveTab] = useState("All");
@@ -16,6 +28,9 @@ export default function MyAppointments(){
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [updatingId, setUpdatingId] = useState(null);
+    const [mapModalOpen, setMapModalOpen] = useState(false);
+    const [selectedAppointmentForMap, setSelectedAppointmentForMap] = useState(null);
 
     useEffect(() => {
         const fetchAppointments = async () => {
@@ -53,11 +68,38 @@ export default function MyAppointments(){
         fetchAppointments();
     }, []);
 
+    const refreshAppointments = async () => {
+        const response = await api.get("/api/nurse/my-appointments");
+        setAppointments(response.data.appointments || []);
+    };
+
+    const markComplete = async (appointmentId) => {
+        try {
+            setUpdatingId(appointmentId);
+            await api.put(`/api/nurse/my-appointments/${appointmentId}/status`, { state: "completed" });
+            await refreshAppointments();
+        } catch (err) {
+            console.error("Error marking appointment complete:", err);
+            setError(err.response?.data?.message || "Failed to update appointment status");
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    const handleOpenMap = (appointment) => {
+        setSelectedAppointmentForMap(appointment);
+        setMapModalOpen(true);
+    };
+
+    const handleCloseMap = () => {
+        setMapModalOpen(false);
+        setSelectedAppointmentForMap(null);
+    };
+
     // Filter appointments based on active tab
     const filteredAppointments = appointments.filter((appointment) => {
         if (activeTab === "All") return true;
         const statusLower = appointment.status?.toLowerCase() || "";
-        if (activeTab === "Pending") return statusLower === "pending";
         if (activeTab === "Confirmed") return statusLower === "confirmed";
         if (activeTab === "Completed") return statusLower === "completed";
         return true;
@@ -69,7 +111,6 @@ export default function MyAppointments(){
         const statusLower = status.toLowerCase();
         if (statusLower === "completed") return "status-completed";
         if (statusLower === "confirmed") return "status-confirmed"; // Confirmed appointments (phlebotomist started)
-        if (statusLower === "pending") return "status-pending";
         if (statusLower === "cancelled" || statusLower === "canceled") return "status-canceled";
         return "";
     };
@@ -114,12 +155,6 @@ export default function MyAppointments(){
                     All
                 </button>
                 <button
-                    className={activeTab === "Pending" ? "tab-active-nurse" : "tab-inactive"}
-                    onClick={() => setActiveTab("Pending")}
-                >
-                    Pending
-                </button>
-                <button
                     className={activeTab === "Confirmed" ? "tab-active-nurse" : "tab-inactive"}
                     onClick={() => setActiveTab("Confirmed")}
                 >
@@ -159,20 +194,23 @@ export default function MyAppointments(){
                             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                                 {(() => {
                                     const statusLower = appointment.status?.toLowerCase() || "";
-                                    // Show "Mark Complete" for both "pending" and "confirmed" statuses, but not for "completed" or "canceled"
-                                    const canMarkComplete = statusLower === "pending" || statusLower === "confirmed";
+                                    // Show "Mark Complete" for "confirmed" status, but not for "completed" or "canceled"
+                                    const canMarkComplete =  statusLower === "confirmed";
                                     return canMarkComplete && (
                                         <button
                                             className="add-btn"
                                             style={{ background: "linear-gradient(to right, #A7BBFC, #3257CD)", padding: "8px 16px", fontSize: "14px", borderRadius: "5px", color: "white" }}
+                                            disabled={updatingId === appointment.id}
+                                            onClick={() => markComplete(appointment.id)}
                                         >
-                                            Mark Complete
+                                            {updatingId === appointment.id ? "Updating..." : "Mark Complete"}
                                         </button>
                                     );
                                 })()}
                                 <button
                                     className="add-btn"
                                     style={{ background: "linear-gradient(to right, #FF9D9D, #EE2A2A)", padding: "8px 16px", fontSize: "14px", borderRadius: "5px", display: "flex", alignItems: "center", gap: "5px", color: "white" }}
+                                    onClick={() => handleOpenMap(appointment)}
                                 >
                                     <FaMapMarkerAlt style={{ fontSize: "12px" }} />
                                     Directions
@@ -220,6 +258,54 @@ export default function MyAppointments(){
                     </div>
                 )}
             </div>
+
+            {/* Map Modal (Leaflet) */}
+            {mapModalOpen && selectedAppointmentForMap && (
+                <div className="modal-overlay" onClick={handleCloseMap}>
+                    <div
+                        className="modal-container"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ maxWidth: "700px", width: "90%" }}
+                    >
+                        <div className="modal-title">
+                            <h2>{selectedAppointmentForMap.donorName || "Donor"} - Location</h2>
+                            <button onClick={handleCloseMap} aria-label="Close map modal">
+                                <IoClose />
+                            </button>
+                        </div>
+
+                        <div style={{ padding: "20px" }}>
+                            {selectedAppointmentForMap.latitude !== null &&
+                            selectedAppointmentForMap.latitude !== undefined &&
+                            selectedAppointmentForMap.longitude !== null &&
+                            selectedAppointmentForMap.longitude !== undefined ? (
+                                <div style={{ height: "400px", width: "100%", marginBottom: "15px" }}>
+                                    <MapContainer
+                                        center={[Number(selectedAppointmentForMap.latitude), Number(selectedAppointmentForMap.longitude)]}
+                                        zoom={15}
+                                        style={{ height: "100%", width: "100%", borderRadius: "8px" }}
+                                        scrollWheelZoom={true}
+                                    >
+                                        <TileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        />
+                                        <Marker position={[Number(selectedAppointmentForMap.latitude), Number(selectedAppointmentForMap.longitude)]} />
+                                    </MapContainer>
+                                </div>
+                            ) : (
+                                <div style={{ padding: "40px", textAlign: "center", color: "#767676" }}>
+                                    <p>No location coordinates available for this appointment.</p>
+                                </div>
+                            )}
+
+                            <p className="text-gray-700 text-sm text-center" style={{ marginTop: "10px" }}>
+                                {selectedAppointmentForMap.address || "N/A"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

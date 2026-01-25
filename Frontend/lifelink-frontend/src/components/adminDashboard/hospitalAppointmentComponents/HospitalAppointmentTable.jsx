@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp, IoClose } from "react-icons/io5";
+import { IoSearchSharp } from "react-icons/io5";
 import { BsCalendar3 } from "react-icons/bs";
 import { BsListUl } from "react-icons/bs";
 import { SpinnerDotted } from 'spinners-react';
@@ -10,6 +10,7 @@ import api from "../../../api/axios";
 import CalendarView from "../homeVisitComponents/CalendarView";
 import EditHospitalAppointmentModal from "./EditHospitalAppointmentModal";
 import ViewHospitalAppointmentModal from "./ViewHospitalAppointmentModal";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
 export default function HospitalAppointmentTable({ appointments = [], loading = false, error = "", onAppointmentsUpdate, searchTerm: externalSearchTerm = "", filters: externalFilters = null, onStatusUpdate }){
     const [visitState, setVisitState] = useState("all-states"); 
@@ -18,13 +19,12 @@ export default function HospitalAppointmentTable({ appointments = [], loading = 
     const [itemsPerPage, setItemsPerPage] = useState(8);
     const [viewMode, setViewMode] = useState("table"); 
     const [internalSearchTerm, setInternalSearchTerm] = useState("");
-    const [editModal, setEditModal] = useState(null); // { appointmentCode }
-    const [viewModal, setViewModal] = useState(null); // { appointmentCode }
-    const [deleteConfirm, setDeleteConfirm] = useState(null); // { appointmentCode, appointmentName }
+    const [editModal, setEditModal] = useState(null); 
+    const [viewModal, setViewModal] = useState(null); 
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [deleteError, setDeleteError] = useState("");
     
-    // Use external search term if provided, otherwise use internal
     const searchTerm = externalSearchTerm || internalSearchTerm;
 
     useEffect(()=>{
@@ -99,21 +99,32 @@ export default function HospitalAppointmentTable({ appointments = [], loading = 
                         matchesDateRange = true;
                 }
             } else {
-                matchesDateRange = false; // No date means no match
+                matchesDateRange = false; 
             }
         }
 
         return matchesSearch && matchesStatus && matchesBlood && matchesHospital && matchesDonationType && matchesDateRange;
     });
 
+    const sortedAppointments = [...filteredAppointments].sort((a, b) => {
+        const futureDateA = a.date ? new Date(a.date) : new Date(0);
+        const futureDateB = b.date ? new Date(b.date) : new Date(0);
+        const createdA = a.created_at ? new Date(a.created_at) : new Date(0);
+        const createdB = b.created_at ? new Date(b.created_at) : new Date(0);
+
+        const byFuture = futureDateB.getTime() - futureDateA.getTime();
+        if (byFuture !== 0) return byFuture;
+        return createdB.getTime() - createdA.getTime();
+    });
+
     //Calculate pagination values
-    const totalAppointments = filteredAppointments.length;
+    const totalAppointments = sortedAppointments.length;
     const totalPages = Math.ceil(totalAppointments / itemsPerPage);
 
     //Calculating which items should show
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const currentAppointments = filteredAppointments.slice(startIndex, endIndex);
+    const currentAppointments = sortedAppointments.slice(startIndex, endIndex);
 
     //Displaying text
     const startDisplay = startIndex + 1;
@@ -242,7 +253,7 @@ export default function HospitalAppointmentTable({ appointments = [], loading = 
             </div>
 
             {viewMode === "calendar" && (
-                <CalendarView orders={appointments} filteredOrders={filteredAppointments} />
+                <CalendarView orders={appointments} filteredOrders={sortedAppointments} />
             )}
 
             {viewMode === "table" && <div className="table-design">
@@ -404,54 +415,16 @@ export default function HospitalAppointmentTable({ appointments = [], loading = 
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Delete Hospital Appointment</h2>
-                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete the appointment for <strong>{deleteConfirm.appointmentName}</strong>?</p>
-                            <p className="modal-text-secondary">
-                                This action cannot be undone.
-                            </p>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteCancel}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Hospital Appointment"
+                    description={`You are going to delete the appointment for ${deleteConfirm.appointmentName}. Are you sure?`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={handleDeleteCancel}
+                    onConfirm={handleDeleteConfirm}
+                />
             )}
         </section>
     )

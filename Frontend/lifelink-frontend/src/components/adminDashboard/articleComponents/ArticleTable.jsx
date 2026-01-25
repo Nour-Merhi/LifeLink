@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react"
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp, IoClose } from "react-icons/io5";
+import { IoSearchSharp } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
-export default function ArticleTable({ articles = [], loading = false, error = "", onArticlesUpdate }){
+export default function ArticleTable({ articles = [], loading = false, error = "", onArticlesUpdate, onEditArticle }){
     const [articleStatus, setArticleStatus] = useState("all-status"); 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(8);
@@ -69,15 +70,19 @@ export default function ArticleTable({ articles = [], loading = false, error = "
     };
 
     const transformedArticles = Array.isArray(articles) ? articles.map((article) => {
+        const isAiGenerated = article?.author_id == null; // null or undefined
         return {
             id: article.code || `ART-${String(article.id).padStart(4, '0')}`,
             title: article.title || 'N/A',
             category: article.category || 'N/A',
             description: article.description || 'No description',
             status: article.is_published ? 'published' : 'draft',
-            author: article.author ? `${article.author.first_name || ''} ${article.author.last_name || ''}`.trim() : 'N/A',
+            author: article.author
+                ? `${article.author.first_name || ''} ${article.author.last_name || ''}`.trim()
+                : (isAiGenerated ? 'AI' : 'N/A'),
             created_at: formatDate(article.created_at),
             published_at: formatDate(article.published_at),
+            isAiGenerated,
             _originalArticle: article
         }
     }) : [];
@@ -142,7 +147,7 @@ export default function ArticleTable({ articles = [], loading = false, error = "
                 <table className="h1-table">
                     <thead>
                         <tr>
-                            <th className="text-left col-hospital">Title</th>
+                            <th className="text-left col-hospital !pl-3">Title</th>
                             <th className="col-address">Category</th>
                             <th className="col-status">Status</th>
                             <th className="col-contact">Author</th>
@@ -155,12 +160,14 @@ export default function ArticleTable({ articles = [], loading = false, error = "
                         {currentArticles.length > 0 ? currentArticles.map ((article, index) => (
                             <tr key={`${article.id}-${startIndex + index}`}>
                                 <td className="col-hospital">
-                                    <div className="cell-title">
-                                        <strong title={article.title}>{ article.title }</strong>
+                                    <div className="cell-title pl-3">
+                                        <div className="cell-title-row">
+                                            <strong title={article.title}>{ article.title }</strong>
+                                        </div>
                                         <small className="muted">{ article.id }</small>
                                     </div>
                                 </td>
-                                <td className="col-address">
+                                <td className="col-address !text-center">
                                     <span>{ article.category }</span>
                                 </td>
                                 <td className="col-status">
@@ -168,7 +175,7 @@ export default function ArticleTable({ articles = [], loading = false, error = "
                                         { article.status === "published" ? "Published" : "Draft"}
                                     </span>
                                 </td>
-                                <td className="col-contact">
+                                <td className="col-contact !text-center">
                                     <span>{ article.author }</span>
                                 </td>
                                 <td className="col-date">{ article.created_at }</td>
@@ -178,7 +185,11 @@ export default function ArticleTable({ articles = [], loading = false, error = "
                                         <button 
                                             className="icon-btn text-green-600" 
                                             title="Edit"
-                                            onClick={() => {/* TODO: Implement edit */}}
+                                            onClick={() => {
+                                                if (typeof onEditArticle === "function") {
+                                                    onEditArticle(article._originalArticle);
+                                                }
+                                            }}
                                         >
                                             <FiEdit />
                                         </button>
@@ -237,54 +248,16 @@ export default function ArticleTable({ articles = [], loading = false, error = "
             )}
 
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Delete Article</h2>
-                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete <strong>{deleteConfirm.articleTitle}</strong>?</p>
-                            <p className="modal-text-secondary">
-                                This action cannot be undone. The article will be permanently removed from the system.
-                            </p>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteCancel}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Article"
+                    description={`You are going to delete "${deleteConfirm.articleTitle}". Are you sure?`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={handleDeleteCancel}
+                    onConfirm={handleDeleteConfirm}
+                />
             )}
         </section>
     )

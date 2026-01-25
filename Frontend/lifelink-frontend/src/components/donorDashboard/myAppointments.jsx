@@ -14,8 +14,13 @@ export default function MyAppointments(){
     const [sortBy, setSortBy] = useState("date-desc");
     const [showSortDropdown, setShowSortDropdown] = useState(false);
     const [appointments, setAppointments] = useState([]);
+    const [organAppointments, setOrganAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [organChoiceByCode, setOrganChoiceByCode] = useState({});
+    const [organSubmitLoading, setOrganSubmitLoading] = useState(false);
+    const [organSubmitError, setOrganSubmitError] = useState("");
+    const [organSubmitSuccess, setOrganSubmitSuccess] = useState("");
 
     useEffect(() => {
         const fetchAppointments = async () => {
@@ -24,10 +29,12 @@ export default function MyAppointments(){
                 setError("");
                 const response = await api.get("/api/donor/my-appointments");
                 setAppointments(response.data.appointments || []);
+                setOrganAppointments(response.data.organ_appointments || []);
             } catch (err) {
                 console.error("Error fetching appointments:", err);
                 setError(err.response?.data?.message || "Failed to load appointments");
                 setAppointments([]);
+                setOrganAppointments([]);
             } finally {
                 setLoading(false);
             }
@@ -35,6 +42,22 @@ export default function MyAppointments(){
 
         fetchAppointments();
     }, []);
+
+    useEffect(() => {
+        // If deep-linked from email: /donor/my-appointments?focus=living&code=LO-XXXX
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("focus") === "living") {
+            const code = params.get("code");
+            if (code) {
+                // preselect first option if available
+                const item = (organAppointments || []).find((x) => x.code === code);
+                const first = item?.suggested_appointments?.[0];
+                if (first) {
+                    setOrganChoiceByCode((prev) => ({ ...prev, [code]: first }));
+                }
+            }
+        }
+    }, [organAppointments]);
 
     useEffect(() => {
         // Reset to first page when search or sort changes
@@ -45,7 +68,8 @@ export default function MyAppointments(){
     const filteredAppointments = appointments.filter((appointment) => {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = (appointment.hospitalName && appointment.hospitalName.toLowerCase().includes(searchLower)) || 
-                             (appointment.donationType && appointment.donationType.toLowerCase().includes(searchLower));
+                             (appointment.donationType && appointment.donationType.toLowerCase().includes(searchLower)) ||
+                             (appointment.phlebotomist?.name && appointment.phlebotomist.name.toLowerCase().includes(searchLower));
         
         // Filter by tab
         let matchesTab = true;
@@ -144,6 +168,31 @@ export default function MyAppointments(){
         // Add delete functionality here
     };
 
+    const submitOrganAppointmentChoice = async (code) => {
+        const selected = organChoiceByCode[code];
+        if (!selected) {
+            setOrganSubmitError("Please select an appointment option first.");
+            return;
+        }
+        setOrganSubmitLoading(true);
+        setOrganSubmitError("");
+        setOrganSubmitSuccess("");
+        try {
+            await api.post(`/api/donor/living-donors/${code}/choose-appointment`, {
+                selected_appointment_at: selected,
+            });
+            setOrganSubmitSuccess("Your appointment choice has been submitted successfully.");
+            // refresh
+            const response = await api.get("/api/donor/my-appointments");
+            setAppointments(response.data.appointments || []);
+            setOrganAppointments(response.data.organ_appointments || []);
+        } catch (e) {
+            setOrganSubmitError(e.response?.data?.message || "Failed to submit appointment choice.");
+        } finally {
+            setOrganSubmitLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <section className="donor-section">
@@ -176,6 +225,92 @@ export default function MyAppointments(){
                 </div>
                 <p className="text-gray-500 !text-lg">Total Appointments: {appointments.length}</p>
             </div>
+
+            {/* Living Organ Donation appointment choices panel */}
+            {organAppointments?.length > 0 && (
+                <div className="control-panel" style={{ marginBottom: 14 }}>
+                    <div className="control">
+                        <div>
+                            <h4>Living Organ Donation — Appointment Choices</h4>
+                            <span className="text-sm text-gray-500">
+                                If you received an email with appointment options, choose one here.
+                            </span>
+                        </div>
+                    </div>
+
+                    {organSubmitError && (
+                        <div style={{ color: "#F12C31", marginTop: 10 }}>{organSubmitError}</div>
+                    )}
+                    {organSubmitSuccess && (
+                        <div style={{ color: "#16a34a", marginTop: 10 }}>{organSubmitSuccess}</div>
+                    )}
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginTop: 12 }}>
+                        {organAppointments.map((o) => {
+                            const canChoose = o.appointment_status === "awaiting_donor_choice" && Array.isArray(o.suggested_appointments) && o.suggested_appointments.length > 0;
+                            return (
+                                <div key={o.code} style={{ background: "#fff", border: "1px solid #eee", borderRadius: 10, padding: 14 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                                        <div>
+                                            <div style={{ fontWeight: 800 }}>Pledge {o.code}</div>
+                                            <div className="muted" style={{ fontSize: 13 }}>
+                                                Organ: {o.organ || "N/A"} • Ethics: {o.ethics_status} • Medical: {o.medical_status}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className={`status-badge status-${(o.appointment_status || "pending").toLowerCase()}`}>
+                                                {o.appointment_status || "N/A"}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {o.selected_appointment_at && (
+                                        <div style={{ marginTop: 10, fontSize: 14 }}>
+                                            <b>Selected:</b> {new Date(o.selected_appointment_at).toLocaleString()}
+                                        </div>
+                                    )}
+
+                                    {canChoose ? (
+                                        <div style={{ marginTop: 12 }}>
+                                            <div style={{ fontWeight: 700, marginBottom: 8 }}>Choose an option:</div>
+                                            <div style={{ display: "grid", gap: 8 }}>
+                                                {o.suggested_appointments.map((slot) => (
+                                                    <label key={slot} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`slot-${o.code}`}
+                                                            checked={organChoiceByCode[o.code] === slot}
+                                                            onChange={() => setOrganChoiceByCode((prev) => ({ ...prev, [o.code]: slot }))}
+                                                        />
+                                                        <span>{slot}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+
+                                            <button
+                                                className="btn-save"
+                                                style={{ marginTop: 12, background: "linear-gradient(to right, #FF585D, #CA2529)" }}
+                                                disabled={organSubmitLoading}
+                                                onClick={() => submitOrganAppointmentChoice(o.code)}
+                                            >
+                                                {organSubmitLoading ? "Submitting..." : "Submit Appointment Choice"}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+                                            {o.appointment_status === "awaiting_scheduling"
+                                                ? "Your pledge is approved. Please wait for suggested appointment options."
+                                                : o.appointment_status === "awaiting_approval"
+                                                    ? "Your pledge is under review. Please wait for approval."
+                                                    : "No appointment options available at the moment."}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             <div className="control-panel">
                 <div className="control-panel-layout">
@@ -234,6 +369,7 @@ export default function MyAppointments(){
                             <th className="text-left col-hospital">Hospital Name</th>
                             <th className="col-date">Date</th>
                             <th className="col-time">Time</th>
+                            <th className="col-contact">Phlebotomist</th>
                             <th className="col-status">Status</th>
                             <th className="col-actions">Actions</th>
                         </tr>
@@ -252,6 +388,11 @@ export default function MyAppointments(){
                                 <td className="col-hospital text-left">{appointment.hospitalName}</td>
                                 <td className="col-date">{appointment.date}</td>
                                 <td className="col-time">{appointment.time}</td>
+                                <td className="col-contact">
+                                    {appointment.donationType === "Home Donation"
+                                        ? (appointment.phlebotomist?.name || "Not assigned")
+                                        : "—"}
+                                </td>
                                 <td className="col-status">
                                     <span className={`status-badge status-${appointment.status?.toLowerCase() || 'pending'}`}>
                                         {appointment.status || 'Pending'}
@@ -285,7 +426,7 @@ export default function MyAppointments(){
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan="7" className="text-center">No appointments found</td>
+                                <td colSpan="8" className="text-center">No appointments found</td>
                             </tr>
                         )}
                     </tbody>

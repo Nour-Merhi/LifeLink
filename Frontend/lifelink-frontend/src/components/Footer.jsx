@@ -50,7 +50,6 @@ const Footer = forwardRef(function Footer(props, ref) {
                     <h2 className="text-lg font-bold mt-3">24/7 Hotline</h2>
                     <div className="footer-contact-item-text">
                         <span className="text-sm">(555) LIFE-LINK</span>
-                        <span className="text-sm">(555) LIFE-LINK</span>
                         <span className="font-light mt-1 text-sm">Emergency donation requests</span>
                     </div>
                 </div>
@@ -61,7 +60,6 @@ const Footer = forwardRef(function Footer(props, ref) {
                     <h2 className="text-lg font-bold mt-3">Email Support</h2>
                     <div className="footer-contact-item-text">
                         <span className="text-sm">lifelink.org.team@gmail.com</span>
-                        <span className="text-sm">lifelink.org.team@gmail.com</span>
                         <span className="font-light mt-1 text-sm">Response within 24 hours</span>
                     </div>
                 </div>
@@ -71,7 +69,6 @@ const Footer = forwardRef(function Footer(props, ref) {
                     </div>
                     <h2 className="text-lg font-bold mt-3">Main Office</h2>
                     <div className="footer-contact-item-text">
-                        <span className="text-sm">123 Hope Street</span>
                         <span className="text-sm">Donation City, DC 12345</span>
                         <span className="font-light mt-1 text-sm">Mon-Fri: 8AM-8PM</span>
                     </div>
@@ -82,7 +79,6 @@ const Footer = forwardRef(function Footer(props, ref) {
                     </div>
                     <h2 className="text-lg font-bold mt-3">Live Chat</h2>
                     <div className="footer-contact-item-text">
-                        <span className="text-sm">Available on our website</span>
                         <span className="text-sm">Instant assistance</span>
                         <span className="font-light mt-1 text-sm">Online 24/7</span>
                     </div>

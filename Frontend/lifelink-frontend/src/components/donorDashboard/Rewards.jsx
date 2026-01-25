@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { TbDroplet } from "react-icons/tb";
 import { BiDonateHeart } from "react-icons/bi";
 import { RiHeart3Line } from "react-icons/ri";
-import { IoIosLock } from "react-icons/io";
+import { MdCardGiftcard } from "react-icons/md";
+import { HiDownload } from "react-icons/hi";
 
 import "../../styles/Dashboard.css";
 import Quality from "../../assets/imgs/quality.svg";
@@ -13,8 +14,11 @@ import api from "../../api/axios";
 
 export default function Rewards() {
     const [rewardsData, setRewardsData] = useState(null);
+    const [certificates, setCertificates] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [certificatesLoading, setCertificatesLoading] = useState(true);
     const [error, setError] = useState("");
+    const [certificatesError, setCertificatesError] = useState("");
 
     useEffect(() => {
         const fetchRewardsData = async () => {
@@ -31,7 +35,22 @@ export default function Rewards() {
             }
         };
 
+        const fetchCertificates = async () => {
+            try {
+                setCertificatesLoading(true);
+                setCertificatesError("");
+                const response = await api.get("/api/donor/certificates");
+                setCertificates(response.data.certificates || []);
+            } catch (err) {
+                console.error("Error fetching certificates:", err);
+                setCertificatesError(err.response?.data?.message || "Failed to load certificates");
+            } finally {
+                setCertificatesLoading(false);
+            }
+        };
+
         fetchRewardsData();
+        fetchCertificates();
     }, []);
 
     // Helper function to get level icon (you may need to adjust based on available icons)
@@ -46,56 +65,57 @@ export default function Rewards() {
         return `+${amount} XP`;
     };
 
-    // Helper function to get certificate image/icon based on certificate type and level
-    const getCertificateImage = (certificate) => {
-        if (certificate.type === 'level') {
-            // For level certificates, use the level icon
-            // Certificate ID corresponds to level number (1-20)
-            const level = certificate.id;
-            // Since we only have level-2 and level-3 icons, use level-2 for levels 1-2, level-3 for 3+
-            if (level <= 2) {
-                return Level2;
-            } else {
-                return level3;
-            }
-        } else if (certificate.type === 'xp_milestone') {
-            // For XP milestones, use level icon as placeholder
-            return level3;
+    // Helper function to format date
+    const formatDate = (dateString) => {
+        if (!dateString) return "N/A";
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch {
+            return "N/A";
         }
-        return Level2;
     };
 
-    if (loading) {
-        return (
-            <section className="donor-section">
-                <div className="flex items-center justify-center h-64">
-                    <p className="text-gray-500">Loading rewards...</p>
-                </div>
-            </section>
-        );
-    }
+    // Download certificate image
+    const downloadCertificate = async (certificate) => {
+        if (!certificate.id) return;
+        
+        try {
+            // Use the API endpoint to download with proper headers
+            const response = await api.get(`/api/donor/certificates/${certificate.id}/download`, {
+                responseType: 'blob', // Important: tell axios to expect binary data
+            });
+            
+            // response.data is already a Blob when responseType is 'blob'
+            const blob = response.data;
+            
+            // Create object URL from blob
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `certificate.png`;
+            link.style.display = 'none';
+            
+            // Append to body
+            document.body.appendChild(link);
+            
+            // Trigger download
+            link.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(blobUrl);
+            }, 100);
+        } catch (error) {
+            console.error('Error downloading certificate:', error);
+            alert('Failed to download certificate. Please try again.');
+        }
+    };
 
-    if (error) {
-        return (
-            <section className="donor-section">
-                <div className="flex items-center justify-center h-64">
-                    <p className="text-red-500">Error: {error}</p>
-                </div>
-            </section>
-        );
-    }
-
-    if (!rewardsData) {
-        return (
-            <section className="donor-section">
-                <div className="flex items-center justify-center h-64">
-                    <p className="text-gray-500">No rewards data available</p>
-                </div>
-            </section>
-        );
-    }
-
-    const { level_progress = {}, xp_rules = [], certificates = [] } = rewardsData;
+    const { level_progress = {}, xp_rules = [] } = rewardsData || {};
 
     return (
         <section className="donor-section">
@@ -104,34 +124,76 @@ export default function Rewards() {
                     <img src={Quality} alt="Quality" className="quality-1" />
                     <div>
                         <h2 className="certificates-title">Your Certificates</h2>
-                        <p className="certificates-description">Achievements and recognition for your donations</p>
+                        <p className="certificates-description">Recognition certificates issued by administrators</p>
                     </div>
                 </div>
             </div>
 
-            {/* Certificates Section */}
-            <div className="mb-8 certificates-grid">
-                {certificates.map((certificate) => (
-                    <div key={certificate.id} className="certificate-card">
-                        {certificate.unlocked ? (
-                            <div className="certificate-placeholder certificate-unlocked">
-                                <img 
-                                    src={getCertificateImage(certificate)} 
-                                    alt={certificate.name}
-                                    className="certificate-image"
-                                />
+            {/* Certificates Section - Modern Design */}
+            {certificatesLoading ? (
+                <div className="flex items-center justify-center h-64 mb-8">
+                    <p className="text-gray-500">Loading certificates...</p>
+                </div>
+            ) : certificatesError ? (
+                <div className="flex items-center justify-center h-64 mb-8">
+                    <p className="text-red-500">Error: {certificatesError}</p>
+                </div>
+            ) : certificates.length === 0 ? (
+                <div className="donor-container mb-8 p-8 text-center">
+                    <MdCardGiftcard className="mx-auto text-6xl text-gray-300 mb-4" />
+                    <p className="text-gray-500 text-lg">No certificates yet</p>
+                    <p className="text-gray-400 text-sm mt-2">Certificates will appear here once issued by administrators</p>
+                </div>
+            ) : (
+                <div className="mb-8 modern-certificates-grid">
+                    {certificates.map((certificate) => (
+                        <div key={certificate.id} className="modern-certificate-card">
+                            {certificate.image_url ? (
+                                <div className="modern-certificate-image-wrapper">
+                                    <img 
+                                        src={certificate.image_url} 
+                                        alt={certificate.description_option || "Certificate"}
+                                        className="modern-certificate-image"
+                                    />
+                                    <div className="modern-certificate-overlay">
+                                        <button
+                                            onClick={() => downloadCertificate(certificate)}
+                                            className="modern-certificate-download-btn"
+                                            title="Download certificate"
+                                        >
+                                            <HiDownload />
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="modern-certificate-placeholder">
+                                    <MdCardGiftcard className="text-5xl text-gray-300 mb-2" />
+                                    <p className="text-sm text-gray-400">No image</p>
+                                </div>
+                            )}
+                            <div className="modern-certificate-info">
+                                <h3 className="modern-certificate-title">{certificate.description_option || "Certificate"}</h3>
+                                <p className="modern-certificate-date">{formatDate(certificate.certificate_date || certificate.created_at)}</p>
                             </div>
-                        ) : (
-                            <div className="certificate-placeholder">
-                                <IoIosLock className="text-2xl text-gray-500" />
-                                <p className="text-xs mt-2 text-center text-gray-400">{certificate.requirement}</p>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
             
             {/* Level Progress & XP System */}
+            {loading ? (
+                <div className="flex items-center justify-center h-64 mt-5">
+                    <p className="text-gray-500">Loading rewards...</p>
+                </div>
+            ) : error ? (
+                <div className="flex items-center justify-center h-64 mt-5">
+                    <p className="text-red-500">Error: {error}</p>
+                </div>
+            ) : !rewardsData ? (
+                <div className="flex items-center justify-center h-64 mt-5">
+                    <p className="text-gray-500">No rewards data available</p>
+                </div>
+            ) : (
             <div className="donor-container mt-5 p-10">
                 <div className="xp-section-header">
                     <h2 className="xp-section-title">Level Progress & Xp System</h2>
@@ -185,13 +247,14 @@ export default function Rewards() {
                                 <div key={index} className="earn-xp-item">
                                     {icon}
                                     <span className="earn-xp-name">{rule.name}</span>
-                                    <span className="earn-xp-amount">{formatXpAmount(rule.xp_amount)}</span>
+                                    <span className="earn-xp-amount">{ index !== 3 ?formatXpAmount(rule.xp_amount) : "Dependant on Donation Amount"}</span>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
             </div>
+            )}
         </section>
     );
 }

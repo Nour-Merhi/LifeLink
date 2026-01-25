@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react"
 import { FiTrash2 } from "react-icons/fi";
-import { IoSearchSharp, IoClose } from "react-icons/io5";
+import { IoSearchSharp } from "react-icons/io5";
 import { BsCalendar3, BsClock } from "react-icons/bs";
 import { MdLocationOn } from "react-icons/md";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
 import EditAppointmentModal from "../homeVisitComponents/EditAppointmentModal";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
 export default function HospitalAppTable({ hospitals = [], loading = false, error = "", onAppointmentsUpdate }){
     const [selectedHospitalId, setSelectedHospitalId] = useState("");
@@ -317,57 +318,17 @@ export default function HospitalAppTable({ hospitals = [], loading = false, erro
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Delete Appointments</h2>
-                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete all appointments for <strong>{deleteConfirm.date}</strong>?</p>
-                            <p className="modal-text-secondary">
-                                This will delete {deleteConfirm.appointmentIds?.length || 0} appointment record(s).
-                            </p>
-                            <span className="modal-warning-text">
-                                Note: This action cannot be undone if there are no active bookings.
-                            </span>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteCancel}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Appointments"
+                    description={`You are going to delete all appointments for ${deleteConfirm.date}. Are you sure?`}
+                    details={`${deleteConfirm.appointmentIds?.length || 0} record(s) • Note: Deletion may be blocked if there are active bookings.`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={handleDeleteCancel}
+                    onConfirm={handleDeleteConfirm}
+                />
             )}
 
             {/* Edit Appointment Modal */}

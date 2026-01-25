@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import Timeslots from "./Timeslots";
-import timeslots from "../../../timeSlots";
-
 
 export default function CalendarStep({ 
     onSelectDate, 
     pageType, 
+    storagePrefix,
     thankMessHospital, 
     setThankMessHospital,
     setStep,
@@ -167,18 +166,17 @@ export default function CalendarStep({
       if (isUrgent) return;
       
       // For regular appointments, check if there's a date in localStorage
-      const prefix = pageType === "home" ? "home_" : "hospital_";
+      const prefix = storagePrefix || (pageType === "home" ? "home_" : "hospital_");
       const storedDate = localStorage.getItem(prefix + "date");
       if (storedDate) {
         try {
-          const storedDateObj = new Date(storedDate);
-          const storedDay = storedDateObj.getDate();
-          const storedMonth = storedDateObj.getMonth();
-          const storedYear = storedDateObj.getFullYear();
+          // Avoid timezone shifts when parsing YYYY-MM-DD / ISO strings
+          const storedDateStr = normalizeDate(storedDate);
+          const [storedYear, storedMonth1, storedDay] = storedDateStr.split('-').map(Number);
+          const storedMonth = (storedMonth1 || 0) - 1;
           
           // Check if stored date is in current month and has appointments
           if (storedMonth === month && storedYear === year) {
-            const storedDateStr = storedDate.split('T')[0].split(' ')[0];
             if (availableDates.has(storedDateStr) && hasAppointments(storedDay)) {
               setSelected(storedDay);
               setSelectedDate(storedDateStr);
@@ -303,7 +301,7 @@ return (
                         <p>Available Time Slots</p>
                         
                         <Timeslots 
-                            timeslots={(pageType === "home" || pageType === "hospital") && timeSlots && timeSlots.length > 0
+                            timeslots={(pageType === "home" || pageType === "hospital") && Array.isArray(timeSlots) && timeSlots.length > 0
                                 ? timeSlots.filter(slot => {
                                     // Filter slots for the selected date
                                     if (!slot.date || !selectedDate) return false;
@@ -406,10 +404,11 @@ return (
                                             return slotObj;
                                         }).filter(slot => slot !== null);
                                     }).filter(slot => slot && slot.date)
-                                    : timeslots
+                                    : []
                                 )}
                             selectedDate={selectedDate}
                             pageType={pageType}
+                            storagePrefix={storagePrefix}
                             setStep={setStep}
                             setTime={setTime} 
                             hospitalAppt={hospitalAppt}

@@ -29,13 +29,16 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
         if (phlebotomistData) {
             // Extract data from nested structure (raw backend data has user and hospital relationships)
             const user = phlebotomistData.user || {};
+            const backendStatus = (phlebotomistData.status || '').toString().toLowerCase();
+            const forceUnavailable = backendStatus === 'inactive';
+
             const initialData = {
                 first_name: user.first_name || phlebotomistData.first_name || "",
                 middle_name: user.middle_name || phlebotomistData.middle_name || "",
                 last_name: user.last_name || phlebotomistData.last_name || "",
                 email: user.email || phlebotomistData.email || "",
                 phone_nb: user.phone_nb || phlebotomistData.phone_nb || "",
-                availability: phlebotomistData.availability || "available",
+                availability: forceUnavailable ? "unavailable" : (phlebotomistData.availability || "available"),
                 max_appointments: phlebotomistData.max_appointments || "",
                 start_time: phlebotomistData.start_time || "",
                 end_time: phlebotomistData.end_time || "",
@@ -69,13 +72,16 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
             const phleb = response.data.phlebotomist || response.data;
             setPhlebotomistInfo(phleb);
             
+            const backendStatus = (phleb.status || '').toString().toLowerCase();
+            const forceUnavailable = backendStatus === 'inactive';
+
             const initialData = {
                 first_name: phleb.first_name || "",
                 middle_name: phleb.middle_name || "",
                 last_name: phleb.last_name || "",
                 email: phleb.email || "",
                 phone_nb: phleb.phone_nb || "",
-                availability: phleb.availability || "available",
+                availability: forceUnavailable ? "unavailable" : (phleb.availability || "available"),
                 max_appointments: phleb.max_appointments || "",
                 start_time: phleb.start_time || "",
                 end_time: phleb.end_time || "",
@@ -293,12 +299,18 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
                                         name="availability"
                                         value={editPhlebotomistData.availability}
                                         onChange={handleChange}
+                                        disabled={(phlebotomistInfo?.status || '').toString().toLowerCase() === 'inactive'}
                                     >
                                         <option value="available">Available</option>
                                         <option value="onDuty">On Duty</option>
                                         <option value="unavailable">Unavailable</option>
                                     </select>
                                 </div>
+                                {(phlebotomistInfo?.status || '').toString().toLowerCase() === 'inactive' && (
+                                    <small className="error-text" style={{ color: "#6B6B6B" }}>
+                                        This phlebotomist is inactive, so availability is forced to Unavailable.
+                                    </small>
+                                )}
                                 {errors.availability && (
                                     <small className="error-text">{errors.availability}</small>
                                 )}

@@ -11,6 +11,7 @@ class HomeAppointmentRating extends Model
 
     protected $fillable = [
         'home_appointment_id',
+        'phlebotomist_id',
         'donor_id',
         'rating',
         'comment',
@@ -24,6 +25,11 @@ class HomeAppointmentRating extends Model
     public function donor()
     {
         return $this->belongsTo(Donor::class, 'donor_id');
+    }
+
+    public function phlebotomist()
+    {
+        return $this->belongsTo(MobilePhlebotomist::class, 'phlebotomist_id');
     }
 }
 

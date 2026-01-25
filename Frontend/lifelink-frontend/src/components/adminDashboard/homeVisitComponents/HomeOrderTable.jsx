@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { FiEye } from "react-icons/fi";
 import { FiEdit } from "react-icons/fi";
 import { RiDeleteBin6Line } from "react-icons/ri";
-import { IoSearchSharp, IoClose } from "react-icons/io5";
+import { IoSearchSharp } from "react-icons/io5";
 import { BsCalendar3 } from "react-icons/bs";
 import { BsListUl } from "react-icons/bs";
 import { FiUserPlus } from "react-icons/fi";
@@ -13,6 +13,7 @@ import CalendarView from "./CalendarView";
 import AssignPhlebotomistModal from "./AssignPhlebotomistModal";
 import ViewHomeOrderModal from "./ViewHomeOrderModal";
 import EditHomeOrderModal from "./EditHomeOrderModal";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
 export default function HomeOrderTable({ orders = [], loading = false, error = "", onOrdersUpdate }){
     const [visitState, setVisitState] = useState(""); 
@@ -620,74 +621,37 @@ export default function HomeOrderTable({ orders = [], loading = false, error = "
             )}
 
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Confirm Deletion</h2>
-                            <button onClick={() => {
-                                setDeleteConfirm(null);
-                                setDeleteError("");
-                            }} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete the order for <strong>{deleteConfirm.donorName}</strong> at <strong>{deleteConfirm.hospitalName}</strong> on <strong>{deleteConfirm.date}</strong>?</p>
-                            <p className="modal-text-secondary">This action cannot be undone.</p>
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        setDeleteConfirm(null);
-                                        setDeleteError("");
-                                    }}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={async () => {
-                                        setDeleteLoading(true);
-                                        setDeleteError("");
-                                        try {
-                                            await api.get("/sanctum/csrf-cookie");
-                                            await api.delete(
-                                                `/api/admin/dashboard/home-visit-orders/${deleteConfirm.orderCode}`
-                                            );
-                                            setDeleteConfirm(null);
-                                            if (onOrdersUpdate) {
-                                                onOrdersUpdate();
-                                            }
-                                        } catch (error) {
-                                            console.error('Error deleting home order:', error);
-                                            setDeleteError(error.response?.data?.message || error.message || "Failed to delete order");
-                                        } finally {
-                                            setDeleteLoading(false);
-                                        }
-                                    }}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Order"
+                    description={`You are going to delete the order for ${deleteConfirm.donorName}. Are you sure?`}
+                    details={`${deleteConfirm.hospitalName || "N/A"} • ${deleteConfirm.date || "N/A"}`}
+                    confirmText="Delete"
+                    cancelText="Cancel"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={() => {
+                        if (deleteLoading) return;
+                        setDeleteConfirm(null);
+                        setDeleteError("");
+                    }}
+                    onConfirm={async () => {
+                        setDeleteLoading(true);
+                        setDeleteError("");
+                        try {
+                            await api.get("/sanctum/csrf-cookie");
+                            await api.delete(`/api/admin/dashboard/home-visit-orders/${deleteConfirm.orderCode}`);
+                            setDeleteConfirm(null);
+                            if (onOrdersUpdate) {
+                                onOrdersUpdate();
+                            }
+                        } catch (error) {
+                            console.error('Error deleting home order:', error);
+                            setDeleteError(error.response?.data?.message || error.message || "Failed to delete order");
+                        } finally {
+                            setDeleteLoading(false);
+                        }
+                    }}
+                />
             )}
         </section>
     )

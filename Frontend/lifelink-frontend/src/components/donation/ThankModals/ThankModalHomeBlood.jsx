@@ -1,13 +1,11 @@
- import { IoCheckmarkSharp } from "react-icons/io5";
+import SuccessAnimation from "../../../animations/animationSuccess";
  
  export default function ThankModalHomeBlood({onClose}){ 
   return (
     <div className="modal-overlay">
       <div className="modal-box">
         <div className="complete">
-          <div className="tick">
-              <IoCheckmarkSharp />
-          </div>
+         <SuccessAnimation />
           <h3>Appointment Completed!</h3>
         </div>
 

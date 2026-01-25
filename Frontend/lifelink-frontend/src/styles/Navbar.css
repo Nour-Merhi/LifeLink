@@ -11,12 +11,19 @@
 .navbar  h2{
     font-size: 20px;
     font-weight: 600;
+    min-width: 0; /* allow truncation */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .nav-info{
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 15px;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 .admin-info{
     display: flex;
@@ -24,6 +31,7 @@
     align-items: center;
     gap:10px;
     position: relative;
+    min-width: 0;
 }
 .admin-info img{
     height: 40px !important;
@@ -35,16 +43,115 @@
     display: flex;
     flex-direction: column;
     align-items: left;
+    min-width: 0;
 }
 .admin-name > h3{
     padding-top: 2px;
     font-size: 15px;
     font-weight: 600;
     line-height: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .admin-name> small{
     font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .admin-icon {
     font-size: 20px;
+}
+
+/* Make nav buttons align like links (no default button styles) */
+.quiz-nav-button{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    line-height: normal;
+    font: inherit;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .navbar{
+        padding: 12px 14px;
+    }
+    .navbar h2{
+        font-size: 18px;
+        
+        width: 100%;
+    }
+    .nav-info{
+        width: 100%;
+    }
+    .admin-info img{
+        height: 36px !important;
+        width: 36px !important;
+    }
+    .admin-name > h3{
+        font-size: 14px;
+        line-height: 14px;
+    }
+    .admin-name > small{
+        font-size: 11px;
+    }
+    .quiz-nav-link{
+        font-size: 14px;
+    }
+    .quiz-nav-link-active{
+        font-size: 14px;
+    }
+    .quiz-navbar{
+        padding: 10px 12px;
+    }
+
+    /* Mobile dropdown menu links should be black (the global .quiz-nav-link is white) */
+    .quiz-nav-link-mobile{
+        color: #000000 !important;
+        display: block;
+        width: 100%;
+        text-align: left;
+    }
+    .quiz-nav-link-mobile.quiz-nav-link-active{
+        color: #F12C31 !important;
+    }
+
+    /* Contact Us button: align like the other mobile links */
+    .quiz-nav-button.quiz-nav-link-mobile{
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 430px) {
+    .navbar{
+        padding: 10px 12px;
+    }
+    .navbar h2{
+        font-size: 18px;
+        max-width: 80px;
+        text-overflow: clip;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    .navbar-info {
+        font-size: 12px;
+    }
+    .admin-info{
+        font-size: 12px;
+        gap: 8px;
+    }
+    .admin-info img{
+        height: 32px !important;
+        width: 32px !important;
+    }
+    .admin-icon{
+        font-size: 18px;
+    }
 }

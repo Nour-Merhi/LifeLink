@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Appointment;
 use App\Models\Hospital;
+use App\Models\HomeAppointment;
+use App\Models\HospitalAppointment;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -616,6 +618,152 @@ class AppointmentsController extends Controller
                 'message' => 'Failed to update appointment: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Update/remove a single time slot on an Appointment.
+     * Expects:
+     * - op: "update" | "remove"
+     * - old_time: "HH:MM"
+     * - new_time: "HH:MM" (required for update)
+     */
+    public function updateTimeSlot(Request $request, Appointment $appointment)
+    {
+        $validated = $request->validate([
+            'op' => 'required|in:update,remove',
+            'old_time' => 'required|string|date_format:H:i',
+            'new_time' => 'required_if:op,update|nullable|string|date_format:H:i',
+        ]);
+
+        // Authorization: allow admin, or manager who owns the appointment hospital
+        $user = $request->user();
+        $role = strtolower((string)($user->role ?? ''));
+        if ($role === 'manager') {
+            if (!$user->relationLoaded('healthCenterManager')) {
+                $user->load('healthCenterManager');
+            }
+            $managerHospitalId = $user->healthCenterManager->hospital_id ?? null;
+            if (!$managerHospitalId || (int)$managerHospitalId !== (int)$appointment->hospital_id) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        } elseif (!in_array($role, ['admin', 'superadmin'], true) && $role !== 'administrator') {
+            // Some projects use "Admin" casing; keep it permissive but not open.
+            // If your admin role differs, add it here.
+            // Allow also "donation center" ? not needed.
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $oldTime = $validated['old_time'];
+        $newTime = $validated['new_time'] ?? null;
+
+        $timeSlots = $appointment->time_slots ?? [];
+        if (!is_array($timeSlots)) {
+            $timeSlots = [];
+        }
+
+        // Check bookings for this specific appointment/time (home + hospital bookings)
+        $activeHomeBookings = HomeAppointment::where('appointment_id', $appointment->id)
+            ->where('appointment_time', $oldTime)
+            ->where('state', '!=', 'canceled')
+            ->count();
+        $activeHospitalBookings = HospitalAppointment::where('appointment_id', $appointment->id)
+            ->where('appointment_time', $oldTime)
+            ->where('state', '!=', 'canceled')
+            ->count();
+        $activeBookings = $activeHomeBookings + $activeHospitalBookings;
+
+        if ($activeBookings > 0) {
+            return response()->json([
+                'message' => 'Cannot modify this time slot because it has active bookings.',
+                'bookings_count' => $activeBookings,
+            ], 422);
+        }
+
+        $op = $validated['op'];
+
+        // Helper: slot start
+        $slotStart = function ($slot) {
+            if (is_string($slot)) return $slot;
+            if (is_array($slot) && isset($slot['start'])) return $slot['start'];
+            return null;
+        };
+
+        // Prevent duplicates on update
+        if ($op === 'update' && $newTime) {
+            foreach ($timeSlots as $slot) {
+                $start = $slotStart($slot);
+                if ($start === $newTime) {
+                    return response()->json([
+                        'message' => 'This time slot already exists.',
+                    ], 422);
+                }
+            }
+        }
+
+        $found = false;
+        $updated = [];
+
+        foreach ($timeSlots as $slot) {
+            if (is_string($slot)) {
+                if ($slot === $oldTime) {
+                    $found = true;
+                    if ($op === 'remove') {
+                        continue;
+                    }
+                    $updated[] = $newTime;
+                    continue;
+                }
+                $updated[] = $slot;
+                continue;
+            }
+
+            if (is_array($slot) && isset($slot['start'])) {
+                if (($slot['start'] ?? null) === $oldTime) {
+                    $found = true;
+                    if ($op === 'remove') {
+                        continue;
+                    }
+
+                    $newSlot = $slot;
+                    $newSlot['start'] = $newTime;
+
+                    // If slot has end, keep duration constant
+                    if (!empty($slot['end'])) {
+                        try {
+                            $oldStart = Carbon::createFromFormat('H:i', $slot['start']);
+                            $oldEnd = Carbon::createFromFormat('H:i', $slot['end']);
+                            $diffMinutes = $oldStart->diffInMinutes($oldEnd, false);
+                            if ($diffMinutes > 0) {
+                                $newStart = Carbon::createFromFormat('H:i', $newTime);
+                                $newEnd = $newStart->copy()->addMinutes($diffMinutes);
+                                $newSlot['end'] = $newEnd->format('H:i');
+                            }
+                        } catch (\Exception $e) {
+                            // If parsing fails, leave end as-is.
+                        }
+                    }
+
+                    $updated[] = $newSlot;
+                    continue;
+                }
+            }
+
+            $updated[] = $slot;
+        }
+
+        if (!$found) {
+            return response()->json([
+                'message' => 'Time slot not found on this appointment.',
+            ], 404);
+        }
+
+        $appointment->time_slots = array_values($updated);
+        $appointment->save();
+
+        return response()->json([
+            'message' => $op === 'remove' ? 'Time slot removed.' : 'Time slot updated.',
+            'appointment' => $appointment,
+        ], 200);
     }
 
     /**

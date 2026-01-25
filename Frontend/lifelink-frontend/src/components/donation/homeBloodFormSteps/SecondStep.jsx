@@ -3,7 +3,7 @@ import ScrollToTop from "../../ScrollToTop";
 
 import { useState, useEffect } from "react";
 
-export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setHomeBloodFormData, pageType = "home" }){
+export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setHomeBloodFormData, pageType = "home", lockLastDonation = false }){
     const navigate = useNavigate();
     const [bloodType, setBloodType] = useState(homeBloodFormData.blood_type || "");
     const [lastDonation, setLastDonation] = useState(homeBloodFormData.last_donation || "");
@@ -75,6 +75,7 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
     };
 
     const handleLastDonationChange = (e) => {
+        if (lockLastDonation) return;
         const value = e.target.value;
         setLastDonation(value);
         validateLastDonation(value);
@@ -135,9 +136,9 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
             try {
                 const parsed = JSON.parse(savedData);
                 if (parsed.blood_type) setBloodType(parsed.blood_type);
-                if (parsed.last_donation) {
+                // Only allow localStorage to fill last_donation if it's not locked by backend
+                if (!lockLastDonation && parsed.last_donation) {
                     setLastDonation(parsed.last_donation);
-                    // Validate on load
                     validateLastDonation(parsed.last_donation);
                 }
                 if (parsed.medical_conditions) setMedicalConditions(parsed.medical_conditions);
@@ -145,8 +146,23 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                 console.warn('Error parsing saved form data:', e);
             }
         }
+        // If locked, always ensure we display the backend-provided date
+        if (lockLastDonation) {
+            const backendDate = homeBloodFormData.last_donation || "";
+            setLastDonation(backendDate);
+            if (backendDate) validateLastDonation(backendDate);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Only run once on mount
+
+    // Keep last donation synced if backend/user data changes while locked
+    useEffect(() => {
+        if (!lockLastDonation) return;
+        const backendDate = homeBloodFormData.last_donation || "";
+        setLastDonation(backendDate);
+        if (backendDate) validateLastDonation(backendDate);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lockLastDonation, homeBloodFormData.last_donation]);
 
     
     return(
@@ -229,8 +245,14 @@ export default function SecondStep({ nextStep, prevStep, homeBloodFormData, setH
                                         id="last-donation"
                                         value={lastDonation} 
                                         max={new Date().toISOString().split('T')[0]} // Cannot be in the future
+                                        disabled={lockLastDonation}
                                         required
                                     />
+                                    {lockLastDonation && (
+                                        <p className="muted" style={{ marginTop: "6px" }}>
+                                            This value comes from your last donation date.
+                                        </p>
+                                    )}
                                     {lastDonationError && (
                                         <p style={{ 
                                             color: "#dc2626", 

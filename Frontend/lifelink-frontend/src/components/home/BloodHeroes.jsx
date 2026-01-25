@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { FaTint, FaHeart } from "react-icons/fa";
+import { FaTint, FaHeart, FaUsers } from "react-icons/fa";
+import { FaDroplet } from "react-icons/fa6";
 import api from "../../api/axios";
 import heroes from "../../assets/illustrations/hero.svg";
+import AnimatedSection from "../common/AnimatedSection";
 
 export default function BloodDonationStatsAndLeaderboard() {
   const [topDonors, setTopDonors] = useState([]);
@@ -38,32 +40,32 @@ export default function BloodDonationStatsAndLeaderboard() {
   }, []);
 
   const statsList = [
-    { label: "Total Donations", value: stats.totalDonations },
-    { label: "Active Donors", value: stats.activeDonors },
-    { label: "Lives Saved", value: stats.livesSaved },
+    { label: "Total Donations", value: stats.totalDonations, icon: <FaDroplet />, iconClass: "text-white" },
+    { label: "Active Donors", value: stats.activeDonors, icon: <FaUsers />, iconClass: "text-white" },
+    { label: "Lives Saved", value: stats.livesSaved, icon: <FaHeart />, iconClass: "text-white" },
   ];
 
   return (
-    <div className="max-w-[810px] mx-auto p-6 relative">
-
+    <AnimatedSection as="div" className="max-w-[900px] mx-auto px-4 sm:px-6 py-6 relative" animation="fade-up">
       {/* Heroes image - positioned behind the table */}
-      <div className="absolute inset-0 flex items-center justify-center z-0 opacity-50 mt-25">
-        <img src={heroes} alt="heroes" className="max-w-full h-full" />
+      <div className="absolute inset-0 flex items-center justify-center z-0 opacity-40 pointer-events-none">
+        <img src={heroes} alt="heroes" className="w-full max-w-[760px] h-auto" />
       </div>
 
       {/* Three Stats boxes */}
-      <div className="flex justify-center gap-6 mb-8 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 relative z-10">
         {statsList.map((stat, idx) => (
           <div
             key={idx}
-            className="bg-white shadow-md rounded-lg flex items-center px-8 py-6 min-w-[180px]"
+            className="bg-white rounded-[18px] flex flex-row gap-3 justify-flex-start items-center p-4 w-full"
+            style={{ boxShadow: "0 0 4px 0 rgba(0, 0, 0, 0.25)" }}
           >
-            <span className="text-red-500 text-xl mr-2">
-              <FaTint />
+            <span className={`${stat.iconClass || "text-red-500"} text-xl mr-2`} style={{ backgroundColor: "#f12c31", borderRadius: "10px", padding: "10px" }}>
+              {stat.icon}
             </span>
             <div className="flex flex-col">
+              <span className=" font-bold text-lg">{stat.value.toLocaleString()}</span>
               <span className="text-gray-700 font-semibold">{stat.label}</span>
-              <span className="text-red-600 font-bold text-lg">{stat.value.toLocaleString()}</span>
             </div>
           </div>
         ))}
@@ -71,11 +73,11 @@ export default function BloodDonationStatsAndLeaderboard() {
 
       {/* Leaderboard table */}
       <div className="relative z-10">
-        <h2 className="bg-gradient-to-r from-red-700 to-red-600 text-white font-semibold p-4 rounded-t-lg text-2xl">
+        <h2 className="bg-gradient-to-r from-red-700 to-red-600 text-white font-semibold p-4 rounded-t-[18px] text-lg text-center sm:text-2xl sm:text-left">
           Top Blood Donors Leaderboard
         </h2>
       </div>
-      <div className="relative z-10 rounded-b-2xl px-6 py-4 shadow-lg bg-white/40">
+      <div className="relative z-10 rounded-b-[18px] px-6 py-4 shadow-lg bg-white/40">
         {loading ? (
           <div className="text-center py-8">
             <p className="text-gray-600">Loading top donors...</p>
@@ -89,9 +91,9 @@ export default function BloodDonationStatsAndLeaderboard() {
             {topDonors.map((user, index) => (
               <div
                 key={user.id}
-                className="bg-white rounded-lg flex items-center justify-between p-4 shadow-sm"
+                className="bg-white rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 shadow-sm"
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 ">
                   <div className="text-gray-600 bg-gray-300 rounded-full w-10 h-10 flex items-center justify-center font-semibold">
                     {index + 1}
                   </div>
@@ -102,13 +104,13 @@ export default function BloodDonationStatsAndLeaderboard() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-6 text-sm text-gray-600">
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-4 text-sm text-gray-600 w-full sm:w-auto">
                   <div>
                     <div className="font-semibold text-red-500 text-lg">{user.donations}</div>
                     <div className="text-xs">Donations</div>
                   </div>
                   {user.lastDonated && (
-                    <div className="text-right">
+                    <div className="text-left sm:text-right">
                       <div className="font-semibold">{user.lastDonated}</div>
                       {user.daysAgo !== null && (
                         <div className="text-xs">{user.daysAgo} days ago</div>
@@ -128,6 +130,6 @@ export default function BloodDonationStatsAndLeaderboard() {
           </div>
         )}
       </div>
-    </div>
+    </AnimatedSection>
   );
 }

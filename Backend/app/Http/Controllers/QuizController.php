@@ -8,7 +8,9 @@ use App\Models\QuizLevel;
 use App\Models\MiniGameUnlock;
 use App\Models\XpTransaction;
 use App\Services\XpService;
+use App\Services\DeepSeekService;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Donor;
 
 class QuizController extends Controller
 {
@@ -72,22 +74,29 @@ class QuizController extends Controller
     public function getQuestions($level)
     {
         $questions = QuizQuestion::where('level', $level)->get();
-        
+
+        // Randomize question order so different users get different order for same level
+        $questions = $questions->shuffle();
+
+        $letters = ['A', 'B', 'C', 'D'];
+
         // Transform questions to match frontend format
-        $formattedQuestions = $questions->map(function ($question) {
+        $formattedQuestions = $questions->map(function ($question) use ($letters) {
             $options = is_array($question->options) ? $question->options : json_decode($question->options, true);
-            
-            // Format options with letters (A, B, C, D)
+            if (!is_array($options)) {
+                $options = [];
+            }
+            shuffle($options);
+
             $formattedOptions = [];
-            $letters = ['A', 'B', 'C', 'D'];
             foreach ($options as $index => $option) {
                 $formattedOptions[] = [
                     'option' => $option,
                     'isCorrect' => $option === $question->correct_answer,
-                    'letter' => $letters[$index] ?? chr(65 + $index) // A, B, C, D...
+                    'letter' => $letters[$index] ?? chr(65 + $index),
                 ];
             }
-            
+
             return [
                 'id' => $question->id,
                 'question' => $question->question,
@@ -96,7 +105,147 @@ class QuizController extends Controller
             ];
         });
 
-        return response()->json($formattedQuestions);
+        return response()->json($formattedQuestions->values()->all());
+    }
+
+    /**
+     * Admin: generate quiz questions for a level via DeepSeek and store them.
+     * Request: { "level": 1 } (level 1–10).
+     */
+    public function generateQuestions(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        if (strtolower($user->role ?? '') !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can generate quiz questions.'], 403);
+        }
+
+        $validated = $request->validate([
+            'level' => 'required|integer|min:1|max:10',
+        ]);
+        $level = (int) $validated['level'];
+
+        $generated = DeepSeekService::generateQuizQuestionsForLevel($level);
+        if ($generated === null) {
+            return response()->json([
+                'message' => 'Failed to generate quiz questions. Check DeepSeek API key and logs.',
+            ], 500);
+        }
+
+        QuizQuestion::where('level', $level)->delete();
+
+        $points = 10 + ($level - 1) * 2;
+        $count = 0;
+        foreach ($generated as $q) {
+            QuizQuestion::create([
+                'level' => $level,
+                'question' => $q['question'],
+                'options' => $q['options'],
+                'correct_answer' => $q['correct_answer'],
+                'points' => $points,
+            ]);
+            $count++;
+        }
+
+        return response()->json([
+            'message' => "Generated and stored {$count} quiz questions for level {$level}.",
+            'level' => $level,
+            'count' => $count,
+        ], 200);
+    }
+
+    /**
+     * Admin: list quiz questions (optional ?level=1..10).
+     */
+    public function adminQuestions(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        if (strtolower($user->role ?? '') !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can access.'], 403);
+        }
+
+        $query = QuizQuestion::orderBy('level')->orderBy('id');
+        $level = $request->query('level');
+        if ($level !== null && $level !== '') {
+            $lev = (int) $level;
+            if ($lev >= 1 && $lev <= 10) {
+                $query->where('level', $lev);
+            }
+        }
+
+        $questions = $query->get()->map(function ($q) {
+            $options = is_array($q->options) ? $q->options : (json_decode($q->options, true) ?: []);
+            return [
+                'id' => $q->id,
+                'level' => $q->level,
+                'question' => $q->question,
+                'options' => $options,
+                'correct_answer' => $q->correct_answer,
+                'points' => $q->points,
+                'created_at' => $q->created_at?->toIso8601String(),
+                'updated_at' => $q->updated_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json(['questions' => $questions]);
+    }
+
+    /**
+     * Admin: update a single quiz question.
+     */
+    public function updateQuestion(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        if (strtolower($user->role ?? '') !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can update.'], 403);
+        }
+
+        $question = QuizQuestion::findOrFail($id);
+        $validated = $request->validate([
+            'question' => 'required|string|max:1000',
+            'options' => 'required|array',
+            'options.*' => 'string|max:500',
+            'correct_answer' => 'required|string|max:500',
+            'points' => 'nullable|integer|min:0|max:100',
+        ]);
+
+        $options = array_values(array_slice($validated['options'], 0, 4));
+        if (count($options) < 2) {
+            return response()->json(['message' => 'At least 2 options required.'], 422);
+        }
+        if (!in_array($validated['correct_answer'], $options, true)) {
+            return response()->json(['message' => 'correct_answer must be one of the options.'], 422);
+        }
+
+        $question->question = $validated['question'];
+        $question->options = $options;
+        $question->correct_answer = $validated['correct_answer'];
+        if (array_key_exists('points', $validated) && $validated['points'] !== null) {
+            $question->points = (int) $validated['points'];
+        }
+        $question->save();
+
+        $opts = is_array($question->options) ? $question->options : (json_decode($question->options, true) ?: []);
+        return response()->json([
+            'message' => 'Question updated.',
+            'question' => [
+                'id' => $question->id,
+                'level' => $question->level,
+                'question' => $question->question,
+                'options' => $opts,
+                'correct_answer' => $question->correct_answer,
+                'points' => $question->points,
+                'updated_at' => $question->updated_at?->toIso8601String(),
+            ],
+        ]);
     }
 
     public function getLeaderboard(Request $request)
@@ -198,6 +347,29 @@ class QuizController extends Controller
         $donor = $user->donor;
         if (!$donor) return response()->json(['message' => 'Donor profile not found'], 404);
 
+        return $this->buildQuizHistoryResponse($donor);
+    }
+
+    /**
+     * Admin dashboard: get quiz history for a specific donor code.
+     */
+    public function getDonorQuizHistoryForAdmin(Request $request, string $code)
+    {
+        $user = Auth::user();
+        if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+        if (strtolower($user->role ?? '') !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Only admins can access this endpoint.'], 403);
+        }
+
+        $donor = Donor::where('code', $code)->first();
+        if (!$donor) return response()->json(['message' => 'Donor not found'], 404);
+
+        return $this->buildQuizHistoryResponse($donor);
+    }
+
+    private function buildQuizHistoryResponse(Donor $donor)
+    {
         $totalXp = XpService::getTotalXp($donor->id);
         $currentLevel = XpService::calculateLevel($totalXp);
 

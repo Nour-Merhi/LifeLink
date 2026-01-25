@@ -3,7 +3,13 @@ import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
 
-export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomistAdded }) {
+export default function AddPhlebotomistForm({
+    onClose,
+    hospitals,
+    onPhlebotomistAdded,
+    fixedHospitalId,
+    fixedHospitalName,
+}) {
     const [workingDates, setWorkingDates] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -23,7 +29,7 @@ export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomist
         last_name: '',
         licence_number: '',
         hospital_name: '',
-        hospital_id: '',
+        hospital_id: fixedHospitalId || '',
         phone_nb: "",
         email: "",
         password: '',
@@ -72,6 +78,16 @@ export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomist
         }));
     }, [workingDates]);
 
+    useEffect(() => {
+        if (fixedHospitalId) {
+            setAddPhlebotomistData((prev) => ({
+                ...prev,
+                hospital_id: fixedHospitalId,
+                hospital_name: fixedHospitalName || prev.hospital_name,
+            }));
+        }
+    }, [fixedHospitalId, fixedHospitalName]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -100,7 +116,7 @@ export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomist
                     last_name: '',
                     licence_number: '',
                     hospital_name: '',
-                    hospital_id: '',
+                    hospital_id: fixedHospitalId || '',
                     phone_nb: "",
                     email: "",
                     password: '',
@@ -276,6 +292,14 @@ export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomist
                                 <div>
                                     <label htmlFor="hospital_id">Working at Hospital</label>
                                     <div className="select-des">
+                                        {fixedHospitalId ? (
+                                            <input
+                                                type="text"
+                                                value={fixedHospitalName ? fixedHospitalName : `Hospital #${fixedHospitalId}`}
+                                                readOnly
+                                                style={{ backgroundColor: "#f6f6f6" }}
+                                            />
+                                        ) : (
                                         <select
                                             id="hospital_id"
                                             name="hospital_id"
@@ -290,6 +314,7 @@ export default function AddPhlebotomistForm({ onClose, hospitals, onPhlebotomist
                                                 </option>
                                             ))}
                                         </select>
+                                        )}
                                     </div>
                                 </div>
 

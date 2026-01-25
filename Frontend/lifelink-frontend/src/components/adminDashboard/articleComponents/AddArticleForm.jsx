@@ -169,7 +169,7 @@ export default function AddArticleForm({ onClose, onArticleAdded }) {
                                             required
                                         />
                                     </div>
-                                    <div>
+                                    <div  className="m-auto">
                                         <label>
                                             <input
                                                 type="checkbox"

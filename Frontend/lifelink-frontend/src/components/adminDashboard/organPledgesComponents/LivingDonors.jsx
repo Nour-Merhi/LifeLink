@@ -71,6 +71,28 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
         return <span className={`badge ${statusInfo.className}`}>{statusInfo.label}</span>;
     };
 
+    const getAppointmentStatusBadge = (status) => {
+        const statusMap = {
+            awaiting_approval: { label: "Awaiting Approval", className: "badge-pending" },
+            awaiting_scheduling: { label: "Awaiting Scheduling", className: "badge-pending" },
+            awaiting_donor_choice: { label: "Awaiting Donor Choice", className: "badge-pending" },
+            in_progress: { label: "In Progress", className: "badge-pending" },
+            completed: { label: "Completed", className: "badge-success" },
+            cancelled: { label: "Cancelled", className: "badge-danger" },
+        };
+        const statusInfo = statusMap[status] || { label: status || "N/A", className: "badge-inactive" };
+        return <span className={`badge ${statusInfo.className}`}>{statusInfo.label}</span>;
+    };
+
+    const formatSelected = (iso) => {
+        if (!iso) return "—";
+        try {
+            return new Date(iso).toLocaleString();
+        } catch {
+            return iso;
+        }
+    };
+
     return (
         <section className="hospital-table-section">
             {/* Metrics Cards */}
@@ -191,6 +213,8 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
                         <th className="col-medical-status">Medical Status</th>
                         <th className="col-hospital-info">Hospital</th>
                         <th className="col-ethics-status">Ethics Status</th>
+                        <th className="col-ethics-status">Appointment Status</th>
+                        <th className="col-ethics-status">Chosen Slot</th>
                         <th className="col-donation-type">Donation Type</th>
                         <th className="col-actions">Actions</th>
                     </tr>
@@ -247,6 +271,16 @@ export default function LivingDonors({ livingDonors = [], metricsData, loading =
                                 {/* Ethics Status */}
                                 <td className="col-ethics-status">
                                     {getEthicsStatusBadge(donor.ethics_status)}
+                                </td>
+
+                                {/* Appointment Status */}
+                                <td className="col-ethics-status">
+                                    {getAppointmentStatusBadge(donor.appointment_status)}
+                                </td>
+
+                                {/* Chosen Slot */}
+                                <td className="col-ethics-status">
+                                    <span className="muted">{formatSelected(donor.selected_appointment_at)}</span>
                                 </td>
 
                                 {/* Donation Type */}

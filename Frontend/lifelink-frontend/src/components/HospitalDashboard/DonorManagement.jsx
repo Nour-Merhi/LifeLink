@@ -12,46 +12,14 @@ export default function DonorManagement() {
     const [error, setError] = useState("");
     const [selectedDonor, setSelectedDonor] = useState(null);
     const [showDonorModal, setShowDonorModal] = useState(false);
-    const [hospitalId, setHospitalId] = useState(null);
+    const [hospitalId, setHospitalId] = useState(null); // set from API response for status updates
 
     // Filter states
     const [donationType, setDonationType] = useState(""); // All, Home Blood Donation, Hospital Blood Donation, Alive Organ Donation
     const [appointmentType, setAppointmentType] = useState(""); // All, urgent, regular
     const [status, setStatus] = useState(""); // All, pending, completed, canceled
 
-    useEffect(() => {
-        // Get hospital ID from authenticated user's health center manager relationship
-        if (user) {
-            let id = null;
-            
-            // Try different possible property names for the relationship
-            if (user.health_center_manager && user.health_center_manager.hospital_id) {
-                id = user.health_center_manager.hospital_id;
-            } else if (user.healthCenterManager && user.healthCenterManager.hospital_id) {
-                id = user.healthCenterManager.hospital_id;
-            } else if (user.hospital_id) {
-                id = user.hospital_id;
-            }
-            
-            // Fallback to URL param
-            if (!id) {
-                id = new URLSearchParams(window.location.search).get('hospital_id');
-            }
-            
-            if (id) {
-                setHospitalId(id);
-            } else {
-                setError("Hospital ID not found. Please ensure you are logged in as a hospital manager.");
-            }
-        }
-    }, [user]);
-
     const fetchDonors = () => {
-        if (!hospitalId) {
-            setError("Hospital ID is not available");
-            return;
-        }
-
         setLoading(true);
         setError("");
         
@@ -60,14 +28,16 @@ export default function DonorManagement() {
         if (donationType) params.donation_type = donationType;
         if (appointmentType) params.appointment_type = appointmentType;
         if (status) params.status = status;
-        
-        const queryString = new URLSearchParams(params).toString();
-        const url = `/api/hospital/dashboard/donors/${hospitalId}${queryString ? '?' + queryString : ''}`;
-        
-        api.get(url)
+
+        // Manager-scoped endpoint: backend resolves hospital_id from authenticated manager
+        api.get(`/api/hospital/dashboard/donors`, { params })
             .then(res => {
                 if (res.data.success) {
                     setDonors(res.data.donors || []);
+                    // Keep hospitalId from response for status updates in the table
+                    if (res.data?.hospital?.id) {
+                        setHospitalId(res.data.hospital.id);
+                    }
                 } else {
                     setError(res.data.message || "Failed to fetch donors");
                     setDonors([]);
@@ -82,10 +52,10 @@ export default function DonorManagement() {
     };
 
     useEffect(() => {
-        if (hospitalId) {
+        if (user) {
             fetchDonors();
         }
-    }, [hospitalId, donationType, appointmentType, status]);
+    }, [user, donationType, appointmentType, status]);
 
     const handleViewDonor = (donor) => {
         setSelectedDonor(donor);
@@ -247,62 +217,74 @@ export default function DonorManagement() {
             {/* Donor Detail Modal */}
             {showDonorModal && selectedDonor && (
                 <div className="modal-overlay" onClick={() => setShowDonorModal(false)}>
-                    <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-                        <button className="modal-close-btn" onClick={() => setShowDonorModal(false)}>
-                            <FiX />
-                        </button>
-                        <h3 className="modal-title">Donor Profile: {selectedDonor.name}</h3>
-                        <div className="modal-content">
-                            <div className="control-panel">
-                                <h4 className="control-panel-title">Personal Information</h4>
-                                <div className="info-grid">
-                                    <div><strong>Donor ID:</strong> {selectedDonor.code || selectedDonor.id}</div>
-                                    <div><strong>Age:</strong> {selectedDonor.age || 'N/A'}</div>
-                                    <div><strong>Blood Type:</strong> {selectedDonor.blood_type || 'N/A'}</div>
-                                    <div><strong>Gender:</strong> {selectedDonor.gender || 'N/A'}</div>
-                                    <div><strong>Phone:</strong> {selectedDonor.phone_nb || 'N/A'}</div>
-                                    <div><strong>Email:</strong> {selectedDonor.email || 'N/A'}</div>
-                                    <div><strong>Address:</strong> {selectedDonor.address || 'N/A'}</div>
+                    <div
+                        className="modal-container modal-modern modal-modern-wide"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <div className="modal-modern-header">
+                            <div className="modal-modern-title">
+                                <h2>Donor Profile</h2>
+                                <div className="modal-modern-subtitle">
+                                    <span><strong>{selectedDonor.name || "N/A"}</strong></span>
+                                    <span>•</span>
+                                    <span>{selectedDonor.code || selectedDonor.id || "N/A"}</span>
                                 </div>
                             </div>
-                            <div className="control-panel" style={{ marginTop: '15px' }}>
-                                <h4 className="control-panel-title">Appointment Information</h4>
-                                <div className="info-grid">
-                                    <div><strong>Last Appointment Type:</strong> {selectedDonor.latest_appointment_type || 'N/A'}</div>
-                                    <div><strong>Last Appointment Status:</strong> {selectedDonor.latest_appointment_status || 'N/A'}</div>
-                                    <div><strong>Last Appointment Date:</strong> {selectedDonor.latest_appointment_date || 'N/A'}</div>
-                                    <div><strong>Last Donation Type:</strong> {selectedDonor.latest_donation_type || 'N/A'}</div>
+                            <button className="modal-icon-btn" onClick={() => setShowDonorModal(false)} aria-label="Close">
+                                <FiX />
+                            </button>
+                        </div>
+
+                        <div className="modal-modern-body">
+                            <div className="modal-section">
+                                <div className="modal-section-title">Personal Information</div>
+                                <div className="modal-grid">
+                                    <div className="modal-field"><span className="label">Age</span><span className="value">{selectedDonor.age ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Blood Type</span><span className="value">{selectedDonor.blood_type ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Gender</span><span className="value">{selectedDonor.gender ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Phone</span><span className="value">{selectedDonor.phone_nb ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Email</span><span className="value">{selectedDonor.email ?? "N/A"}</span></div>
+                                    <div className="modal-field full-width"><span className="label">Address</span><span className="value">{selectedDonor.address ?? "N/A"}</span></div>
                                 </div>
                             </div>
-                            <div className="control-panel" style={{ marginTop: '15px' }}>
-                                <h4 className="control-panel-title">Medical History</h4>
-                                <div className="info-grid">
-                                    <div><strong>Last Donation:</strong> {selectedDonor.last_donation || 'Never'}</div>
-                                    <div><strong>Total Donations:</strong> {selectedDonor.total_donations || 0}</div>
-                                    <div><strong>Pending Appointments:</strong> {selectedDonor.pending_appointments || 0}</div>
-                                    <div><strong>Hospital Appointments:</strong> {selectedDonor.hospital_appointments_count || 0}</div>
-                                    <div><strong>Home Appointments:</strong> {selectedDonor.home_appointments_count || 0}</div>
-                                    <div><strong>Medical Conditions:</strong> 
-                                        {selectedDonor.medical_conditions?.length > 0 
-                                            ? selectedDonor.medical_conditions.join(', ')
-                                            : 'None'}
+
+                            <div className="modal-section">
+                                <div className="modal-section-title">Appointment Information</div>
+                                <div className="modal-grid">
+                                    <div className="modal-field"><span className="label">Last Appointment Type</span><span className="value">{selectedDonor.latest_appointment_type ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Last Appointment Status</span><span className="value">{selectedDonor.latest_appointment_status ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Last Appointment Date</span><span className="value">{selectedDonor.latest_appointment_date ?? "N/A"}</span></div>
+                                    <div className="modal-field"><span className="label">Last Donation Type</span><span className="value">{selectedDonor.latest_donation_type ?? "N/A"}</span></div>
+                                </div>
+                            </div>
+
+                            <div className="modal-section">
+                                <div className="modal-section-title">Medical & Activity Summary</div>
+                                <div className="modal-grid">
+                                    <div className="modal-field"><span className="label">Last Donation</span><span className="value">{selectedDonor.last_donation ?? "Never"}</span></div>
+                                    <div className="modal-field"><span className="label">Total Donations</span><span className="value">{selectedDonor.total_donations ?? 0}</span></div>
+                                    <div className="modal-field"><span className="label">Pending Appointments</span><span className="value">{selectedDonor.pending_appointments ?? 0}</span></div>
+                                    <div className="modal-field"><span className="label">Hospital Appointments</span><span className="value">{selectedDonor.hospital_appointments_count ?? 0}</span></div>
+                                    <div className="modal-field"><span className="label">Home Appointments</span><span className="value">{selectedDonor.home_appointments_count ?? 0}</span></div>
+                                    <div className="modal-field full-width">
+                                        <span className="label">Medical Conditions</span>
+                                        <span className="value">
+                                            {selectedDonor.medical_conditions?.length > 0 ? selectedDonor.medical_conditions.join(", ") : "None"}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="control-panel" style={{ marginTop: '15px' }}>
-                                <h4 className="control-panel-title">Eligibility Status</h4>
-                                <div className="filter-gap" style={{ marginTop: '10px' }}>
-                                    <button 
-                                        className="add-btn button"
-                                        onClick={() => handleApproveDonation(selectedDonor.id)}
-                                    >
-                                        Approve for Donation
-                                    </button>
-                                    <button className="button" style={{ background: '#6B6B6B' }}>
-                                        Contact Donor
-                                    </button>
-                                </div>
-                            </div>
+                        </div>
+
+                        <div className="modal-modern-footer">
+                            <button className="btn-cancel" type="button" onClick={() => setShowDonorModal(false)}>
+                                Close
+                            </button>
+                            <button className="submit-btn active" type="button" onClick={() => handleApproveDonation(selectedDonor.id)}>
+                                Approve for Donation
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -17,28 +17,6 @@
     object-fit: contain;
 }
 
-/* Responsive Design */
-@media (max-width: 1024px) {
-    .human-body-container {
-        max-width: 100%;
-        padding: 30px;
-        min-height: 400px;
-    }
-
-    .human-body-image {
-        max-width: 100%;
-    }
-}
-
-@media (max-width: 768px) {
-    .human-body-container {
-        padding: 20px;
-        min-height: 350px;
-        margin-top: 20px;
-    }
-}
-
-
 /*Human Body Animation*/
 .organ-map svg{
     width: 100%;
@@ -48,14 +26,78 @@
     padding: 20px;
 }
 
-/* Let only the top-level group handle clicks */
-#heart-main, #lungs, #liver, #kidneys, #intestines, #stomach, #brain {
-    cursor: pointer;
-    pointer-events: visiblePainted; /* normal behavior */
-  }
-  
-  /* Prevent inner paths from capturing events */
-  #heart *, #lungs *, #liver *, #kidneys *, #base *, #intestines *, #stomach *, #brain * {
-    pointer-events: none;
-  }
-  
+/* Responsive Design */
+@media (max-width: 1035px) {
+    .human-body-container {
+        max-width: 100%;
+        padding: 30px;
+        min-height: 400px;
+    }
+
+    .human-body-image {
+        max-width: 70%;
+    }
+    .human-container{
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+    }
+    .human-container h2{
+        font-size: 40px !important;
+    }
+    .human-container p{
+        font-size: 16px !important;
+    }
+    .human-container button{
+        font-size: 14px !important;
+    }
+    .human-container button svg{
+        font-size: 14px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .human-body-container {
+        padding: 20px;
+        max-width: 100%;
+        width: 100%;
+        margin-top: 20px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .human-container{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .human-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+    }
+    .human-container > div{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .human-container > div > h2{
+        text-align: center !important;
+    }
+    .human-container > div > p{
+        text-align: center !important;
+        margin-bottom: 20px !important;
+    }
+
+   
+}
+

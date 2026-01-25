@@ -22,8 +22,19 @@ class HospitalAppointment extends Model
         'appointment_id',
         'appointment_time',
         'state',
+        'completed_at',
+        'expires_at',
+        'blood_units_collected',
+        'blood_usage_status',
+        'blood_used_at',
         'note',
         'code',
+    ];
+
+    protected $casts = [
+        'completed_at' => 'datetime',
+        'expires_at' => 'date',
+        'blood_used_at' => 'datetime',
     ];
 
     protected static function booted()

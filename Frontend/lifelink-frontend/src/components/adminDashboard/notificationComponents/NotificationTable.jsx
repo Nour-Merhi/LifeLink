@@ -42,7 +42,7 @@ export default function NotificationTable({ notifications }) {
     return (
         <section className="notification-table-section">
             <div className="control-panel control-panel-layout">
-                <div>
+                <div className="control-panel-layout-left">
                     <div className="search-input">
                         <IoSearchSharp />
                         <input 
@@ -53,7 +53,7 @@ export default function NotificationTable({ notifications }) {
                         />
                     </div>
                 </div>
-                <div>
+                <div className="filter-gap">
                     <div className="filters">
                         <select
                             value={notificationType}

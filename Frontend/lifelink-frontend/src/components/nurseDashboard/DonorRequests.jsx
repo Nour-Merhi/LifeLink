@@ -20,6 +20,19 @@ export default function DonorRequests(){
     const [error, setError] = useState("");
     const [startingAppointment, setStartingAppointment] = useState(null); // Track which appointment is being started
 
+    const isUrgentRequest = (request) => {
+        const dateStr = request?.date;
+        if (!dateStr || dateStr === "N/A") return false;
+        // request.date is "YYYY-MM-DD" from backend
+        const reqDate = new Date(`${dateStr}T00:00:00`);
+        if (Number.isNaN(reqDate.getTime())) return false;
+
+        const now = new Date();
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        // Urgent = today or overdue
+        return reqDate.getTime() <= endOfToday.getTime();
+    };
+
     const fetchDonorRequests = async () => {
         try {
             setLoading(true);
@@ -61,6 +74,16 @@ export default function DonorRequests(){
         if (bloodType === "all-blood") return true;
         return request.bloodType === bloodType;
     });
+
+    const tabFilteredRequests = filteredRequests.filter((request) => {
+        if (activeTab === "All") return true;
+        if (activeTab === "Urgent") return isUrgentRequest(request);
+        if (activeTab === "Regular") return !isUrgentRequest(request);
+        return true;
+    });
+
+    const urgentCount = filteredRequests.filter((r) => isUrgentRequest(r)).length;
+    const regularCount = filteredRequests.length - urgentCount;
 
     // Handle starting an appointment
     const handleStartAppointment = async (appointmentId) => {
@@ -141,6 +164,18 @@ export default function DonorRequests(){
                 >
                     All
                 </button>
+                <button
+                    className={activeTab === "Urgent" ? "tab-active-nurse" : "tab-inactive"}
+                    onClick={() => setActiveTab("Urgent")}
+                >
+                    Urgent ({urgentCount})
+                </button>
+                <button
+                    className={activeTab === "Regular" ? "tab-active-nurse" : "tab-inactive"}
+                    onClick={() => setActiveTab("Regular")}
+                >
+                    Regular ({regularCount})
+                </button>
                 <div className="filters">
                     <select
                         value={bloodType}
@@ -160,7 +195,7 @@ export default function DonorRequests(){
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginTop: "20px" }}>
-                {filteredRequests.length > 0 ? filteredRequests.map((request) => (
+                {tabFilteredRequests.length > 0 ? tabFilteredRequests.map((request) => (
                     <div key={request.id} className="donor-container" style={{ padding: "20px", display: "flex", flexDirection: "column" }}>
                         <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", gap: "20px" }}>
                             {/* Top Section - Donor Information */}
@@ -170,9 +205,14 @@ export default function DonorRequests(){
                                         <FaInfoCircle style={{ fontSize: "30px", color: "#2196F3" }} />
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#252E32" }}>
-                                            {request.donorName} ({request.gender})
-                                        </h3>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                                            <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#252E32", margin: 0 }}>
+                                                {request.donorName} ({request.gender})
+                                            </h3>
+                                            <span className={`badge ${isUrgentRequest(request) ? "badge-danger" : "badge-success"}`}>
+                                                {isUrgentRequest(request) ? "Urgent" : "Regular"}
+                                            </span>
+                                        </div>
                                         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#767676" }}>
                                             <span style={{ fontWeight: "600", color: "#767676" }}>Blood Type:</span> {request.bloodType}
                                         </div>
@@ -254,8 +294,10 @@ export default function DonorRequests(){
                         <p className="text-gray-500 text-lg">No donor requests found</p>
                         <p className="text-gray-400 text-sm mt-2">
                             {bloodType !== "all-blood" 
-                                ? `No assigned requests for blood type "${bloodType}"` 
-                                : "You have no assigned donor requests at this time"}
+                                ? `No assigned requests for blood type "${bloodType}"`
+                                : activeTab !== "All"
+                                    ? `No ${activeTab.toLowerCase()} requests found`
+                                    : "You have no assigned donor requests at this time"}
                         </p>
                     </div>
                 )}

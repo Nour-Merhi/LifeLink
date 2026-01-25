@@ -10,7 +10,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import api from "../../api/axios";
 import { useSystemSettings } from "../../context/SystemSettingsContext";
 
-export default function Sidebar(){
+export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {} } = {}){
     const navigate = useNavigate();
     const { systemLogo, platformName } = useSystemSettings();
 
@@ -27,40 +27,45 @@ export default function Sidebar(){
           navigate("/home");
         }
       };
+
+    const closeSidebar = () => {
+        try { setOpenSidebar(false); } catch (_) {}
+    };
     
     return (
         <>
-        <div className="sidebar layout admin-sidebar ">
+        {openSidebar && <div className="sidebar-backdrop" onClick={closeSidebar}></div>}
+        <div className={`sidebar layout admin-sidebar ${openSidebar ? "open" : ""}`} id="sidebar-donor">
             <button onClick={() => navigate("/home")} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
                 <img src={systemLogo || lifelinkLogoBlack} alt={`${platformName || "LifeLink"} logo`} />
             </button>
 
             <div className="links">
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <GoHomeFill className="icon-size text-gray-600"/>
                     <NavLink to="/donor/home" className="text-gray-800">Home</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <IoHeart className="icon-size text-gray-600"/>
                     <NavLink to="/donor/my-donations" className="text-gray-800">My Donations</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <IoCalendar className="icon-size text-gray-600"/>
                     <NavLink to="/donor/my-appointments" className="text-gray-800">Appointments</NavLink>
                 </div>    
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <IoGift className="icon-size text-gray-600"/>
                     <NavLink to="/donor/rewards" className="text-gray-800">Rewards</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <FaGamepad className="icon-size text-gray-600"/>
                     <NavLink to="/donor/quiz" className="text-gray-800">Quiz</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <IoSettings className="icon-size text-gray-600"/>
                     <NavLink to="/donor/settings" className="text-gray-800">Profile Settings</NavLink>
                 </div>
-                <div className="link-item">
+                <div className="link-item" onClick={closeSidebar}>
                     <MdContactSupport className="icon-size text-gray-600"/>
                     <NavLink to="/support" className="text-gray-800">Support</NavLink>
                 </div>

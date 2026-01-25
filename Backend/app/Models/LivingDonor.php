@@ -26,6 +26,14 @@ class LivingDonor extends Model
         'donation_type',
         'medical_status',
         'ethics_status',
+        'appointment_status',
+        'suggested_appointments',
+        'suggestions_sent_at',
+        'selected_appointment_at',
+        'selected_at',
+        'appointment_completed_at',
+        'appointment_cancelled_at',
+        'appointment_cancel_reason',
         'hospital_id',
         'recipient_full_name',
         'recipient_age',
@@ -39,6 +47,12 @@ class LivingDonor extends Model
     protected $casts = [
         'medical_conditions' => 'array',
         'date_of_birth' => 'date',
+        'suggested_appointments' => 'array',
+        'suggestions_sent_at' => 'datetime',
+        'selected_appointment_at' => 'datetime',
+        'selected_at' => 'datetime',
+        'appointment_completed_at' => 'datetime',
+        'appointment_cancelled_at' => 'datetime',
     ];
 
     protected static function booted()

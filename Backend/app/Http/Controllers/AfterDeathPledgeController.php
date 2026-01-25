@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\AfterDeathPledge;
+use App\Mail\AfterDeathPledgeThankYou;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 
 class AfterDeathPledgeController extends Controller
@@ -171,6 +173,18 @@ class AfterDeathPledgeController extends Controller
                     \App\Models\AfterDeathPledge::class,
                     $pledge->id
                 );
+            }
+
+            // Send thank-you email to the donor
+            try {
+                Mail::to($validated['email'])->send(new AfterDeathPledgeThankYou($pledge));
+            } catch (\Exception $e) {
+                \Log::error('Failed to send after-death pledge thank-you email:', [
+                    'pledge_id' => $pledge->id,
+                    'email' => $validated['email'],
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
             }
 
             return response()->json([

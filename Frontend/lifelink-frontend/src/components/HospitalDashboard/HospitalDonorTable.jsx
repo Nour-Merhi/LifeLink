@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FiEye, FiSearch, FiX } from "react-icons/fi";
 import { SpinnerDotted } from 'spinners-react';
-import { FaTint, FaCalendarAlt, FaClock, FaUser } from "react-icons/fa";
 import api from "../../api/axios";
 
-export default function HospitalDonorTable({ donors = [], loading = false, error = "", onViewDonor, hospitalId, onStatusUpdate }) {
+export default function HospitalDonorTable({ donors = [], loading = false, error = "", onViewDonor, onStatusUpdate }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [statusLoading, setStatusLoading] = useState({});
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
     const itemsPerPage = 10;
 
     // Filter donors based on search term
@@ -39,19 +39,6 @@ export default function HospitalDonorTable({ donors = [], loading = false, error
         }
     };
 
-    const getStatusBadgeClass = (status) => {
-        switch (status?.toLowerCase()) {
-            case 'completed':
-                return 'badge-success';
-            case 'pending':
-                return 'badge-pending';
-            case 'canceled':
-                return 'badge-danger';
-            default:
-                return 'badge-request';
-        }
-    };
-
     const getAppointmentTypeBadgeClass = (type) => {
         switch (type?.toLowerCase()) {
             case 'urgent':
@@ -63,37 +50,46 @@ export default function HospitalDonorTable({ donors = [], loading = false, error
         }
     };
 
-    const handleStatusChange = async (donorId, appointmentId, appointmentType, newStatus) => {
-        if (!hospitalId || !appointmentId || !appointmentType) {
-            alert('Missing appointment information');
-            return;
+    const filteredIds = useMemo(() => filteredDonors.map((d) => d.id).filter(Boolean), [filteredDonors]);
+    const isAllSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
+    const selectedCount = selectedIds.length;
+
+    const toggleSelect = (id) => {
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    };
+
+    const toggleSelectAll = () => {
+        if (isAllSelected) {
+            setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+        } else {
+            setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
         }
+    };
 
-        setStatusLoading(prev => ({ ...prev, [donorId]: true }));
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        const ok = window.confirm(
+            `Delete ${selectedIds.length} donor record(s) from this hospital?\n\nThis will remove their appointment registrations for this hospital (it will NOT delete the donor account).`
+        );
+        if (!ok) return;
 
+        setBulkDeleteLoading(true);
         try {
-            const response = await api.put(
-                `/api/hospital/dashboard/donors/${hospitalId}/${donorId}/appointments/status`,
-                {
-                    appointment_id: appointmentId,
-                    appointment_type: appointmentType,
-                    status: newStatus
-                }
-            );
+            const res = await api.post(`/api/hospital/dashboard/donors/bulk-delete`, {
+                donor_ids: selectedIds,
+            });
 
-            if (response.data.success) {
-                // Call callback to refresh data
-                if (onStatusUpdate) {
-                    onStatusUpdate();
-                }
+            if (res.data?.success) {
+                setSelectedIds([]);
+                if (onStatusUpdate) onStatusUpdate();
             } else {
-                alert(response.data.message || 'Failed to update status');
+                alert(res.data?.message || "Failed to delete selected donors");
             }
-        } catch (err) {
-            console.error('Error updating appointment status:', err);
-            alert(err.response?.data?.message || 'An error occurred while updating status');
+        } catch (e) {
+            console.error("Bulk delete donors error:", e);
+            alert(e.response?.data?.message || "Failed to delete selected donors");
         } finally {
-            setStatusLoading(prev => ({ ...prev, [donorId]: false }));
+            setBulkDeleteLoading(false);
         }
     };
 
@@ -166,6 +162,32 @@ export default function HospitalDonorTable({ donors = [], loading = false, error
                 )}
             </div>
 
+            {/* Bulk actions */}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 12 }}>
+                <div style={{ color: "#6B6B6B", fontSize: 13 }}>
+                    {selectedCount > 0 ? <strong>{selectedCount} selected</strong> : <span>Select donors to delete their hospital registrations</span>}
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    {selectedCount > 0 && ( <>
+                        <button
+                            type="button"
+                            className="btn-cancel"
+                            onClick={() => setSelectedIds([])}
+                            disabled={bulkDeleteLoading}
+                        >
+                            Clear selection
+                        </button>
+                    <button
+                    type="button"
+                    className="submit-btn active"
+                    onClick={handleBulkDelete}
+                    >
+                        {bulkDeleteLoading ? "Deleting..." : "Delete Selected"}
+                    </button>
+                    </>)}
+                </div>
+            </div>
+
             {/* Table */}
             {filteredDonors.length === 0 ? (
                 <div style={{ 
@@ -192,15 +214,19 @@ export default function HospitalDonorTable({ donors = [], loading = false, error
                     )}
                 </div>
             ) : (
-                <div >
+                <div className="table-overflow-x">
                     <table className="h1-table">
                         <thead>
                             <tr>
+                                <th style={{ width: 44 }}>
+                                    <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} />
+                                </th>
+                                <th className="col-donor-id">DonorID</th>
                                 <th className="text-left col-donor">Donor</th>
                                 <th className="col-blood">Blood Type</th>
                                 <th className="col-contact">Contact</th>
                                 <th className="col-date">Latest Appointment</th>
-                                <th className="col-status">Status</th>
+                                <th className="col-date">Last Donation</th>
                                 <th className="col-total">Donations</th>
                                 <th className="col-actions">Actions</th>
                             </tr>
@@ -208,11 +234,19 @@ export default function HospitalDonorTable({ donors = [], loading = false, error
                         <tbody>
                             {paginatedDonors.map((donor, index) => (
                                 <tr key={donor.id || donor.code || index}>
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.includes(donor.id)}
+                                            onChange={() => toggleSelect(donor.id)}
+                                        />
+                                    </td>
+                                    <td classNmae="col-donor-id">{donor.code || 'N/A'}</td>
                                     <td className="col-hospital-donor">
                                         <div className="cell-title">
                                             <strong title={donor.name}>{donor.name || 'N/A'}</strong>
                                             <small className="muted">
-                                                {donor.code || 'N/A'}
+                                                
                                                 {donor.age && ` • Age: ${donor.age}`}
                                             </small>
                                         </div>
@@ -249,36 +283,8 @@ export default function HospitalDonorTable({ donors = [], loading = false, error
                                             <span className="muted">No appointments</span>
                                         )}
                                     </td>
-                                    <td className="col-status">
-                                        {donor.latest_appointment_status ? (
-                                            <div>
-                                                <span className={`badge ${getStatusBadgeClass(donor.latest_appointment_status)}`}>
-                                                    {donor.latest_appointment_id && donor.latest_appointment_type_db && (
-                                                        <select
-                                                            value={donor.latest_appointment_status}
-                                                            onChange={(e) => handleStatusChange(
-                                                                donor.id,
-                                                                donor.latest_appointment_id,
-                                                                donor.latest_appointment_type_db,
-                                                                e.target.value
-                                                            )}
-                                                            disabled={statusLoading[donor.id]}
-                                                            
-                                                        >
-                                                            <option value="pending">Pending</option>
-                                                            <option value="completed">Completed</option>
-                                                            <option value="canceled">Canceled</option>
-                                                        </select>
-                                                    )}
-                                                    
-                                                </span>
-                                                {statusLoading[donor.id] && (
-                                                    <small className="muted" style={{ display: 'block', marginTop: '4px' }}>Updating...</small>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <span className="muted">N/A</span>
-                                        )}
+                                    <td className="col-date">
+                                        <span className="muted">{formatDate(donor.last_donation)}</span>
                                     </td>
                                     <td className="col-total">
                                         <div>

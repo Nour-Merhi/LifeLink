@@ -2,9 +2,11 @@ import Navbar from "../../components/donorDashboard/Navbar.jsx";
 import Sidebar from "../../components/donorDashboard/Sidebar.jsx";
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useState } from "react";
 
 export default function DonorDashboard(){   
     const { user, loading } = useAuth();
+    const [openSidebar, setOpenSidebar] = useState(false);
 
     // Show loading state while checking authentication
     if (loading) {
@@ -33,8 +35,8 @@ export default function DonorDashboard(){
 
     return (
         <div className="admin-layout">
-            <Sidebar />
-            <Navbar />
+            <Sidebar openSidebar={openSidebar} setOpenSidebar={setOpenSidebar} />
+            <Navbar openSidebar={openSidebar} setOpenSidebar={setOpenSidebar} />
             <div className="admin-content">
                 <Outlet />
             </div>

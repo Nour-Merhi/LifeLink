@@ -11,14 +11,18 @@
 .sidebar{
   width: 21%;
   height: 100vh;
+  min-height: 100vh;
   box-shadow: 0 4px 4px  rgba(0,0,0, 0.25);
   flex-shrink: 0; 
   position: relative;       
   position: sticky;
   top: 0;
-  height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+#sidebar-donation, #sidebar-donor{
+  background-color: white;
 }
 
 .sidebar > hr {
@@ -105,7 +109,7 @@
   width: 100%;
   height: auto;
   max-height: 120px;
-  padding: 15px 10px;
+  padding: 15px 10px 10px;
   display: block;
 }
 
@@ -214,13 +218,13 @@
   font-size: 21px;
 }
 
-.logout{
-  margin-top: auto;
-  margin-bottom: 20px;
+.logout {
+  position: absolute;
+  bottom: 0;
+  padding: 20px 0 24px 20px;
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding-left: 17px;
   gap: 10px;
 }
 .logout-button{
@@ -259,7 +263,7 @@
 }
 
 
-@media (width < 1020px){
+@media (max-width: 1229px){
   .sidebar-toggle{
     display: block;
   }
@@ -271,7 +275,7 @@
     left: 0;
     z-index: 1001;
     width: 230px;
-
+ 
   }
   .sidebar.open{
     transform: translateX(0);
@@ -300,7 +304,7 @@
   }
 }
 
-@media (width >= 1020px){
+@media (min-width: 1230px){
   .sidebar-toggle{
     display: none;
   }

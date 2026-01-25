@@ -8,8 +8,9 @@ import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
 import AssignPhlebotomistModal from "../homeVisitComponents/AssignPhlebotomistModal";
 import EditPhlebotomistForm from "./EditPhlebotomistForm";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
-export default function PhlebotomistTable({ phlebotomists = [], loading = false, error = "", onPhlebotomistsUpdate }){
+export default function PhlebotomistTable({ phlebotomists = [], loading = false, error = "", onPhlebotomistsUpdate, viewBasePath = "/admin/phlebotomists" }){
     const navigate = useNavigate();
     const [phlebotomistState, setPhlebotomistState] = useState("all-states");
     const [availableState, setAvailableState] = useState("all-states");
@@ -41,6 +42,13 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
         }
     };
 
+    const formatRating = (value) => {
+        if (value === null || value === undefined) return null;
+        const n = Number(value);
+        if (Number.isNaN(n)) return null;
+        return n.toFixed(1);
+    };
+
     // Transform backend data to match table format
     const transformedPhlebotomists = Array.isArray(phlebotomists) ? phlebotomists.map((phleb) => {
         const user = phleb.user || {};
@@ -49,8 +57,14 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
         // Build full name
         const fullName = `${user.first_name || ''} ${user.middle_name || ''} ${user.last_name || ''}`.trim() || 'N/A';
         
-        // Determine status based on availability (can be enhanced with actual status field)
-        const status = phleb.availability === 'unavailable' ? 'inactive' : 'active';
+        // Determine status: prefer backend status if present, otherwise derive from availability
+        const backendStatus = (phleb.status || '').toString().toLowerCase();
+        const status = backendStatus === 'active' || backendStatus === 'inactive'
+            ? backendStatus
+            : (phleb.availability === 'unavailable' ? 'inactive' : 'active');
+
+        // Enforce: inactive => unavailable (UI consistency)
+        const availability = status === 'inactive' ? 'unavailable' : (phleb.availability || 'available');
         
         // Get performance data from backend (calculated in controller)
         const totalAppointments = phleb.total_appointments || 0;
@@ -67,9 +81,11 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
             email: user.email || 'N/A',
             phone_nb: user.phone_nb || 'N/A',
             status: status,
-            availability: phleb.availability || 'available',
+            availability: availability,
             performance: performance,
             success_rate: success_rate,
+            avg_rating: phleb.avg_rating ?? null,
+            ratings_count: phleb.ratings_count ?? 0,
             Working_at: hospital.name || 'N/A',
             hospital_phone: hospital.phone_nb || 'N/A',
             created_at: formatDate(phleb.created_at),
@@ -175,6 +191,7 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
                             <th className="col-address">Working At</th>
                             <th className="col-status">Status</th>
                             <th className="col-performance">Performance</th>
+                            <th className="col-performance">Rating</th>
                             <th className="col-availability">Availability</th>
                             <th className="col-actions">Actions</th>
                         </tr>
@@ -182,7 +199,7 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
                     <tbody>
                         {currentPhlebotomists.length === 0 ? (
                             <tr>
-                                <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: '#6B6B6B' }}>
+                                <td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: '#6B6B6B' }}>
                                     No phlebotomists found
                                 </td>
                             </tr>
@@ -224,6 +241,18 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
                                         <small className="muted">{ p.success_rate }</small>
                                     </div>
                                 </td>
+                                <td className="col-performance">
+                                    {formatRating(p.avg_rating) ? (
+                                        <div className="cell-title">
+                                            <span style={{ fontWeight: 700, color: '#252E32' }}>
+                                                <span style={{ color: '#f39c12' }}>★</span> {formatRating(p.avg_rating)}
+                                            </span>
+                                            <small className="muted">({Number(p.ratings_count || 0)})</small>
+                                        </div>
+                                    ) : (
+                                        <span className="muted">No ratings</span>
+                                    )}
+                                </td>
                                 <td className="col-availability">
                                     <span className={`badge ${
                                         p.availability === "available" ? "badge-success" : 
@@ -240,7 +269,7 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
                                         <button 
                                             className="icon-btn text-blue-800" 
                                             title="View Details"
-                                            onClick={() => navigate(`/admin/phlebotomists/${p.id}`)}
+                                            onClick={() => navigate(`${viewBasePath}/${p.id}`)}
                                         >
                                             <FiEye />
                                         </button>
@@ -332,76 +361,36 @@ export default function PhlebotomistTable({ phlebotomists = [], loading = false,
             )}
 
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Confirm Deletion</h2>
-                            <button onClick={() => {
-                                setDeleteConfirm(null);
-                                setDeleteError("");
-                            }} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete <strong>{deleteConfirm.phlebotomistName}</strong>?</p>
-                            <p className="modal-text-secondary">
-                                This action cannot be undone. The phlebotomist will be permanently removed from the system.
-                            </p>
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        setDeleteConfirm(null);
-                                        setDeleteError("");
-                                    }}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={async () => {
-                                        setDeleteLoading(true);
-                                        setDeleteError("");
-                                        try {
-                                            await api.get("/sanctum/csrf-cookie");
-                                            await api.delete(
-                                                `/api/admin/dashboard/phlebotomists/${deleteConfirm.phlebotomistCode}`
-                                            );
-                                            setDeleteConfirm(null);
-                                            if (onPhlebotomistsUpdate) {
-                                                onPhlebotomistsUpdate();
-                                            }
-                                        } catch (error) {
-                                            console.error('Error deleting phlebotomist:', error);
-                                            setDeleteError(error.response?.data?.message || error.message || "Failed to delete phlebotomist");
-                                        } finally {
-                                            setDeleteLoading(false);
-                                        }
-                                    }}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Record"
+                    description={`You are going to delete ${deleteConfirm.phlebotomistName}. Are you sure?`}
+                    confirmText="Yes, Delete"
+                    cancelText="No, Keep It"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={() => {
+                        if (deleteLoading) return;
+                        setDeleteConfirm(null);
+                        setDeleteError("");
+                    }}
+                    onConfirm={async () => {
+                        setDeleteLoading(true);
+                        setDeleteError("");
+                        try {
+                            await api.get("/sanctum/csrf-cookie");
+                            await api.delete(`/api/admin/dashboard/phlebotomists/${deleteConfirm.phlebotomistCode}`);
+                            setDeleteConfirm(null);
+                            if (onPhlebotomistsUpdate) {
+                                onPhlebotomistsUpdate();
+                            }
+                        } catch (error) {
+                            console.error('Error deleting phlebotomist:', error);
+                            setDeleteError(error.response?.data?.message || error.message || "Failed to delete phlebotomist");
+                        } finally {
+                            setDeleteLoading(false);
+                        }
+                    }}
+                />
             )}
         </section>
     )

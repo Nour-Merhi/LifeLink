@@ -3,7 +3,7 @@
   <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
     <p>Dear {{ $name }},</p>
 
-    <p>Welcome to <strong>LifeLink</strong> — we're so happy to have you with us!</p>
+    <p>Welcome to <strong>LifeLink</strong> - we're so happy to have you with us!</p>
 
     <p>
       By joining LifeLink, you’ve become part of a community that believes in hope,
@@ -18,7 +18,7 @@
       <li>stay informed about events and campaigns</li>
     </ul>
 
-    <p>If you ever need help, just reply to this email — we’re here for you.</p>
+    <p>If you ever need help, just reply to this email - we’re here for you.</p>
 
     <p>Thank you for being part of LifeLink. Together, we make a difference.</p>
 

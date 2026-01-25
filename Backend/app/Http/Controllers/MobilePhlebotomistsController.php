@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MobilePhlebotomist;
 use App\Models\HomeAppointment;
+use App\Models\HomeAppointmentRating;
 use App\Models\User;
 use App\Models\HealthCenterManager;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,14 @@ use Carbon\Carbon;
 
 class MobilePhlebotomistsController extends Controller
 {
+    private function shouldForceUnavailable($phlebotomist): bool
+    {
+        // Some environments may include a "status" attribute for phlebotomists.
+        // If it exists and is inactive, we force availability to unavailable.
+        $status = strtolower((string)($phlebotomist->status ?? ''));
+        return $status === 'inactive';
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -26,9 +35,30 @@ class MobilePhlebotomistsController extends Controller
         }
         
         $phlebotomists = $query->orderBy('created_at', 'desc')->get();
+
+        // Aggregate donor ratings per phlebotomist (based on rated, completed home appointments)
+        // IMPORTANT: use the snapshot phlebotomist_id on ratings so ratings never "move"
+        // if the appointment gets reassigned later.
+        $ratingsByPhlebotomist = HomeAppointmentRating::join('home_appointments', 'home_appointment_ratings.home_appointment_id', '=', 'home_appointments.id')
+            ->whereNotNull('home_appointment_ratings.phlebotomist_id')
+            ->where('home_appointments.state', 'completed')
+            ->select(
+                'home_appointment_ratings.phlebotomist_id as phlebotomist_id',
+                DB::raw('AVG(home_appointment_ratings.rating) as avg_rating'),
+                DB::raw('COUNT(home_appointment_ratings.id) as ratings_count')
+            )
+            ->groupBy('home_appointment_ratings.phlebotomist_id')
+            ->get()
+            ->keyBy('phlebotomist_id');
         
         // Calculate performance statistics for each phlebotomist
         $phlebotomists = $phlebotomists->map(function ($phlebotomist) {
+            // Enforce: inactive => unavailable
+            if ($this->shouldForceUnavailable($phlebotomist) && $phlebotomist->availability !== 'unavailable') {
+                $phlebotomist->availability = 'unavailable';
+                $phlebotomist->save();
+            }
+
             // Get all appointments assigned to this phlebotomist
             $allAppointments = HomeAppointment::where('phlebotomist_id', $phlebotomist->id)->get();
             $totalAppointments = $allAppointments->count();
@@ -53,6 +83,19 @@ class MobilePhlebotomistsController extends Controller
             // Make the attributes visible in JSON
             $phlebotomist->makeVisible(['total_appointments', 'completed_appointments', 'pending_appointments', 'canceled_appointments', 'success_rate']);
             
+            return $phlebotomist;
+        })->values();
+
+        // Attach rating stats (avg donor rating + rating count) to each phlebotomist
+        $phlebotomists = $phlebotomists->map(function ($phlebotomist) use ($ratingsByPhlebotomist) {
+            $ratingRow = $ratingsByPhlebotomist->get($phlebotomist->id);
+            $avgRating = $ratingRow ? (float) $ratingRow->avg_rating : null;
+            $ratingsCount = $ratingRow ? (int) $ratingRow->ratings_count : 0;
+
+            $phlebotomist->avg_rating = $avgRating !== null ? round($avgRating, 2) : null;
+            $phlebotomist->ratings_count = $ratingsCount;
+            $phlebotomist->makeVisible(['avg_rating', 'ratings_count']);
+
             return $phlebotomist;
         });
         
@@ -229,6 +272,14 @@ class MobilePhlebotomistsController extends Controller
                 ], 404);
             }
 
+            // Do not allow reassignment after completion (protect stats + rating attribution)
+            if (($homeAppointment->state ?? '') === 'completed') {
+                return response()->json([
+                    'message' => 'Cannot assign phlebotomist to a completed appointment',
+                    'error' => 'This appointment is already completed and cannot be reassigned'
+                ], 422);
+            }
+
             // Verify phlebotomist exists
             $phlebotomist = MobilePhlebotomist::find($validated['phlebotomist_id']);
             if (!$phlebotomist) {
@@ -302,6 +353,12 @@ class MobilePhlebotomistsController extends Controller
                     'homeAppointment.hospital'
                 ])
                 ->firstOrFail();
+
+            // Enforce: inactive => unavailable
+            if ($this->shouldForceUnavailable($phlebotomist) && $phlebotomist->availability !== 'unavailable') {
+                $phlebotomist->availability = 'unavailable';
+                $phlebotomist->save();
+            }
 
             // Calculate statistics - fetch all appointments for this phlebotomist
             $allAppointments = HomeAppointment::where('phlebotomist_id', $phlebotomist->id)->get();
@@ -435,6 +492,8 @@ class MobilePhlebotomistsController extends Controller
 
             $validated = $request->validate([
                 'availability' => 'sometimes|in:available,onDuty,unavailable',
+                // Optional: some clients may send status; we only use it to enforce availability.
+                'status' => 'sometimes|in:active,inactive',
                 'max_appointments' => 'sometimes|integer|min:1',
                 'start_time' => 'sometimes|date_format:H:i',
                 'end_time' => 'sometimes|date_format:H:i',
@@ -467,6 +526,12 @@ class MobilePhlebotomistsController extends Controller
             if (isset($validated['start_time'])) $phlebotomist->start_time = $validated['start_time'];
             if (isset($validated['end_time'])) $phlebotomist->end_time = $validated['end_time'];
             if (isset($validated['working_dates'])) $phlebotomist->working_dates = $validated['working_dates'];
+
+            // Enforce: if status is inactive (from client or existing attribute), availability must be unavailable
+            $incomingStatus = isset($validated['status']) ? strtolower((string)$validated['status']) : null;
+            if (($incomingStatus === 'inactive') || $this->shouldForceUnavailable($phlebotomist)) {
+                $phlebotomist->availability = 'unavailable';
+            }
             
             $phlebotomist->save();
 

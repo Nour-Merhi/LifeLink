@@ -33,6 +33,11 @@ class HomeAppointment extends Model
         'emerg_phone',
         'note',
         'state',
+        'completed_at',
+        'expires_at',
+        'blood_units_collected',
+        'blood_usage_status',
+        'blood_used_at',
         'code',
     ];
 
@@ -47,6 +52,9 @@ class HomeAppointment extends Model
     }
     protected $casts = [
         'medical_conditions' => 'array',
+        'completed_at' => 'datetime',
+        'expires_at' => 'date',
+        'blood_used_at' => 'datetime',
     ];
 
     public function mobilePhlebotomist(){

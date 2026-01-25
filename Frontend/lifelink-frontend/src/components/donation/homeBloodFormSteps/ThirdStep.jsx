@@ -13,9 +13,6 @@ export default function ThirdStep({ prevStep, pageType = "home", homeBloodFormDa
      const [loading, setLoading] = useState(false);
      const [error, setError] = useState("");
 
-     // Log pageType on mount to help debug
-     console.log('ThirdStep rendered with pageType:', pageType);
-
      const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -60,6 +57,8 @@ export default function ThirdStep({ prevStep, pageType = "home", homeBloodFormDa
             localStorage.setItem(prefix + "step", "hospitals");
             localStorage.removeItem(prefix + "hospital");
             localStorage.removeItem(prefix + "date");
+            localStorage.removeItem(prefix + "appointment_time");
+            // Backward compat: older key
             localStorage.removeItem("appointment_time");
             localStorage.removeItem(formDataKey); // Clear form data
 
@@ -164,9 +163,9 @@ export default function ThirdStep({ prevStep, pageType = "home", homeBloodFormDa
                                     <ul>
                                         <li>You'll receive an email with your registration details</li>
                                         <li>Our team will review your application within 24 hours</li>
-                                        <li>If eligible, you'll be contacted for approval</li>
-                                        <li>A brief health screening will be conducted at visit</li>
+                                        <li>A brief health screening will be conducted before the donation</li>
                                     </ul>
+                                    
                                 </div>
 
                                 <div className="line"></div>

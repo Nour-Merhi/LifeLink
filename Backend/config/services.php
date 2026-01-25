@@ -34,5 +34,10 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'deepseek' => [
+        // Support multiple env var names to avoid misconfiguration.
+        // Prefer DEEPKEY_API_KEY (current), fallback to DEEPSEEK_API_KEY (common).
+        'key' => env('DEEPKEY_API_KEY', env('DEEPSEEK_API_KEY')),
+    ],
 
 ];

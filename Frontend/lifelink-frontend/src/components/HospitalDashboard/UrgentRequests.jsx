@@ -1,6 +1,6 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect } from "react";
 import { FiAlertCircle, FiSearch } from "react-icons/fi";
-import { FiEye, FiMessageSquare, FiEdit, FiUserPlus } from "react-icons/fi";
+import { FiEye, FiEdit, FiUserPlus } from "react-icons/fi";
 import { IoClose, IoEye } from "react-icons/io5";
 import { FaCalendarAlt, FaCheckCircle, FaUsers as FaUsersIcon } from "react-icons/fa";
 import { RiDeleteBin6Line } from "react-icons/ri";
@@ -9,6 +9,9 @@ import { SpinnerDotted } from 'spinners-react';
 import { useAuth } from "../../context/AuthContext";
 import CalendarView from "../../components/adminDashboard/homeVisitComponents/CalendarView";
 import AssignPhlebotomistModal from "../../components/adminDashboard/homeVisitComponents/AssignPhlebotomistModal";
+import ConfirmDeleteDialog from "../common/ConfirmDeleteDialog";
+import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 export default function UrgentRequests() {
     const { user } = useAuth();
@@ -16,8 +19,9 @@ export default function UrgentRequests() {
     const [donorRequests, setDonorRequests] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [expandedRequests, setExpandedRequests] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     const [selectedRequests, setSelectedRequests] = useState(new Set());
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
@@ -31,11 +35,10 @@ export default function UrgentRequests() {
     const [editLoading, setEditLoading] = useState(false);
     const [editError, setEditError] = useState("");
     const [editFormData, setEditFormData] = useState({
-        appointment_date: '',
         appointment_time: '',
         state: 'pending',
-        max_capacity: null
     });
+    const [showDonorMap, setShowDonorMap] = useState(false);
     
     // Phlebotomist assignment states (only for home appointments)
     const [selectedHomeAppointments, setSelectedHomeAppointments] = useState(new Set());
@@ -50,6 +53,11 @@ export default function UrgentRequests() {
             fetchDonorRequests();
         }
     }, [user, hospitalId, appointmentTypeFilters]);
+
+    // Reset pagination when filters/search/view changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, appointmentTypeFilters, statusFilters, viewMode]);
 
     const fetchDonorRequests = () => {
         if (!hospitalId) {
@@ -78,21 +86,32 @@ export default function UrgentRequests() {
             .finally(() => setLoading(false));
     };
 
-    const toggleExpand = (requestId) => {
-        setExpandedRequests(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(requestId)) {
-                newSet.delete(requestId);
-            } else {
-                newSet.add(requestId);
-            }
-            return newSet;
-        });
-    };
-
     // Check if appointment is a home appointment
     const isHomeAppointment = (apt) => {
         return apt.donation_type && apt.donation_type.includes('Home');
+    };
+
+    const getDonorCoords = (apt) => {
+        const latRaw =
+            apt?.donor?.latitude ??
+            apt?.donor?.lat ??
+            apt?.donor_latitude ??
+            apt?.latitude ??
+            apt?.lat;
+        const lngRaw =
+            apt?.donor?.longitude ??
+            apt?.donor?.lng ??
+            apt?.donor_longitude ??
+            apt?.longitude ??
+            apt?.lng;
+
+        const lat = latRaw !== undefined && latRaw !== null ? Number(latRaw) : NaN;
+        const lng = lngRaw !== undefined && lngRaw !== null ? Number(lngRaw) : NaN;
+
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            return { lat, lng };
+        }
+        return null;
     };
 
 
@@ -151,6 +170,15 @@ export default function UrgentRequests() {
         return true;
     });
 
+    // Pagination (table view)
+    const totalPages = Math.max(1, Math.ceil(filteredRequests.length / itemsPerPage));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+    const startDisplay = filteredRequests.length === 0 ? 0 : startIndex + 1;
+    const endDisplay = Math.min(endIndex, filteredRequests.length);
+
     const handleSelectAll = (e) => {
         if (e.target.checked) {
             setSelectedRequests(new Set(filteredRequests.map(r => r.id)));
@@ -191,13 +219,12 @@ export default function UrgentRequests() {
 
     const handleEdit = (request) => {
         setEditFormData({
-            appointment_date: request.appointment_date || '',
             appointment_time: request.appointment_time || '',
             state: request.state || 'pending',
-            max_capacity: request.max_capacity || null
         });
         setEditModal(request);
         setEditError("");
+        setShowDonorMap(false);
     };
 
     const handleSaveEdit = async () => {
@@ -208,10 +235,14 @@ export default function UrgentRequests() {
 
         try {
             await api.get("/sanctum/csrf-cookie");
+
+            // Update booking record (home/hospital) for this hospital
+            const response = await api.put(
+                `/api/hospital/dashboard/appointments/bookings/${editModal.type}/${editModal.id}`,
+                editFormData
+            );
             
-            const response = await api.put(`/api/admin/dashboard/appointments/${editModal.id}`, editFormData);
-            
-            if (response.data) {
+            if (response.data?.success) {
                 setEditModal(null);
                 fetchDonorRequests();
             }
@@ -616,16 +647,14 @@ export default function UrgentRequests() {
                     </thead>
                     <tbody>
                         {filteredRequests.length > 0 ? (
-                            filteredRequests.map((request) => {
-                                const isExpanded = expandedRequests.has(request.id);
+                            paginatedRequests.map((request) => {
                                 const donorName = `${request.donor?.user?.first_name || ''} ${request.donor?.user?.last_name || ''}`.trim() || 'Unknown Donor';
                                 const donationType = request.donation_type || '';
                                 const isHome = donationType.includes('Home');
                                 const isHospital = donationType.includes('Hospital');
                                 
                                 return (
-                                    <Fragment key={request.id}>
-                                        <tr>
+                                    <tr key={request.id}>
                                             <td style={{ textAlign: 'center', width: '50px' }}>
                                                 <input
                                                     type="checkbox"
@@ -687,80 +716,18 @@ export default function UrgentRequests() {
                                                         <FiEdit />
                                                     </button>
                                                     <button 
-                                                        className="icon-btn text-blue-600" 
-                                                        title="Expand/Collapse"
-                                                        onClick={() => toggleExpand(request.id)}
+                                                        className="icon-btn text-red-500" 
+                                                        title="Delete"
+                                                        onClick={() => {
+                                                            setDeleteConfirm({ requestIds: [request.id], count: 1 });
+                                                            setDeleteError("");
+                                                        }}
                                                     >
-                                                        <FiMessageSquare />
+                                                        <RiDeleteBin6Line />
                                                     </button>
                                                 </div>
                                             </td>
                                         </tr>
-                                        {isExpanded && (
-                                            <tr key={`${request.id}-details`}>
-                                                <td colSpan="7" style={{ padding: '20px', backgroundColor: '#f8f9fa' }}>
-                                                    <div style={{ display: 'grid', gap: '15px' }}>
-                                                        <div style={{
-                                                            padding: '15px',
-                                                            backgroundColor: 'white',
-                                                            borderRadius: '8px',
-                                                            border: '1px solid #e0e0e0'
-                                                        }}>
-                                                            <h4 style={{ margin: '0 0 15px 0', color: '#333' }}>Request Details</h4>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
-                                                                <div>
-                                                                    <strong>Donor Name:</strong> {donorName}
-                                                                </div>
-                                                                {request.donor?.user?.phone_nb && (
-                                                                    <div>
-                                                                        <strong>Phone:</strong> {request.donor.user.phone_nb}
-                                                                    </div>
-                                                                )}
-                                                                {request.donor?.user?.email && (
-                                                                    <div>
-                                                                        <strong>Email:</strong> {request.donor.user.email}
-                                                                    </div>
-                                                                )}
-                                                                {request.donor?.bloodType && (
-                                                                    <div>
-                                                                        <strong>Blood Type:</strong> 
-                                                                        <span style={{ color: '#F12C31', marginLeft: '8px' }}>
-                                                                            {request.donor.bloodType.type}{request.donor.bloodType.rh_factor || ''}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                                <div>
-                                                                    <strong>Appointment Date:</strong> {request.appointment_date || 'N/A'}
-                                                                </div>
-                                                                {request.appointment_time && (
-                                                                    <div>
-                                                                        <strong>Appointment Time:</strong> {request.appointment_time}
-                                                                    </div>
-                                                                )}
-                                                                <div>
-                                                                    <strong>Type:</strong> 
-                                                                    <span className={`badge ${isHome ? 'badge-blue' : isHospital ? 'urgent-badge' : 'badge-gray'}`} style={{ marginLeft: '8px' }}>
-                                                                        {isHome ? 'Home' : isHospital ? 'Hospital' : donationType}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <strong>Status:</strong> 
-                                                                    <span className={`badge status-${request.state || 'pending'}`} style={{ marginLeft: '8px' }}>
-                                                                        {request.state || 'pending'}
-                                                                    </span>
-                                                                </div>
-                                                                {request.code && (
-                                                                    <div>
-                                                                        <strong>Request Code:</strong> {request.code}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </Fragment>
                                 );
                             })
                         ) : (
@@ -772,62 +739,57 @@ export default function UrgentRequests() {
                         )}
                     </tbody>
                 </table>
+
+                {/* Pagination */}
+                {filteredRequests.length > 0 && (
+                    <div className="pagination">
+                        <div className="showing">
+                            <small className="muted">
+                                Showing {startDisplay} to {endDisplay} of {filteredRequests.length} requests
+                            </small>
+                        </div>
+                        <div className="pagination-controls">
+                            <button
+                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                disabled={safeCurrentPage === 1}
+                                className="pagination-btn"
+                            >
+                                Previous
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                                <button
+                                    key={pageNum}
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`pagination-btn ${safeCurrentPage === pageNum ? 'active' : ''}`}
+                                >
+                                    {pageNum}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                disabled={safeCurrentPage === totalPages}
+                                className="pagination-btn"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
                 </div>
             )}
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>Delete Donor Requests</h2>
-                            <button onClick={handleDeleteCancel} disabled={deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <p>Are you sure you want to delete <strong>{deleteConfirm.count}</strong> donor request{deleteConfirm.count !== 1 ? 's' : ''}?</p>
-                            <p className="modal-text-secondary">
-                                This action cannot be undone.
-                            </p>
-                            <span className="modal-warning-text">
-                                Note: This action cannot be undone if there are no active bookings.
-                            </span>
-                            
-                            {deleteError && (
-                                <div className="error-message modal-error-container">
-                                    {deleteError}
-                                </div>
-                            )}
-
-                            <div className="form-actions form-actions-modal">
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteCancel}
-                                    disabled={deleteLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleDeleteConfirm}
-                                    disabled={deleteLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {deleteLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Deleting...
-                                        </>
-                                    ) : (
-                                        'Delete'
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title="Delete Record"
+                    description={`You are going to delete ${deleteConfirm.count === 1 ? "this request" : `${deleteConfirm.count} requests`}. Are you sure?`}
+                    confirmText="Yes, Delete"
+                    cancelText="No, Keep It"
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={handleDeleteCancel}
+                    onConfirm={handleDeleteConfirm}
+                />
             )}
 
             {/* View Modal */}
@@ -941,34 +903,41 @@ export default function UrgentRequests() {
 
             {/* Edit Modal */}
             {editModal && (
-                <div className="modal-overlay modal-overlay-delete" onClick={() => !editLoading && setEditModal(null)}>
-                    <div className="modal-container modal-container-delete" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-title">
-                            <h2>Edit Urgent Request</h2>
-                            <button onClick={() => !editLoading && setEditModal(null)} disabled={editLoading}>
+                <div className="modal-overlay" onClick={() => !editLoading && setEditModal(null)}>
+                    <div
+                        className="modal-container modal-modern"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        style={{ maxWidth: 560 }}
+                    >
+                        <div className="modal-modern-header">
+                            <div className="modal-modern-title">
+                                <h2>Edit Urgent Request</h2>
+                                <div className="modal-modern-subtitle">
+                                    <span className="muted">
+                                        {`${editModal.donor?.user?.first_name || ''} ${editModal.donor?.user?.last_name || ''}`.trim() || 'Unknown Donor'}
+                                        {editModal.donation_type ? ` • ${editModal.donation_type}` : ''}
+                                        {editModal.appointment_date ? ` • ${editModal.appointment_date}` : ''}
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                className="modal-icon-btn"
+                                onClick={() => !editLoading && setEditModal(null)}
+                                aria-label="Close"
+                                disabled={editLoading}
+                            >
                                 <IoClose />
                             </button>
                         </div>
-                        <div className="modal-form">
+
+                        <div className="modal-modern-body">
+                            <div className="modal-note" style={{ marginBottom: 12 }}>
+                                <strong>Request:</strong> {editModal.code || `REQ-${editModal.id}`}
+                            </div>
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                        Appointment Date <span style={{ color: 'red' }}>*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={editFormData.appointment_date}
-                                        onChange={(e) => setEditFormData({...editFormData, appointment_date: e.target.value})}
-                                        style={{
-                                            width: '100%',
-                                            padding: '8px 12px',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '6px',
-                                            fontSize: '14px'
-                                        }}
-                                        required
-                                    />
-                                </div>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         Appointment Time
@@ -976,7 +945,7 @@ export default function UrgentRequests() {
                                     <input
                                         type="time"
                                         value={editFormData.appointment_time}
-                                        onChange={(e) => setEditFormData({...editFormData, appointment_time: e.target.value})}
+                                        onChange={(e) => setEditFormData({ ...editFormData, appointment_time: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '8px 12px',
@@ -986,13 +955,14 @@ export default function UrgentRequests() {
                                         }}
                                     />
                                 </div>
+
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
                                         Status <span style={{ color: 'red' }}>*</span>
                                     </label>
                                     <select
                                         value={editFormData.state}
-                                        onChange={(e) => setEditFormData({...editFormData, state: e.target.value})}
+                                        onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
                                         style={{
                                             width: '100%',
                                             padding: '8px 12px',
@@ -1007,24 +977,55 @@ export default function UrgentRequests() {
                                         <option value="canceled">Canceled</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>
-                                        Max Capacity
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={editFormData.max_capacity || ''}
-                                        onChange={(e) => setEditFormData({...editFormData, max_capacity: e.target.value ? parseInt(e.target.value) : null})}
-                                        min="1"
-                                        style={{
-                                            width: '100%',
-                                            padding: '8px 12px',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '6px',
-                                            fontSize: '14px'
-                                        }}
-                                    />
-                                </div>
+
+                                {isHomeAppointment(editModal) && (
+                                    <div style={{ marginTop: 4 }}>
+                                        <button
+                                            type="button"
+                                            className="btn-cancel"
+                                            onClick={() => setShowDonorMap((prev) => !prev)}
+                                            style={{ width: "100%" }}
+                                        >
+                                            {showDonorMap ? "Hide Donor Location Map" : "Show Donor Location Map"}
+                                        </button>
+
+                                        {showDonorMap ? (
+                                            (() => {
+                                                const coords = getDonorCoords(editModal);
+                                                if (!coords) {
+                                                    return (
+                                                        <div className="modal-note" style={{ marginTop: 10 }}>
+                                                            Donor coordinates are not available for this request.
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div style={{ marginTop: 10, height: 280, borderRadius: 12, overflow: "hidden" }}>
+                                                        <MapContainer
+                                                            center={[coords.lat, coords.lng]}
+                                                            zoom={15}
+                                                            style={{ height: "100%", width: "100%" }}
+                                                            scrollWheelZoom={true}
+                                                        >
+                                                            <TileLayer
+                                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                                            />
+                                                            <CircleMarker center={[coords.lat, coords.lng]} radius={10} pathOptions={{ color: "#F12C31" }}>
+                                                                <Popup>
+                                                                    {`${editModal.donor?.user?.first_name || ''} ${editModal.donor?.user?.last_name || ''}`.trim() ||
+                                                                        "Donor"}{" "}
+                                                                    location
+                                                                </Popup>
+                                                            </CircleMarker>
+                                                        </MapContainer>
+                                                    </div>
+                                                );
+                                            })()
+                                        ) : null}
+                                    </div>
+                                )}
                             </div>
 
                             {editError && (
@@ -1032,32 +1033,32 @@ export default function UrgentRequests() {
                                     {editError}
                                 </div>
                             )}
+                        </div>
 
-                            <div className="form-actions form-actions-modal" style={{ marginTop: '20px' }}>
-                                <button 
-                                    type="button" 
-                                    onClick={() => setEditModal(null)}
-                                    disabled={editLoading}
-                                    className="btn-cancel"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={handleSaveEdit}
-                                    disabled={editLoading}
-                                    className="submit-btn btn-delete-submit"
-                                >
-                                    {editLoading ? (
-                                        <>
-                                            <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        'Save Changes'
-                                    )}
-                                </button>
-                            </div>
+                        <div className="modal-modern-footer">
+                            <button
+                                type="button"
+                                onClick={() => !editLoading && setEditModal(null)}
+                                disabled={editLoading}
+                                className="btn-cancel"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveEdit}
+                                disabled={editLoading}
+                                className="submit-btn"
+                            >
+                                {editLoading ? (
+                                    <span style={{ display: "inline-flex", alignItems: "center" }}>
+                                        <SpinnerDotted size={18} thickness={120} speed={100} color="#fff" className="spinner-inline" />
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    "Save Changes"
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

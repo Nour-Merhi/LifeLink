@@ -12,6 +12,8 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedPhlebotomist, setSelectedPhlebotomist] = useState(null);
     const [error, setError] = useState("");
+    const [ratingSort, setRatingSort] = useState("desc"); // desc | asc | off
+    const [completedSort, setCompletedSort] = useState("desc"); // desc | asc | off
 
     // Extract hospital IDs from orders
     const getOrderHospitalIds = () => {
@@ -53,11 +55,40 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                        hospital.toLowerCase().includes(searchTerm.toLowerCase());
             });
         }
+
+        // Sorting: by rating and/or by completed appointments
+        const compareNumber = (a, b, dir) => {
+            if (a === b) return 0;
+            return dir === "asc" ? (a - b) : (b - a);
+        };
+
+        const sorted = [...filtered].sort((a, b) => {
+            // Rating sort (avg donor rating)
+            if (ratingSort !== "off") {
+                const ar = Number(a.avg_rating ?? -1);
+                const br = Number(b.avg_rating ?? -1);
+                const c = compareNumber(ar, br, ratingSort);
+                if (c !== 0) return c;
+            }
+
+            // Completed appointments sort
+            if (completedSort !== "off") {
+                const ac = Number(a.completed_appointments ?? 0);
+                const bc = Number(b.completed_appointments ?? 0);
+                const c = compareNumber(ac, bc, completedSort);
+                if (c !== 0) return c;
+            }
+
+            // Fallback: name (A-Z)
+            const an = getPhlebotomistName(a).toLowerCase();
+            const bn = getPhlebotomistName(b).toLowerCase();
+            return an.localeCompare(bn);
+        });
         
         // Note: We keep all phlebotomists in the list but disable unavailable ones
         // This way admins can see who is unavailable but cannot select them
-        setFilteredPhlebotomists(filtered);
-    }, [searchTerm, phlebotomists, orders]);
+        setFilteredPhlebotomists(sorted);
+    }, [searchTerm, phlebotomists, orders, ratingSort, completedSort]);
 
     const fetchPhlebotomists = async () => {
         setLoading(true);
@@ -134,6 +165,13 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
         return nameParts.join(' ') || 'Unknown';
     };
 
+    const formatRating = (value) => {
+        if (value === null || value === undefined) return null;
+        const n = Number(value);
+        if (Number.isNaN(n)) return null;
+        return n.toFixed(1);
+    };
+
     const getAvailabilityBadge = (availability) => {
         const badges = {
             'available': 'badge-success',
@@ -185,6 +223,44 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px' }}>
+                            <label style={{ fontSize: '12px', color: '#666' }}>Sort by rating</label>
+                            <select
+                                value={ratingSort}
+                                onChange={(e) => setRatingSort(e.target.value)}
+                                style={{
+                                    padding: '10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #ddd',
+                                    outline: 'none'
+                                }}
+                            >
+                                <option value="desc">Highest → Lowest</option>
+                                <option value="asc">Lowest → Highest</option>
+                                <option value="off">Off</option>
+                            </select>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+                            <label style={{ fontSize: '12px', color: '#666' }}>Order by completed appointments</label>
+                            <select
+                                value={completedSort}
+                                onChange={(e) => setCompletedSort(e.target.value)}
+                                style={{
+                                    padding: '10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #ddd',
+                                    outline: 'none'
+                                }}
+                            >
+                                <option value="desc">Most → Least</option>
+                                <option value="asc">Least → Most</option>
+                                <option value="off">Off</option>
+                            </select>
+                        </div>
                     </div>
 
                     {error && (
@@ -250,12 +326,25 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
                                                 <div>
                                                     <h4 style={{ margin: '0 0 5px 0', color: isDisabled ? '#999' : '#000' }}>
                                                         {getPhlebotomistName(phleb)}
+                                                        <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666', fontWeight: 600 }}>
+                                                            {formatRating(phleb.avg_rating) ? (
+                                                                <>
+                                                                    <span style={{ color: '#f39c12' }}>★</span> {formatRating(phleb.avg_rating)}
+                                                                    <span style={{ fontWeight: 500, color: '#888' }}> ({Number(phleb.ratings_count || 0)})</span>
+                                                                </>
+                                                            ) : (
+                                                                <span style={{ fontWeight: 500, color: '#888' }}>No ratings</span>
+                                                            )}
+                                                        </span>
                                                     </h4>
                                                     <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
                                                         License: {phleb.license_number || 'N/A'}
                                                     </p>
                                                     <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
                                                         Hospital: {phleb.hospital?.name || 'N/A'}
+                                                    </p>
+                                                    <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                                                        Completed appointments: {Number(phleb.completed_appointments || 0)}
                                                     </p>
                                                     {phleb.user?.phone_nb && (
                                                         <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>

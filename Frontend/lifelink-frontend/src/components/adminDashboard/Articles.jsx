@@ -5,9 +5,14 @@ import api from "../../api/axios";
 
 import ArticleTable from "./articleComponents/ArticleTable"
 import AddArticleForm from "./articleComponents/AddArticleForm"
+import EditArticleForm from "./articleComponents/EditArticleForm"
+import GenerateAIArticleForm from "./articleComponents/GenerateAIArticleForm"
 
 export default function Articles(){
     const [openModal, setModal] = useState(false);
+    const [openEditModal, setOpenEditModal] = useState(false);
+    const [openAIModal, setOpenAIModal] = useState(false);
+    const [editingArticle, setEditingArticle] = useState(null);
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");     
@@ -38,6 +43,25 @@ export default function Articles(){
         setModal(false); // Close modal
     }
 
+    const onEditClose = () => {
+        setOpenEditModal(false);
+        setEditingArticle(null);
+    };
+
+    const onAIClose = () => {
+        setOpenAIModal(false);
+    };
+
+    const handleEditArticle = (article) => {
+        setEditingArticle(article);
+        setOpenEditModal(true);
+    };
+
+    const onArticleUpdated = () => {
+        fetchArticles();
+        onEditClose();
+    };
+
     useEffect(()=> {
         fetchArticles();
     }, []);
@@ -54,6 +78,9 @@ export default function Articles(){
                 </div>
                 <div className="add-btn">
                     <button type="button" onClick={() => setModal(true)}>+ Add New Article</button>
+                    <button type="button" onClick={() => setOpenAIModal(true)}>
+                        + Generate AI Article
+                    </button>
                 </div>
             </div>
 
@@ -62,11 +89,30 @@ export default function Articles(){
                 loading = { loading }
                 error = { error }
                 onArticlesUpdate = { fetchArticles }
+                onEditArticle = { handleEditArticle }
             />
             
             {openModal && 
                 <AddArticleForm onClose = { onClose } onArticleAdded = { onArticleAdded } />
             }
+
+            {openAIModal && (
+                <GenerateAIArticleForm
+                    onClose={onAIClose}
+                    onAIGenerated={() => {
+                        fetchArticles();
+                    }}
+                />
+            )}
+
+            {openEditModal && editingArticle && (
+                <EditArticleForm
+                    onClose={onEditClose}
+                    onArticleUpdated={onArticleUpdated}
+                    articleCode={editingArticle.code || editingArticle.id}
+                    initialArticle={editingArticle}
+                />
+            )}
             
         </section>
     )

@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('category');
             $table->boolean('is_published')->default(false); // Whether article is published/visible
             $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete(); // Admin who created it
-            $table->timestamp('published_at')->nullable(); // When it was published
+            $table->timestamp('published_at')->nullable(); 
             $table->timestamps();
         });
     }

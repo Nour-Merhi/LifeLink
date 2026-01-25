@@ -1,0 +1,28 @@
+.animate-pulse-scale{
+    animation: pulse 2s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+
+@keyframes pulse{
+    0%{
+        scale: 1;
+    }
+    50%{
+        scale: 0.95;
+    }
+    100%{
+        scale: 1;
+    }
+}
+
+.animate-slow-pulse{
+    animation: slow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes slow-pulse {
+    0%, 100%{
+        scale: 1;
+    }
+    50%{
+        scale: 1.05;
+    }
+}

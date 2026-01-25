@@ -20,6 +20,9 @@ class HospitalSetting extends Model
         'working_hours',
         'default_time_gap_minutes',
         'auto_approval_rules',
+        'emergency_contact',
+        'blood_bank_capacity',
+        'auto_reorder_threshold',
     ];
 
     protected $casts = [

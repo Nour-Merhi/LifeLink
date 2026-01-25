@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\Home_Appointment;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\HomeDonationRegistered;
 
 class HomeAppointmentController extends Controller
 {
@@ -67,73 +69,115 @@ class HomeAppointmentController extends Controller
             ], 500);
         }
 
-                // Calculate available slots for each hospital and identify urgent and regular appointments
-                $hospitalsWithSlots = $hospitals->map(function($hospital) {
-                    $totalSlots = 0;
-                    $urgentSlots = 0;
-                    $regularSlots = 0;
-                    $hasUrgent = false;
-                    $hasRegular = false;
-                    $urgentDueDate = null;
-                    $urgentDueTime = null;
-                    $urgentBloodType = null;
-                    
-                    foreach ($hospital->appointments as $appointment) {
-                        $slots = $appointment->time_slots ?? [];
-                        $slotCount = count($slots);
-                        $totalSlots += $slotCount;
-                        
-                        // Check appointment type and count slots separately
-                        if ($appointment->appointment_type === 'urgent' && !empty($appointment->due_date)) {
-                            $hasUrgent = true;
-                            $urgentSlots += $slotCount;
-                            
-                            // Get the earliest urgent due date/time using Carbon for proper comparison
-                            try {
-                                $appointmentDueDate = Carbon::parse($appointment->due_date);
-                                if (!$urgentDueDate) {
+        // Build a lookup of current bookings per appointment/time (pending only)
+        $appointmentIds = $hospitals->flatMap(function ($h) {
+            return $h->appointments->pluck('id');
+        })->values();
+
+        $bookedAppointments = HomeAppointment::whereIn('appointment_id', $appointmentIds)
+            ->where('state', 'pending')
+            ->select('appointment_id', 'appointment_time')
+            ->get()
+            ->groupBy('appointment_id')
+            ->map(function ($group) {
+                return $group->groupBy('appointment_time')->map->count();
+            });
+
+        // Calculate remaining available slots for each hospital (urgent + regular)
+        $hospitalsWithSlots = $hospitals->map(function($hospital) use ($bookedAppointments) {
+            $totalAvailableSlots = 0;
+            $urgentAvailableSlots = 0;
+            $regularAvailableSlots = 0;
+            $hasUrgent = false;
+            $hasRegular = false;
+            $urgentDueDate = null;
+            $urgentDueTime = null;
+            $urgentBloodType = null;
+
+            foreach ($hospital->appointments as $appointment) {
+                $slots = $appointment->time_slots ?? [];
+                $maxCapacity = $appointment->max_capacity ?? null;
+
+                foreach ($slots as $slot) {
+                    // Extract start time key for booking lookup
+                    $timeKey = '';
+                    if (is_array($slot) || is_object($slot)) {
+                        $slotArray = (array) $slot;
+                        $timeKey = $slotArray['start'] ?? '';
+                        if (!$timeKey && isset($slotArray['time'])) {
+                            $timeKey = (string) $slotArray['time'];
+                        }
+                    } else {
+                        $timeKey = (string) $slot;
+                    }
+                    if (!$timeKey) continue;
+                    // If timeKey is "09:00 - 10:00" use the start as key
+                    if (str_contains($timeKey, ' - ')) {
+                        $timeKey = trim(explode(' - ', $timeKey)[0]);
+                    }
+
+                    $currentBookings = $bookedAppointments[$appointment->id][$timeKey] ?? 0;
+                    $isBooked = false;
+                    if ($maxCapacity !== null) {
+                        $isBooked = $currentBookings >= $maxCapacity;
+                    } else {
+                        $isBooked = $currentBookings > 0;
+                    }
+
+                    if ($isBooked) {
+                        continue;
+                    }
+
+                    // Slot is available
+                    $totalAvailableSlots++;
+
+                    if ($appointment->appointment_type === 'urgent' && !empty($appointment->due_date)) {
+                        $hasUrgent = true;
+                        $urgentAvailableSlots++;
+
+                        // Track earliest urgent due date/time
+                        try {
+                            $appointmentDueDate = Carbon::parse($appointment->due_date);
+                            if (!$urgentDueDate) {
+                                $urgentDueDate = $appointment->due_date;
+                                $urgentDueTime = $appointment->due_time ?? null;
+                                $urgentBloodType = $appointment->blood_type ?? null;
+                            } else {
+                                $currentUrgentDueDate = Carbon::parse($urgentDueDate);
+                                if ($appointmentDueDate->lessThan($currentUrgentDueDate)) {
                                     $urgentDueDate = $appointment->due_date;
                                     $urgentDueTime = $appointment->due_time ?? null;
                                     $urgentBloodType = $appointment->blood_type ?? null;
-                                } else {
-                                    $currentUrgentDueDate = Carbon::parse($urgentDueDate);
-                                    if ($appointmentDueDate->lessThan($currentUrgentDueDate)) {
-                                        $urgentDueDate = $appointment->due_date;
-                                        $urgentDueTime = $appointment->due_time ?? null;
-                                        $urgentBloodType = $appointment->blood_type ?? null;
-                                    }
                                 }
-                            } catch (\Exception $e) {
-                                // Skip invalid date format
-                                \Log::warning('Invalid due_date format for appointment: ' . $appointment->id);
                             }
-                        }
-                        
-                        // Check if it's a regular appointment (separate check so hospital can have both)
-                        if ($appointment->appointment_type === 'regular') {
-                            $hasRegular = true;
-                            $regularSlots += $slotCount;
+                        } catch (\Exception $e) {
+                            \Log::warning('Invalid due_date format for appointment: ' . $appointment->id);
                         }
                     }
-                    
-                    // Add available_slots and urgent info to hospital data
-                    $hospitalArray = $hospital->toArray();
-                    $hospitalArray['available_slots'] = $totalSlots;
-                    $hospitalArray['urgent_slots'] = $urgentSlots;
-                    $hospitalArray['regular_slots'] = $regularSlots;
-                    $hospitalArray['has_urgent'] = $hasUrgent;
-                    $hospitalArray['has_regular'] = $hasRegular;
-                    if ($hasUrgent) {
-                        $hospitalArray['urgent_due_date'] = $urgentDueDate;
-                        $hospitalArray['urgent_due_time'] = $urgentDueTime;
-                        $hospitalArray['blood_type_needed'] = $urgentBloodType;
-                    } else {
-                        $hospitalArray['blood_type_needed'] = null;
+
+                    if ($appointment->appointment_type === 'regular') {
+                        $hasRegular = true;
+                        $regularAvailableSlots++;
                     }
-                    // Do not include full appointments payload in the list response to reduce size
-                    unset($hospitalArray['appointments']);
-                    return $hospitalArray;
-                });
+                }
+            }
+
+            $hospitalArray = $hospital->toArray();
+            $hospitalArray['available_slots'] = $totalAvailableSlots;
+            $hospitalArray['urgent_slots'] = $urgentAvailableSlots;
+            $hospitalArray['regular_slots'] = $regularAvailableSlots;
+            $hospitalArray['has_urgent'] = $hasUrgent;
+            $hospitalArray['has_regular'] = $hasRegular;
+            if ($hasUrgent) {
+                $hospitalArray['urgent_due_date'] = $urgentDueDate;
+                $hospitalArray['urgent_due_time'] = $urgentDueTime;
+                $hospitalArray['blood_type_needed'] = $urgentBloodType;
+            } else {
+                $hospitalArray['blood_type_needed'] = null;
+            }
+            unset($hospitalArray['appointments']);
+            return $hospitalArray;
+        });
 
                 // Separate urgent and regular hospitals
                 // A hospital can appear in BOTH lists if it has both urgent and regular appointments
@@ -383,6 +427,26 @@ class HomeAppointmentController extends Controller
             // Only set phlebotomist_id if it's nullable (will be assigned later by admin)
             // Check if column allows null before attempting to set it
             $homeAppointment = HomeAppointment::create($homeAppointmentData);
+
+            try {
+                $donor->loadMissing(['user', 'bloodType']);
+                $homeAppointment->loadMissing(['hospital', 'appointment']);
+
+                $recipientEmail = $donor->user->email ?? null;
+                if ($recipientEmail) {
+                    Mail::to($recipientEmail)->send(new HomeDonationRegistered($donor, $homeAppointment));
+                } else {
+                    \Log::warning('Skipping home donation registered email: donor user email is missing.', [
+                        'donor_id' => $donor->id ?? null,
+                        'donor_code' => $donor->code ?? null,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to send home donation registered email:', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
 
             DB::commit();
 

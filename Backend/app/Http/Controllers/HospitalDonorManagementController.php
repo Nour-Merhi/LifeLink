@@ -6,6 +6,7 @@ use App\Models\Donor;
 use App\Models\Hospital;
 use App\Models\HospitalAppointment;
 use App\Models\HomeAppointment;
+use App\Models\MobilePhlebotomist;
 use App\Models\User;
 use App\Services\XpService;
 use Illuminate\Http\Request;
@@ -19,13 +20,15 @@ class HospitalDonorManagementController extends Controller
      * Includes donors who have appointments (hospital or home) with this hospital
      * Supports filtering by donation type, appointment type, and status
      */
-    public function getDonors(Request $request, $hospitalId)
+    public function getDonors(Request $request, $hospitalId = null)
     {
         try {
             // Get hospital ID from parameter, request, or authenticated user
-            if (!$hospitalId && $request->user()) {
+            // Resolve hospital from authenticated manager regardless of role casing ("manager" vs "Manager").
+            // This prevents 400s when role is stored with different capitalization.
+            if ($request->user()) {
                 $user = $request->user();
-                if ($user->role === 'manager' && $user->healthCenterManager) {
+                if ($user->healthCenterManager && $user->healthCenterManager->hospital_id) {
                     $hospitalId = $user->healthCenterManager->hospital_id;
                 }
             }
@@ -302,6 +305,68 @@ class HospitalDonorManagementController extends Controller
     }
 
     /**
+     * Bulk delete donors "records" for this hospital (appointment registrations).
+     * This does NOT delete the donor account globally; it removes the donor's
+     * home + hospital appointment entries that are associated with this hospital.
+     */
+    public function bulkDeleteDonorsForHospital(Request $request)
+    {
+        $validated = $request->validate([
+            'donor_ids' => ['required', 'array', 'min:1'],
+            'donor_ids.*' => ['integer'],
+        ]);
+
+        $user = $request->user();
+        $hospitalId = null;
+        if ($user && $user->healthCenterManager && $user->healthCenterManager->hospital_id) {
+            $hospitalId = $user->healthCenterManager->hospital_id;
+        }
+
+        if (!$hospitalId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hospital ID is required',
+            ], 400);
+        }
+
+        $donorIds = collect($validated['donor_ids'])->unique()->values()->all();
+
+        try {
+            $result = DB::transaction(function () use ($hospitalId, $donorIds) {
+                $deletedHospitalAppointments = HospitalAppointment::where('hospital_Id', $hospitalId)
+                    ->whereIn('donor_id', $donorIds)
+                    ->delete();
+
+                $deletedHomeAppointments = HomeAppointment::where('hospital_id', $hospitalId)
+                    ->whereIn('donor_id', $donorIds)
+                    ->delete();
+
+                return [
+                    'deleted_hospital_appointments' => $deletedHospitalAppointments,
+                    'deleted_home_appointments' => $deletedHomeAppointments,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Deleted donor appointment records for this hospital',
+                'data' => $result,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error bulk deleting hospital donor records:', [
+                'hospital_id' => $hospitalId,
+                'donor_ids' => $donorIds,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete selected donors records',
+            ], 500);
+        }
+    }
+
+    /**
      * Get a single donor's details for a hospital
      */
     public function getDonor(Request $request, $hospitalId, $donorCode)
@@ -453,6 +518,18 @@ class HospitalDonorManagementController extends Controller
                 $willBeCompleted = $validated['status'] === 'completed' && !$wasCompleted;
                 
                 $appointment->state = $validated['status'];
+                if ($validated['status'] === 'completed' && !$wasCompleted) {
+                    $appointment->completed_at = now();
+                    try {
+                        $appointment->expires_at = Carbon::parse($appointment->completed_at)->addDays(42)->toDateString();
+                    } catch (\Exception $e) {
+                        $appointment->expires_at = null;
+                    }
+                }
+                if ($validated['status'] !== 'completed') {
+                    $appointment->completed_at = null;
+                    $appointment->expires_at = null;
+                }
                 $appointment->save();
 
                 // Award XP if donation was just completed
@@ -494,7 +571,32 @@ class HospitalDonorManagementController extends Controller
                 $willBeCompleted = $validated['status'] === 'completed' && !$wasCompleted;
                 
                 $appointment->state = $validated['status'];
+                if ($validated['status'] === 'completed' && !$wasCompleted) {
+                    $appointment->completed_at = now();
+                    try {
+                        $appointment->expires_at = Carbon::parse($appointment->completed_at)->addDays(42)->toDateString();
+                    } catch (\Exception $e) {
+                        $appointment->expires_at = null;
+                    }
+                }
+                if ($validated['status'] !== 'completed') {
+                    $appointment->completed_at = null;
+                    $appointment->expires_at = null;
+                }
                 $appointment->save();
+
+                // If the home appointment is finished (completed/canceled), free up the assigned phlebotomist.
+                if (in_array($validated['status'], ['completed', 'canceled'], true) && $appointment->phlebotomist_id) {
+                    $p = MobilePhlebotomist::find($appointment->phlebotomist_id);
+                    if ($p) {
+                        if (strtolower((string)($p->status ?? '')) === 'inactive') {
+                            $p->availability = 'unavailable';
+                        } else {
+                            $p->availability = 'available';
+                        }
+                        $p->save();
+                    }
+                }
 
                 // Award XP if donation was just completed
                 if ($willBeCompleted && $appointment->donor_id) {

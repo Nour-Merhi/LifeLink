@@ -95,18 +95,19 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 <div>
                                     <label htmlFor="first-name">First Name</label>
                                     <input 
-                                        onChange={ handleChange }
+                                        readOnly
                                         type="text" 
                                         id="first-name"
                                         name="first_name"
                                         value = { homeBloodFormData.first_name || "" }
+
                                         placeholder="Enter your first name" 
                                     required/>
                                 </div>
                                 <div>
                                     <label for="last-name">Last Name</label>
                                     <input 
-                                        onChange={ handleChange }
+                                        readOnly
                                         type="text" 
                                         id="last-name"
                                         name="last_name"
@@ -119,7 +120,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 <div>
                                     <label for="email">Email Address</label>
                                     <input 
-                                        onChange={ handleChange }
+                                        readOnly
                                         type="email" 
                                         id="email" 
                                         name ="email"
@@ -143,7 +144,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 <div>
                                     <label for="birth-date">Date of Birth</label>
                                     <input 
-                                        onChange={ handleChange }
+                                        readOnly
                                         type="date" 
                                         id="birth-date" 
                                         name="date_of_birth"

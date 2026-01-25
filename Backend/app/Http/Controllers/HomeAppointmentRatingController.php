@@ -40,6 +40,11 @@ class HomeAppointmentRatingController extends Controller
             return response()->json(['message' => 'You can only rate completed appointments'], 422);
         }
 
+        // Must be assigned to a phlebotomist so we can credit the right one permanently.
+        if (!$homeAppointment->phlebotomist_id) {
+            return response()->json(['message' => 'This appointment has no assigned phlebotomist to rate'], 422);
+        }
+
         $data = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'comment' => 'nullable|string|max:1000',
@@ -49,6 +54,9 @@ class HomeAppointmentRatingController extends Controller
             ['home_appointment_id' => $homeAppointment->id],
             [
                 'donor_id' => $donor->id,
+                // Snapshot the phlebotomist who did the appointment so the rating never moves
+                // even if the appointment gets reassigned later.
+                'phlebotomist_id' => $homeAppointment->phlebotomist_id,
                 'rating' => (int) $data['rating'],
                 'comment' => $data['comment'] ?? null,
             ]
@@ -59,6 +67,7 @@ class HomeAppointmentRatingController extends Controller
             'rating' => [
                 'id' => $rating->id,
                 'home_appointment_id' => $rating->home_appointment_id,
+                'phlebotomist_id' => $rating->phlebotomist_id,
                 'rating' => $rating->rating,
                 'comment' => $rating->comment,
                 'created_at' => $rating->created_at,
@@ -95,6 +104,7 @@ class HomeAppointmentRatingController extends Controller
             'rating' => $rating ? [
                 'id' => $rating->id,
                 'home_appointment_id' => $rating->home_appointment_id,
+                'phlebotomist_id' => $rating->phlebotomist_id,
                 'rating' => $rating->rating,
                 'comment' => $rating->comment,
                 'created_at' => $rating->created_at,

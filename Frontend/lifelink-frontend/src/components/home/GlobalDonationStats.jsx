@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import api from "../../api/axios";
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
@@ -51,28 +50,34 @@ function animateCount(from, to, durationMs, onUpdate) {
 export default function GlobalDonationStats() {
   const { ref, inView } = useInViewOnce();
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [stats, setStats] = useState({
-    scope: "worldwide",
-    year: null,
-    metrics: {
-      blood_donations_per_year: 0,
-      organ_transplants_per_year: 0,
-      donated_money_share_pct: 0,
-    },
-    organ_transplants_breakdown: {
-      kidney: 0,
-      liver: 0,
-      heart: 0,
-      lung: 0,
-      pancreas: 0,
-      other: 0,
-    },
-    sources: [],
-    note: "",
-  });
+  // Static (no backend)
+  const loading = false;
+  const error = "";
+  const stats = useMemo(
+    () => ({
+      scope: "worldwide",
+      year: 2025,
+      metrics: {
+        blood_donations_per_year: 118_000_000,
+        organ_transplants_per_year: 150_000,
+        donated_money_share_pct: 12.5,
+      },
+      organ_transplants_breakdown: {
+        kidney: 90_000,
+        liver: 35_000,
+        heart: 8_000,
+        lung: 6_000,
+        pancreas: 1_000,
+        other: 10_000,
+      },
+      sources: [
+        { label: "WHO (example)", url: "https://www.who.int/" },
+        { label: "Global Observatory (example)", url: "https://www.who.int/data/gho" },
+      ],
+      note: "Static demo values (frontend-only).",
+    }),
+    []
+  );
 
   const [display, setDisplay] = useState({
     blood_donations_per_year: 0,
@@ -82,31 +87,6 @@ export default function GlobalDonationStats() {
 
   // Animated pie sweep for organ breakdown (0..1)
   const [pieT, setPieT] = useState(0);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchStats = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await api.get("/api/public/donation-stats");
-        if (!mounted) return;
-        setStats(res.data);
-      } catch (e) {
-        if (!mounted) return;
-        const hint = e.response?.data?.hint ? ` (${e.response.data.hint})` : "";
-        setError((e.response?.data?.message || "Failed to load donation statistics") + hint);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    fetchStats();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const m = stats.metrics || {};
   const ob = stats.organ_transplants_breakdown || {};
@@ -232,7 +212,7 @@ export default function GlobalDonationStats() {
                   <div className="dot dot-gray" />
                   <div>
                     <div className="mini-label">Donated money (share)</div>
-                    <div className="mini-value">{display.donated_money_share_pct ? `${display.donated_money_share_pct}%` : "N/A"}</div>
+                    <div className="mini-value">~ {display.donated_money_share_pct ? `${display.donated_money_share_pct}%` : "N/A"}</div>
                   </div>
                 </div>
                 <div className="home-stats-mini-item">

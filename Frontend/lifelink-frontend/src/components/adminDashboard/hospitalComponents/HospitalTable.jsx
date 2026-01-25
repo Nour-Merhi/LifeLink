@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from "../../../api/axios";
 import EditHospitalForm from "./EditHospitalForm";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
 // Fix for default marker icons in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -607,100 +608,34 @@ export default function hospitalTable({ hospitals = [], loading = false, error =
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>{deleteConfirm.isBulk ? "Delete Selected Hospitals" : "Delete Hospital"}</h2>
-                            <button onClick={deleteConfirm.isBulk ? () => { setDeleteConfirm(null); setBulkDeleteError(""); } : handleDeleteCancel} disabled={deleteConfirm.isBulk ? bulkDeleteLoading : deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            {deleteConfirm.isBulk ? (
-                                <>
-                                    <p>Are you sure you want to delete <strong>{deleteConfirm.hospitalCodes.length} hospital{deleteConfirm.hospitalCodes.length !== 1 ? 's' : ''}</strong>?</p>
-                                    <p className="modal-text-secondary">
-                                        This will delete: <strong>{deleteConfirm.hospitalNames}</strong>
-                                    </p>
-                                    <p className="modal-text-secondary">
-                                        This action cannot be undone. The hospitals will be permanently removed from the system.
-                                    </p>
-                                    
-                                    {bulkDeleteError && (
-                                        <div className="error-message modal-error-container">
-                                            {bulkDeleteError}
-                                        </div>
-                                    )}
-
-                                    <div className="form-actions form-actions-modal">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => { setDeleteConfirm(null); setBulkDeleteError(""); }}
-                                            disabled={bulkDeleteLoading}
-                                            className="btn-cancel"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleBulkDeleteConfirm}
-                                            disabled={bulkDeleteLoading}
-                                            className="submit-btn btn-delete-submit"
-                                        >
-                                            {bulkDeleteLoading ? (
-                                                <>
-                                                    <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                                    Deleting...
-                                                </>
-                                            ) : (
-                                                'Delete All'
-                                            )}
-                                        </button>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <p>Are you sure you want to delete <strong>{deleteConfirm.hospitalName}</strong>?</p>
-                                    <p className="modal-text-secondary">
-                                        This action cannot be undone. The hospital will be permanently removed from the system.
-                                    </p>
-                                    
-                                    {deleteError && (
-                                        <div className="error-message modal-error-container">
-                                            {deleteError}
-                                        </div>
-                                    )}
-
-                                    <div className="form-actions form-actions-modal">
-                                        <button 
-                                            type="button" 
-                                            onClick={handleDeleteCancel}
-                                            disabled={deleteLoading}
-                                            className="btn-cancel"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleDeleteConfirm}
-                                            disabled={deleteLoading}
-                                            className="submit-btn btn-delete-submit"
-                                        >
-                                            {deleteLoading ? (
-                                                <>
-                                                    <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                                    Deleting...
-                                                </>
-                                            ) : (
-                                                'Delete'
-                                            )}
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title={deleteConfirm.isBulk ? "Delete Selected Hospitals" : "Delete Hospital"}
+                    description={
+                        deleteConfirm.isBulk
+                            ? `You are going to delete ${deleteConfirm.hospitalCodes?.length || 0} hospital(s). Are you sure?`
+                            : `You are going to delete ${deleteConfirm.hospitalName}. Are you sure?`
+                    }
+                    details={
+                        deleteConfirm.isBulk
+                            ? deleteConfirm.hospitalNames
+                            : "This action cannot be undone. The hospital will be permanently removed from the system."
+                    }
+                    confirmText={deleteConfirm.isBulk ? "Delete All" : "Delete"}
+                    cancelText="Cancel"
+                    loading={deleteConfirm.isBulk ? bulkDeleteLoading : deleteLoading}
+                    error={deleteConfirm.isBulk ? bulkDeleteError : deleteError}
+                    onClose={() => {
+                        if (deleteConfirm.isBulk) {
+                            if (bulkDeleteLoading) return;
+                            setDeleteConfirm(null);
+                            setBulkDeleteError("");
+                            return;
+                        }
+                        if (deleteLoading) return;
+                        handleDeleteCancel();
+                    }}
+                    onConfirm={deleteConfirm.isBulk ? handleBulkDeleteConfirm : handleDeleteConfirm}
+                />
             )}
 
             {/* Map Modal */}

@@ -1,16 +1,26 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import lifelink_logo from "../assets/imgs/Logo.png";
 import profile from "../assets/imgs/profile.svg";
 import ProfileDropdown from "./ProfileDropdown";
 import AdminProfileDropdown from "./adminDashboard/AdminProfileDropdown";
+import HospitalManagerProfileDropdown from "./HospitalDashboard/HospitalManagerProfileDropdown";
 import { useSystemSettings } from "../context/SystemSettingsContext";
+import { useEffect, useState } from "react";
+import { IoClose, IoMenu } from "react-icons/io5";
 
 export default function Navbar({ handleContactUsClick }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { systemLogo, platformName } = useSystemSettings();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    // Close mobile menu when navigating
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -37,6 +47,76 @@ export default function Navbar({ handleContactUsClick }) {
     return `${firstName} ${lastName}`.trim() || "User";
   };
 
+  const NavItems = ({ isMobile = false }) => (
+    <>
+      <NavLink
+        to="/home"
+        className={({ isActive }) =>
+          `quiz-nav-link ${isMobile ? "quiz-nav-link-mobile" : ""} ${isActive ? "quiz-nav-link-active" : ""}`
+        }
+        onClick={() => isMobile && setMobileOpen(false)}
+      >
+        Home
+      </NavLink>
+      <NavLink
+        to="/donation"
+        className={({ isActive }) =>
+          `quiz-nav-link ${isMobile ? "quiz-nav-link-mobile" : ""} ${isActive ? "quiz-nav-link-active" : ""}`
+        }
+        onClick={() => isMobile && setMobileOpen(false)}
+      >
+        Donate
+      </NavLink>
+      
+      <NavLink
+        to="/quizlit/welcome"
+        className={({ isActive }) =>
+          `quiz-nav-link ${isMobile ? "quiz-nav-link-mobile" : ""} quiz-nav-link-play ${
+            isActive ? "quiz-nav-link-play-active" : ""
+          }`
+        }
+        onClick={() => isMobile && setMobileOpen(false)}
+      >
+        Let&apos;s Play
+      </NavLink>
+
+      <NavLink 
+      to="/rewards"
+      className={({ isActive }) =>
+        `quiz-nav-link ${isMobile ? "quiz-nav-link-mobile" : ""} quiz-nav-link-play 
+      ${isActive ? "quiz-nav-link-play-active" : ""}`
+      }
+
+      onClick={() => isMobile && setMobileOpen(false)}
+      >
+        Rewards
+      </NavLink>
+
+      {handleContactUsClick ? (
+        <button
+          onClick={() => {
+            handleContactUsClick();
+            if (isMobile) setMobileOpen(false);
+          }}
+          className={`quiz-nav-link quiz-nav-button ${isMobile ? "quiz-nav-link-mobile" : ""}`}
+          type="button"
+        >
+          Contact Us
+        </button>
+      ) : (
+        <NavLink
+          to="/support"
+          className={({ isActive }) =>
+            `quiz-nav-link ${isMobile ? "quiz-nav-link-mobile" : ""} ${isActive ? "quiz-nav-link-active" : ""}`
+          }
+          onClick={() => isMobile && setMobileOpen(false)}
+        >
+          Contact Us
+        </NavLink>
+      )}
+    </>
+  );
+
   return (
     <nav className="px-6 py-4 flex items-center justify-between relative z-50 quiz-navbar">
       {/* Logo */}
@@ -48,54 +128,12 @@ export default function Navbar({ handleContactUsClick }) {
           />
       </Link>
 
-      {/* Navigation Links */}
-      <div className="flex items-center space-x-12">
-        <NavLink 
-          to="/home" 
-          className={({ isActive }) => 
-            `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
-          }
-        >
-          Home
-        </NavLink>
-        <NavLink 
-          to="/donation" 
-          className={({ isActive }) => 
-            `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
-          }
-        >
-          Donate
-        </NavLink>
-        <NavLink 
-          to="/quizlit/welcome" 
-          className={({ isActive }) => 
-            `quiz-nav-link quiz-nav-link-play ${isActive ? 'quiz-nav-link-play-active' : ''}`
-          }
-        >
-          Let's Play
-        </NavLink>
-        {handleContactUsClick ? (
-          <button
-            onClick={handleContactUsClick}
-            className="quiz-nav-link"
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Contact Us
-          </button>
-        ) : (
-          <NavLink 
-            to="/support"
-            className={({ isActive }) => 
-              `quiz-nav-link ${isActive ? 'quiz-nav-link-active' : ''}`
-            }
-          >
-            Contact Us
-          </NavLink>
-        )}
+      {/* Desktop Navigation */}
+      <div className="hidden md:flex items-center space-x-12">
+        <NavItems />
 
-        {/* Authentication Section */}
+        {/* Authentication Section (desktop) */}
         {user ? (
-          // User is logged in - show logout and profile
           <div className="flex items-center gap-4 ml-16">
             <button
               onClick={handleLogout}
@@ -108,19 +146,20 @@ export default function Navbar({ handleContactUsClick }) {
               <ProfileDropdown />
             ) : user.role?.toLowerCase() === "admin" ? (
               <AdminProfileDropdown />
+            ) : user.role?.toLowerCase() === "manager" ? (
+              <HospitalManagerProfileDropdown />
             ) : (
-            <div className="flex items-center gap-2">
-              <img 
-                src={profile} 
-                alt="Profile" 
-                className="w-11 h-11 rounded-full cursor-pointer"
-                title={getUserName()}
-              />
-            </div>
+              <div className="flex items-center gap-2">
+                <img
+                  src={profile}
+                  alt="Profile"
+                  className="w-11 h-11 rounded-full cursor-pointer"
+                  title={getUserName()}
+                />
+              </div>
             )}
           </div>
         ) : (
-          // User is not logged in - show sign in button
           <button
             onClick={handleSignIn}
             type="button"
@@ -130,6 +169,61 @@ export default function Navbar({ handleContactUsClick }) {
           </button>
         )}
       </div>
+
+      {/* Mobile menu button */}
+      <button
+        type="button"
+        className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm"
+        onClick={() => setMobileOpen((v) => !v)}
+        aria-label={mobileOpen ? "Close menu" : "Open menu"}
+      >
+        {mobileOpen ? <IoClose size={22} /> : <IoMenu size={22} />}
+      </button>
+
+      {/* Mobile menu */}
+      {mobileOpen ? (
+        <div className="md:hidden absolute top-full left-1/2 right-0 mt-2 mx-3 rounded-xl bg-white text-black shadow-lg border border-black/10 overflow-hidden">
+          <div className="flex flex-col gap-3 p-4">
+            <NavItems isMobile />
+
+            <div className="h-px bg-black/10 my-1" />
+
+            {user ? (
+              <>
+                <button
+                  onClick={handleLogout}
+                  type="button"
+                  className="w-full text-[14px] bg-black text-white px-4 py-2 rounded-lg font-semibold"
+                >
+                  Logout
+                </button>
+                {/* Keep dropdowns desktop-only; on mobile show a simple profile entry */}
+                <button
+                  type="button"
+                  className="w-full text-left text-[14px] bg-gray-100 text-black px-4 py-2 rounded-lg font-semibold"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    const role = user?.role?.toLowerCase();
+                    if (role === "admin") navigate("/admin");
+                    else if (role === "manager") navigate("/hospital");
+                    else if (role === "donor") navigate("/donor");
+                  }}
+                >
+                  {getUserName()}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleSignIn}
+                type="button"
+                className="w-full text-[14px] bg-black text-white px-4 py-2 rounded-lg font-semibold"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </nav>
   );
 }

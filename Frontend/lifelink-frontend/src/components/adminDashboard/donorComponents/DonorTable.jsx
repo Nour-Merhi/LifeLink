@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from "../../../api/axios";
 import EditDonorForm from "./EditDonorForm";
+import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
 
 // Fix for default marker icons in Leaflet with React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -567,100 +568,34 @@ export default function DonorTable({ donors = [], loading = false, error = "", o
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="modal-overlay modal-overlay-delete">
-                    <div className="modal-container modal-container-delete">
-                        <div className="modal-title">
-                            <h2>{deleteConfirm.isBulk ? "Delete Selected Donors" : "Delete Donor"}</h2>
-                            <button onClick={deleteConfirm.isBulk ? () => { setDeleteConfirm(null); setBulkDeleteError(""); } : handleDeleteCancel} disabled={deleteConfirm.isBulk ? bulkDeleteLoading : deleteLoading}>
-                                <IoClose />
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            {deleteConfirm.isBulk ? (
-                                <>
-                                    <p>Are you sure you want to delete <strong>{deleteConfirm.donorCodes.length} donor{deleteConfirm.donorCodes.length !== 1 ? 's' : ''}</strong>?</p>
-                                    <p className="modal-text-secondary">
-                                        This will delete: <strong>{deleteConfirm.donorNames}</strong>
-                                    </p>
-                                    <p className="modal-text-secondary">
-                                        This action cannot be undone. If any donor has active appointments, deletion will be prevented.
-                                    </p>
-                                    
-                                    {bulkDeleteError && (
-                                        <div className="error-message modal-error-container">
-                                            {bulkDeleteError}
-                                        </div>
-                                    )}
-
-                                    <div className="form-actions form-actions-modal">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => { setDeleteConfirm(null); setBulkDeleteError(""); }}
-                                            disabled={bulkDeleteLoading}
-                                            className="btn-cancel"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleBulkDeleteConfirm}
-                                            disabled={bulkDeleteLoading}
-                                            className="submit-btn btn-delete-submit"
-                                        >
-                                            {bulkDeleteLoading ? (
-                                                <>
-                                                    <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                                    Deleting...
-                                                </>
-                                            ) : (
-                                                'Delete All'
-                                            )}
-                                        </button>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <p>Are you sure you want to delete <strong>{deleteConfirm.donorName}</strong>?</p>
-                                    <p className="modal-text-secondary">
-                                        This action cannot be undone. If the donor has active appointments, deletion will be prevented.
-                                    </p>
-                                    
-                                    {deleteError && (
-                                        <div className="error-message modal-error-container">
-                                            {deleteError}
-                                        </div>
-                                    )}
-
-                                    <div className="form-actions form-actions-modal">
-                                        <button 
-                                            type="button" 
-                                            onClick={handleDeleteCancel}
-                                            disabled={deleteLoading}
-                                            className="btn-cancel"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={handleDeleteConfirm}
-                                            disabled={deleteLoading}
-                                            className="submit-btn btn-delete-submit"
-                                        >
-                                            {deleteLoading ? (
-                                                <>
-                                                    <SpinnerDotted size={20} thickness={100} speed={100} color="#fff" className="spinner-inline" />
-                                                    Deleting...
-                                                </>
-                                            ) : (
-                                                'Delete'
-                                            )}
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <ConfirmDeleteDialog
+                    title={deleteConfirm.isBulk ? "Delete Selected Donors" : "Delete Donor"}
+                    description={
+                        deleteConfirm.isBulk
+                            ? `You are going to delete ${deleteConfirm.donorCodes?.length || 0} donor(s). Are you sure?`
+                            : `You are going to delete ${deleteConfirm.donorName}. Are you sure?`
+                    }
+                    details={
+                        deleteConfirm.isBulk
+                            ? deleteConfirm.donorNames
+                            : "If the donor has active appointments, deletion will be prevented."
+                    }
+                    confirmText={deleteConfirm.isBulk ? "Delete All" : "Delete"}
+                    cancelText="Cancel"
+                    loading={deleteConfirm.isBulk ? bulkDeleteLoading : deleteLoading}
+                    error={deleteConfirm.isBulk ? bulkDeleteError : deleteError}
+                    onClose={() => {
+                        if (deleteConfirm.isBulk) {
+                            if (bulkDeleteLoading) return;
+                            setDeleteConfirm(null);
+                            setBulkDeleteError("");
+                            return;
+                        }
+                        if (deleteLoading) return;
+                        handleDeleteCancel();
+                    }}
+                    onConfirm={deleteConfirm.isBulk ? handleBulkDeleteConfirm : handleDeleteConfirm}
+                />
             )}
 
             {/* Map Modal */}

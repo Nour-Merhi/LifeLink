@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { RiSettings5Fill } from "react-icons/ri";
 import { FiSave } from "react-icons/fi";
-import axios from "axios";
+import api from "../../api/axios";
 
 export default function HospitalSettings() {
     const [settings, setSettings] = useState({
@@ -12,10 +12,11 @@ export default function HospitalSettings() {
         operatingHours: "",
         emergencyContact: "",
         bloodBankCapacity: "",
-        autoReorderThreshold: ""
+        threshold: ""
     });
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
 
     useEffect(() => {
         fetchSettings();
@@ -23,20 +24,19 @@ export default function HospitalSettings() {
 
     const fetchSettings = () => {
         setLoading(true);
-        // In production: axios.get("/api/hospital/settings")
-        setTimeout(() => {
-            setSettings({
-                hospitalName: "City General Hospital",
-                address: "123 Medical Center Drive",
-                phone: "+1 234-567-8900",
-                email: "info@citygeneral.com",
-                operatingHours: "24/7",
-                emergencyContact: "+1 234-567-8901",
-                bloodBankCapacity: "500",
-                autoReorderThreshold: "15"
-            });
-            setLoading(false);
-        }, 500);
+        setError("");
+        api.get("/api/hospital/dashboard/settings")
+            .then((res) => {
+                setSettings((prev) => ({
+                    ...prev,
+                    ...(res.data?.settings || {}),
+                }));
+            })
+            .catch((err) => {
+                console.error("Error fetching hospital settings:", err);
+                setError(err.response?.data?.message || "Failed to fetch hospital settings");
+            })
+            .finally(() => setLoading(false));
     };
 
     const handleChange = (e) => {
@@ -49,12 +49,25 @@ export default function HospitalSettings() {
 
     const handleSave = () => {
         setLoading(true);
-        // In production: axios.put("/api/hospital/settings", settings)
-        setTimeout(() => {
-            setLoading(false);
-            setSaved(true);
-            setTimeout(() => setSaved(false), 3000);
-        }, 500);
+        setError("");
+        api.put("/api/hospital/dashboard/settings", {
+            ...settings,
+            // Ensure numeric fields are sent as numbers when possible
+            bloodBankCapacity: settings.bloodBankCapacity === "" ? null : Number(settings.bloodBankCapacity),
+            autoReorderThreshold: settings.autoReorderThreshold === "" ? null : Number(settings.autoReorderThreshold),
+        })
+            .then((res) => {
+                if (res.data?.settings) {
+                    setSettings((prev) => ({ ...prev, ...res.data.settings }));
+                }
+                setSaved(true);
+                setTimeout(() => setSaved(false), 3000);
+            })
+            .catch((err) => {
+                console.error("Error saving hospital settings:", err);
+                setError(err.response?.data?.message || "Failed to save hospital settings");
+            })
+            .finally(() => setLoading(false));
     };
 
     return (
@@ -77,6 +90,17 @@ export default function HospitalSettings() {
             {saved && (
                 <div className="control-panel" style={{ background: '#e8f9ef', color: '#16a34a', marginBottom: '20px' }}>
                     Settings saved successfully!
+                </div>
+            )}
+            {error && (
+                <div className="control-panel" style={{ background: '#fee', color: '#c33', marginBottom: '20px' }}>
+                    <strong>Error:</strong> {error}
+                    <button
+                        onClick={fetchSettings}
+                        style={{ marginLeft: '10px', padding: '5px 10px', cursor: 'pointer' }}
+                    >
+                        Retry
+                    </button>
                 </div>
             )}
 
@@ -170,11 +194,11 @@ export default function HospitalSettings() {
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 600 }}>Auto-Reorder Threshold</label>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 600 }}>Threshold</label>
                         <input
                             type="number"
                             name="autoReorderThreshold"
-                            value={settings.autoReorderThreshold}
+                            value={settings.threshold}
                             onChange={handleChange}
                             className="filters"
                             style={{ width: '100%', padding: '8px' }}

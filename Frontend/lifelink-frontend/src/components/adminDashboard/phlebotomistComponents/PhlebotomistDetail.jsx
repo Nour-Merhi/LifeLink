@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { 
     IoPerson, 
     IoMailOutline, 
@@ -18,10 +18,14 @@ import api from "../../../api/axios";
 export default function PhlebotomistDetail() {
     const { phlebotomistCode } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("work-history");
     const [phlebotomistData, setPhlebotomistData] = useState(null);
+
+    const isHospitalView = (location?.pathname || "").startsWith("/hospital");
+    const backPath = isHospitalView ? "/hospital/phlebotomists" : "/admin/phlebotomists";
 
     useEffect(() => {
         fetchPhlebotomistDetails();
@@ -107,7 +111,7 @@ export default function PhlebotomistDetail() {
         return (
             <div className="error-container">
                 <p>Error: {error || "Phlebotomist not found"}</p>
-                <button onClick={() => navigate('/admin/phlebotomists')} className="btn-cancel">
+                <button onClick={() => navigate(backPath)} className="btn-cancel">
                     Back to Phlebotomist List
                 </button>
             </div>
@@ -120,7 +124,7 @@ export default function PhlebotomistDetail() {
         <section className="donor-detail-section">
             {/* Back Button */}
             <div className="donor-detail-back">
-                <button onClick={() => navigate('/admin/phlebotomists')} className="back-link">
+                <button onClick={() => navigate(backPath)} className="back-link">
                     <IoArrowBack />
                     <span>Back to Phlebotomist List</span>
                 </button>
