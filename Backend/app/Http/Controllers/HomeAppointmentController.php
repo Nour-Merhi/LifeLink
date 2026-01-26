@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\HomeAppointment;
+use App\Models\HospitalAppointment;
 use App\Models\Appointment;
 use App\Models\Hospital;
 use App\Models\User;
@@ -300,6 +301,73 @@ class HomeAppointmentController extends Controller
 
             // Get or create Donor
             $donor = Donor::where('user_id', $user->id)->first();
+            
+            // Check eligibility: last donation must be at least 56 days ago
+            $lastDonationDate = null;
+            if ($donor) {
+                // Get the most recent completed hospital appointment
+                $lastHospitalAppt = HospitalAppointment::where('donor_id', $donor->id)
+                    ->where('state', 'completed')
+                    ->with('appointments')
+                    ->get()
+                    ->filter(function($appt) {
+                        return $appt->appointments && $appt->appointments->appointment_date;
+                    })
+                    ->sortByDesc(function($appt) {
+                        return $appt->appointments->appointment_date;
+                    })
+                    ->first();
+                
+                // Get the most recent completed home appointment
+                $lastHomeAppt = HomeAppointment::where('donor_id', $donor->id)
+                    ->where('state', 'completed')
+                    ->with('appointment')
+                    ->get()
+                    ->filter(function($appt) {
+                        return $appt->appointment && $appt->appointment->appointment_date;
+                    })
+                    ->sortByDesc(function($appt) {
+                        return $appt->appointment->appointment_date;
+                    })
+                    ->first();
+                
+                // Get the most recent donation date from either type
+                $hospitalDate = $lastHospitalAppt && $lastHospitalAppt->appointments 
+                    ? Carbon::parse($lastHospitalAppt->appointments->appointment_date) 
+                    : null;
+                $homeDate = $lastHomeAppt && $lastHomeAppt->appointment 
+                    ? Carbon::parse($lastHomeAppt->appointment->appointment_date) 
+                    : null;
+                
+                if ($hospitalDate && $homeDate) {
+                    $lastDonationDate = $hospitalDate->greaterThan($homeDate) ? $hospitalDate : $homeDate;
+                } elseif ($hospitalDate) {
+                    $lastDonationDate = $hospitalDate;
+                } elseif ($homeDate) {
+                    $lastDonationDate = $homeDate;
+                } elseif (!empty($validated['last_donation']) && $validated['last_donation'] !== '') {
+                    $lastDonationDate = Carbon::parse($validated['last_donation']);
+                } elseif ($donor->last_donation) {
+                    $lastDonationDate = Carbon::parse($donor->last_donation);
+                }
+            } elseif (!empty($validated['last_donation']) && $validated['last_donation'] !== '') {
+                // For new donors, use the provided last_donation
+                $lastDonationDate = Carbon::parse($validated['last_donation']);
+            }
+            
+            // Check eligibility if we have a last donation date
+            if ($lastDonationDate) {
+                $today = Carbon::today();
+                $daysSinceLastDonation = $lastDonationDate->diffInDays($today);
+                
+                if ($daysSinceLastDonation < 56) {
+                    DB::rollBack();
+                    $daysRemaining = 56 - $daysSinceLastDonation;
+                    return response()->json([
+                        'message' => "You are not eligible to donate yet. You must wait at least 56 days between donations. You can donate again in {$daysRemaining} day" . ($daysRemaining !== 1 ? 's' : '') . "."
+                    ], 422);
+                }
+            }
             
             if (!$donor) {
                 // Create new donor

@@ -26,6 +26,7 @@ use App\Http\Controllers\DonorDashboardController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\RewardsController;
 use App\Http\Controllers\SupportController;
+use App\Http\Controllers\PlatformFaqController;
 use App\Http\Controllers\NurseDashboardController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\FinancialDonationController;
@@ -65,6 +66,7 @@ Route::post('/chatbot', [ChatbotController::class, 'chat']);
 // Donor Dashboard Routes
 Route::middleware('auth:sanctum')->prefix('/donor')->group(function(){
     Route::get('/dashboard', [DonorDashboardController::class, 'index']);
+    Route::get('/eligibility', [DonorController::class, 'checkEligibility']);
     Route::get('/my-donations', [DonorDashboardController::class, 'myDonations']);
     Route::get('/my-appointments', [DonorDashboardController::class, 'myAppointments']);
     // Living organ pledge appointment choice (donor)
@@ -319,6 +321,9 @@ Route::prefix('/support')->group(function(){
         Route::get('/tickets/{id}', [SupportController::class, 'show']);
     });
 });
+
+// FAQ Routes (Public)
+Route::get('/faqs', [PlatformFaqController::class, 'index']);
 
 
 //Blood donation Module - Public routes for viewing available appointments

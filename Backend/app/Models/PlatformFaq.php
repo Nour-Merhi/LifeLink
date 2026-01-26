@@ -13,6 +13,7 @@ class PlatformFaq extends Model
     protected $fillable = [
         'question',
         'answer',
+        'category',
     ];
 
 }

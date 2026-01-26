@@ -6,9 +6,12 @@ use App\Models\Donor;
 use App\Models\User;
 use App\Models\BloodType;
 use App\Models\HomeAppointment;
+use App\Models\HospitalAppointment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class DonorController extends Controller
 {
@@ -397,5 +400,125 @@ class DonorController extends Controller
             'blood_types' => $bloodTypes,
             'total' => $bloodTypes->count()
         ], 200);
+    }
+
+    /**
+     * Check donor eligibility for blood donation (56-day rule)
+     * Returns days remaining until eligible, or 0 if eligible
+     */
+    public function checkEligibility(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            
+            if (!$user) {
+                return response()->json([
+                    'eligible' => true,
+                    'daysRemaining' => 0,
+                    'lastDonationDate' => null,
+                    'message' => 'Guest users are eligible (eligibility will be checked on submission)'
+                ], 200);
+            }
+
+            $donor = Donor::where('user_id', $user->id)->first();
+            
+            if (!$donor) {
+                // No donor record means they've never donated
+                return response()->json([
+                    'eligible' => true,
+                    'daysRemaining' => 0,
+                    'lastDonationDate' => null,
+                    'message' => 'Eligible to donate'
+                ], 200);
+            }
+
+            // Get the most recent completed hospital appointment
+            $lastHospitalAppt = HospitalAppointment::where('donor_id', $donor->id)
+                ->where('state', 'completed')
+                ->with('appointments')
+                ->get()
+                ->filter(function($appt) {
+                    return $appt->appointments && $appt->appointments->appointment_date;
+                })
+                ->sortByDesc(function($appt) {
+                    return $appt->appointments->appointment_date;
+                })
+                ->first();
+            
+            // Get the most recent completed home appointment
+            $lastHomeAppt = HomeAppointment::where('donor_id', $donor->id)
+                ->where('state', 'completed')
+                ->with('appointment')
+                ->get()
+                ->filter(function($appt) {
+                    return $appt->appointment && $appt->appointment->appointment_date;
+                })
+                ->sortByDesc(function($appt) {
+                    return $appt->appointment->appointment_date;
+                })
+                ->first();
+            
+            // Get the most recent donation date from either type
+            $hospitalDate = $lastHospitalAppt && $lastHospitalAppt->appointments 
+                ? Carbon::parse($lastHospitalAppt->appointments->appointment_date) 
+                : null;
+            $homeDate = $lastHomeAppt && $lastHomeAppt->appointment 
+                ? Carbon::parse($lastHomeAppt->appointment->appointment_date) 
+                : null;
+            
+            $lastDonationDate = null;
+            if ($hospitalDate && $homeDate) {
+                $lastDonationDate = $hospitalDate->greaterThan($homeDate) ? $hospitalDate : $homeDate;
+            } elseif ($hospitalDate) {
+                $lastDonationDate = $hospitalDate;
+            } elseif ($homeDate) {
+                $lastDonationDate = $homeDate;
+            } elseif ($donor->last_donation) {
+                // Fallback to donor.last_donation if no completed appointments
+                $lastDonationDate = Carbon::parse($donor->last_donation);
+            }
+            
+            if (!$lastDonationDate) {
+                // No last donation found
+                return response()->json([
+                    'eligible' => true,
+                    'daysRemaining' => 0,
+                    'lastDonationDate' => null,
+                    'message' => 'Eligible to donate'
+                ], 200);
+            }
+
+            // Calculate days since last donation
+            $today = Carbon::today();
+            $daysSinceLastDonation = $lastDonationDate->diffInDays($today);
+            $daysRemaining = max(0, 56 - $daysSinceLastDonation);
+            $eligible = $daysRemaining === 0;
+
+            return response()->json([
+                'eligible' => $eligible,
+                'daysRemaining' => $daysRemaining,
+                'lastDonationDate' => $lastDonationDate->format('Y-m-d'),
+                'daysSinceLastDonation' => $daysSinceLastDonation,
+                'message' => $eligible 
+                    ? 'Eligible to donate' 
+                    : "You must wait {$daysRemaining} more day" . ($daysRemaining !== 1 ? 's' : '') . " before you can donate again."
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error checking donor eligibility:', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // On error, default to eligible (don't block user)
+            return response()->json([
+                'eligible' => true,
+                'daysRemaining' => 0,
+                'lastDonationDate' => null,
+                'message' => 'Eligible to donate',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 200);
+        }
     }
 }
