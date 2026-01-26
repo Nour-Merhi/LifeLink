@@ -59,7 +59,7 @@ export default function QuizQuestionTable({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="filters" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="filter-gap" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <label style={{ fontSize: "14px", fontWeight: 500 }}>Level</label>
           <select
             value={levelFilter}

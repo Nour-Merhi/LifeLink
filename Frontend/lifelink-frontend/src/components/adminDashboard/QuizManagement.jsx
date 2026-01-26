@@ -66,7 +66,9 @@ export default function QuizManagement() {
         </div>
         <div className="add-btn" style={{ flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <label style={{ fontSize: "14px", fontWeight: 500 }}>Level</label>
+            <label style={{ fontSize: "14px", fontWeight: 500 }}>Choose Level First to Generate Questions</label>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px"}}>
             <select
               value={generateLevel}
               onChange={(e) => setGenerateLevel(Number(e.target.value))}
@@ -88,7 +90,7 @@ export default function QuizManagement() {
               ) : (
                 <FiPlus />
               )}
-              {generating ? "Generating…" : "Generate Questions"}
+              {generating ? "Generating…" : "AI Generate Questions"}
             </button>
           </div>
           {generateError && (

@@ -4,6 +4,7 @@ import Searchbar from "./Searchbar"
 
 import { useState, useEffect } from "react"
 import axios from "axios";
+import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
 export default function HospitalBloodBooking({ pageType }) {
@@ -14,20 +15,13 @@ export default function HospitalBloodBooking({ pageType }) {
   const scopedKey = (k) => `${storagePrefix}${k}`;
   const legacyKey = (k) => `${prefix}${k}`;
 
-  // Eligibility (56-day rule). If no last donation in backend → eligible.
-  const computeEligibility = () => {
-    const raw = user?.donor?.last_donation;
-    if (!raw) return { eligible: true, daysRemaining: 0, lastDonation: null };
-    const last = new Date(raw);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    last.setHours(0, 0, 0, 0);
-    const daysSince = Math.floor((today - last) / (1000 * 60 * 60 * 24));
-    if (!Number.isFinite(daysSince)) return { eligible: true, daysRemaining: 0, lastDonation: null };
-    const remaining = Math.max(0, 56 - daysSince);
-    return { eligible: remaining === 0, daysRemaining: remaining, lastDonation: raw };
-  };
-  const eligibility = computeEligibility();
+  // Eligibility state - fetched from backend
+  const [eligibility, setEligibility] = useState({ 
+    eligible: true, 
+    daysRemaining: 0, 
+    lastDonationDate: null,
+    loading: true 
+  });
   const isEligible = eligibility.eligible;
 
   const [step, setStep] = useState("hospitals")
@@ -57,6 +51,34 @@ export default function HospitalBloodBooking({ pageType }) {
     appointment_time: time || '',
     appointment_date: date || '',
   })
+
+  // Fetch eligibility from backend
+  useEffect(() => {
+    const fetchEligibility = async () => {
+      if (!user) {
+        // Guest users are eligible (will be checked on submission)
+        setEligibility({ eligible: true, daysRemaining: 0, lastDonationDate: null, loading: false });
+        return;
+      }
+
+      try {
+        setEligibility(prev => ({ ...prev, loading: true }));
+        const response = await api.get('/api/donor/eligibility');
+        setEligibility({
+          eligible: response.data.eligible,
+          daysRemaining: response.data.daysRemaining || 0,
+          lastDonationDate: response.data.lastDonationDate,
+          loading: false
+        });
+      } catch (error) {
+        console.error('Error fetching eligibility:', error);
+        // On error, default to eligible (don't block user)
+        setEligibility({ eligible: true, daysRemaining: 0, lastDonationDate: null, loading: false });
+      }
+    };
+
+    fetchEligibility();
+  }, [user]);
 
   // Rehydrate booking state from storage (scoped to user + booking type)
   useEffect(() => {
@@ -292,9 +314,27 @@ export default function HospitalBloodBooking({ pageType }) {
       {/* Step 1: Hospitals list */} 
       {step === "hospitals" && ( 
         <>
-          {!isEligible && (
-            <div style={{ margin: "10px 0 14px", padding: "12px 14px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", color: "#991b1b" }}>
-              You’re not eligible to donate yet. Please wait <strong>{eligibility.daysRemaining}</strong> more day{eligibility.daysRemaining !== 1 ? "s" : ""} before booking.
+          {!eligibility.loading && !isEligible && (
+            <div style={{ 
+              margin: "10px 0 14px", 
+              padding: "16px 18px", 
+              borderRadius: 10, 
+              border: "2px solid #F12C31", 
+              background: "rgba(241, 44, 49, 0.1)", 
+              color: "#991b1b",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontWeight: 500
+            }}>
+              You’re not eligible to donate yet. Please wait <strong>{eligibility.daysRemaining}</strong> more day{eligibility.daysRemaining !== 1 ? "s" : ""}.
+                  {eligibility.lastDonationDate && (
+                    <span style={{ display: "block", marginTop: "4px", fontSize: "13px", opacity: 0.8 }}>
+                      Last donation: {new Date(eligibility.lastDonationDate).toLocaleDateString()}
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
           )}
         <Hospitals

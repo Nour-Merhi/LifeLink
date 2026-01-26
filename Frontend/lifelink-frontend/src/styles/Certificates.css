@@ -244,7 +244,7 @@
   margin-top: auto;
 }
 
-.btn-add-certificate-image, .submit-btn {
+.btn-add-certificate-image {
   display: inline-flex;
   align-items: center;
   padding: 8px 14px;

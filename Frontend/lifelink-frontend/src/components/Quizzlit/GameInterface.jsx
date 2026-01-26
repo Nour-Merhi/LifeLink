@@ -4,12 +4,15 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
 import QuizCards from "./InterfaceComponents/QuizCards";
 import QuizLevels from "./InterfaceComponents/QuizLevels";
+import MemoryGame from "./miniGames/MemoryGame";
 
 export default function GameInterface() {
     const location = useLocation();
     const { startLevel } = location.state || {};
     const { user } = useAuth();
     const [currentLevel, setCurrentLevel] = useState(startLevel || 1);
+    const [activeView, setActiveView] = useState("quiz"); // "quiz" | "minigame"
+    const [minigameLevel, setMinigameLevel] = useState(null); // 3, 5, 7, or 9 when minigame active
 
     // Update level if startLevel is provided from navigation
     useEffect(() => {
@@ -36,8 +39,22 @@ export default function GameInterface() {
         fetchProgress();
     }, [user, startLevel]);
 
+    const handleMinigameSelect = (level) => {
+        setMinigameLevel(level);
+        setActiveView("minigame");
+    };
+
+    const handleMinigameBack = () => {
+        setActiveView("quiz");
+        setMinigameLevel(null);
+    };
+
+    const handleMinigameWin = (xpEarned) => {
+        // XP is shown in MemoryGame win UI; backend called there if API exists
+    };
+
     return (
-        <div className=" quizzlit-section h-screen w-screen">
+        <div className="quizzlit-section h-screen w-screen">
             <div className="circle-container">
                 <div className="circle-red animate-soft-pulse"></div>
                 <div className="circle-purple animate-soft-pulse"></div>
@@ -46,8 +63,24 @@ export default function GameInterface() {
             </div>
 
             <div className="game-interface-container">
-                <QuizLevels currentLevel={currentLevel} onLevelChange={setCurrentLevel} />
-                <QuizCards currentLevel={currentLevel} />
+                <QuizLevels
+                    currentLevel={currentLevel}
+                    onLevelChange={setCurrentLevel}
+                    onMinigameSelect={handleMinigameSelect}
+                    activeView={activeView}
+                    minigameLevel={minigameLevel}
+                />
+                {activeView === "quiz" ? (
+                    <QuizCards currentLevel={currentLevel} />
+                ) : (
+                    <MemoryGame
+                        embedded
+                        currentLevel={currentLevel}
+                        minigameLevel={minigameLevel}
+                        onBack={handleMinigameBack}
+                        onWin={handleMinigameWin}
+                    />
+                )}
             </div>
         </div>
     );

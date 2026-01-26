@@ -1003,7 +1003,6 @@
     display: grid;
     grid-template-columns: 1fr 3fr;
     gap: 40px;
-    height: calc(100vh - 160px);
     max-height: calc(100vh - 160px);
     min-height: 0;
 }
@@ -1023,9 +1022,6 @@
 .quiz-question-container {
     width: 100%;
     padding-left: 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
     position: relative;
 }
 
@@ -1273,11 +1269,11 @@
     border-collapse: separate;
 }
 
-.leaderboard-row {
+.game-leaderboard-row {
     border-bottom: 2px solid #E0E0E0;
 }
 
-.leaderboard-row:last-child {
+.game-leaderboard-row:last-child {
     border-bottom: none;
 }
 
@@ -1913,16 +1909,49 @@
     position: relative;
     min-height: 0;
 }
-.level-path-container{
-    overflow-y: auto;    
+.level-path-container {
+    overflow-y: auto;
+    overflow-x: hidden;
     scroll-behavior: smooth;
     width: 100%;
     padding-top: 20px;
     padding-right: 40px;
     direction: rtl;
 }
+
 .level-path-container > * {
     direction: ltr; /* prevents content from flipping */
+}
+
+/* Inner wrapper: SVG + overlays scroll together */
+.level-path-inner {
+    display: inline-block;
+}
+
+.level-path-svg-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.level-path-svg {
+    width: 150px;
+    height: auto;
+    display: block;
+    vertical-align: top;
+}
+
+/* Overlay matches SVG size; level/minigame positions use viewBox % */
+.level-path-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.level-path-overlay .minigame-box {
+    pointer-events: auto;
 }
 
 /* Custom scrollbar for quiz levels container */

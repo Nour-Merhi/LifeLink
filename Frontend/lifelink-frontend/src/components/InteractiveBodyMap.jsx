@@ -100,25 +100,18 @@ export default function InteractiveBodyMap() {
     );
   }, [activeId]);
 
-  // Scale-only hover: no style mutations needed, keep ref for future extensibility
-  // (leaving this in place avoids churn if we re-introduce styling later)
-  // const originalStylesRef = useRef(new Map());
   const hoveredGroupRef = useRef(null);
 
   const applyHighlight = (gEl) => {
     if (!gEl) return;
 
-    // Ensure group is clickable as one unit
     gEl.style.cursor = "pointer";
     gEl.style.transformBox = "fill-box";
     gEl.style.transformOrigin = "center";
-
-    // Scale-only hover effect (no color/glow highlight)
   };
 
   const clearHighlight = (gEl) => {
     if (!gEl) return;
-    // Nothing to clear (we only scale on hover)
   };
 
   useEffect(() => {
@@ -127,15 +120,12 @@ export default function InteractiveBodyMap() {
     const svg = root.querySelector("svg");
     if (!svg) return;
 
-    // Keep the body shorter: fit SVG into the wrapper height.
     svg.style.height = "100%";
     svg.style.width = "auto";
     svg.style.maxWidth = "100%";
     svg.style.maxHeight = "100%";
     svg.style.display = "block";
 
-    // Event delegation: many SVGs contain nested <g id="group_123"> etc.
-    // We always resolve to the nearest ancestor whose id is one of our real organ ids.
     const onPointerOver = (e) => {
       const organG = findOrganGroupFromTarget(e.target);
       if (!organG) return;
@@ -158,7 +148,7 @@ export default function InteractiveBodyMap() {
       if (!fromOrgan) return;
 
       const toOrgan = e.relatedTarget ? findOrganGroupFromTarget(e.relatedTarget) : null;
-      if (toOrgan === fromOrgan) return; // still inside the same organ group
+      if (toOrgan === fromOrgan) return; 
 
       if (hoveredGroupRef.current === fromOrgan) hoveredGroupRef.current = null;
       const id = fromOrgan.getAttribute("id");

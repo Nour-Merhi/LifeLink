@@ -14,7 +14,7 @@ export default function Leaderboard({ leaderboardData }) {
                 </thead>
                 <tbody>
                     {leaderboardData.map((player) => (
-                        <tr key={player.rank} className="leaderboard-row">
+                        <tr key={player.rank} className="game-leaderboard-row">
                             <td className="leaderboard-rank">
                                 {player.rank}
                                 {player.rank === 1 && "st"}

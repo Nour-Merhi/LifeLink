@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { IoClose, IoSend } from "react-icons/io5";
+import aiIcon from "../assets/imgs/aiIcon.svg";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import "../styles/Chatbot.css";
@@ -83,11 +84,17 @@ export default function Chatbot() {
   };
 
   return (
-    <div className="chatbot-page rewards-store">
+    <div className="chatbot-page quizzlit-section">
+      <div className="circle-container">
+          <div className="circle-red animate-soft-pulse"></div>
+          <div className="circle-purple animate-soft-pulse"></div>
+          <div className="circle-red circle-bottom-right animate-soft-pulse"></div>
+          <div className="circle-purple circle-bottom-right animate-soft-pulse"></div>
+      </div>
       <div className="chatbot-container">
         <header className="chatbot-header">
           <div className="chatbot-header-left">
-            <span className="chatbot-avatar">AI</span>
+            <img src={aiIcon} alt="Ai Icon" width="35px" height="35px" />
             <div>
               <h1 className="chatbot-title">LifeLink Assistant</h1>
             </div>
@@ -106,8 +113,8 @@ export default function Chatbot() {
           <div className="chatbot-messages">
             {messages.length === 0 && (
               <div className="chatbot-welcome">
-                <p>Hi! I&apos;m the LifeLink assistant.</p>
-                <p>Ask me about blood donation, organ donation, rewards, or how to use the platform.</p>
+                <p className="!text-[14px] !m-0">Hi! I&apos;m the LifeLink assistant.</p>
+                <p className="!text-[14px]">Ask me about blood donation, organ donation, rewards, or how to use the platform.</p>
               </div>
             )}
             {messages.map((msg, i) => (

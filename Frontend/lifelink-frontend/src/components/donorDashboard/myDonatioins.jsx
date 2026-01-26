@@ -282,11 +282,10 @@ export default function MyDonations(){
                 </div>
             </div>
 
-            <div className="table-design">
+            <div className="table-design overflow-x-auto">
                 <table className="h1-table">
                     <thead>
                         <tr>
-                            <th className="col-select"></th>
                             <th className="text-left col-donation-type">Donation Type</th>
                             <th className="text-left col-hospital">Hospital Name</th>
                             <th className="col-date">Date</th>
@@ -298,15 +297,6 @@ export default function MyDonations(){
                     <tbody>
                         {sortedDonations.length > 0 ? sortedDonations.map((donation, index) => (
                             <tr key={donation.id}>
-                                <td className="col-select">
-                                    
-                                        <input 
-                                            className="ml-3" 
-                                            type="checkbox" 
-                                            aria-label={`select donation ${donation.id}`}
-                                        />
-                                    
-                                </td>
                                 <td className="col-donation-type text-left">{donation.donationType}</td>
                                 <td className="col-hospital text-left">{donation.hospitalName}</td>
                                 <td className="col-date">{donation.date}</td>

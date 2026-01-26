@@ -43,9 +43,7 @@ export default function Settings(){
     const settingsMenuItems = [
         { id: "profile", label: "Profile Setting", icon: IoPerson },
         { id: "medical", label: "Medical Information", icon: FaHeartbeat },
-        { id: "notification", label: "Notification Settings", icon: MdNotificationsActive },
         { id: "password", label: "Password", icon: IoLockClosed },
-        { id: "communication", label: "Communication", icon: IoChatbubbleOutline }
     ];
 
     // Callback to refresh settings data after updates

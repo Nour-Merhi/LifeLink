@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { IoArrowBack } from "react-icons/io5";
 import { MdOutlineNotificationsActive } from "react-icons/md";
@@ -6,11 +6,14 @@ import { FaPhone } from "react-icons/fa";
 import { IoChatbubbleEllipses } from "react-icons/io5";
 import { MdEmail } from "react-icons/md";
 import { IoChevronDown } from "react-icons/io5";
+import { useAuth } from "../context/AuthContext";
+import api from "../api/axios";
 import profile from "../assets/imgs/profile.svg";
 import "../styles/Dashboard.css";
 
 export default function Support() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [activeFAQTab, setActiveFAQTab] = useState("All");
     const [openFAQ, setOpenFAQ] = useState(null);
     const [formData, setFormData] = useState({
@@ -19,6 +22,12 @@ export default function Support() {
         message: ""
     });
     const [charCount, setCharCount] = useState(0);
+    const [faqs, setFaqs] = useState([]);
+    const [faqCategories, setFaqCategories] = useState(["All"]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
+    const [submitSuccess, setSubmitSuccess] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -29,26 +38,73 @@ export default function Support() {
         }
     };
 
-    const handleSubmit = (e) => {
+    // Fetch FAQs from API
+    useEffect(() => {
+        const fetchFAQs = async () => {
+            try {
+                setLoading(true);
+                const response = await api.get('/api/faqs');
+                const fetchedFaqs = response.data.faqs || [];
+                const categories = response.data.categories || [];
+                
+                setFaqs(fetchedFaqs);
+                setFaqCategories(["All", ...categories]);
+            } catch (error) {
+                console.error('Error fetching FAQs:', error);
+                setFaqs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchFAQs();
+    }, []);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Support form data:', formData);
-        // Add submit functionality here
+        setSubmitError("");
+        setSubmitSuccess(false);
+
+        if (!formData.subject.trim() || !formData.category.trim() || !formData.message.trim()) {
+            setSubmitError("Please fill in all fields");
+            return;
+        }
+
+        if (formData.message.length > 500) {
+            setSubmitError("Message cannot exceed 500 characters");
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+            await api.get("/sanctum/csrf-cookie");
+            const response = await api.post('/api/support/tickets', {
+                subject: formData.subject,
+                category: formData.category,
+                message: formData.message
+            });
+
+            setSubmitSuccess(true);
+            setFormData({ subject: "", category: "", message: "" });
+            setCharCount(0);
+            
+            // Clear success message after 5 seconds
+            setTimeout(() => setSubmitSuccess(false), 5000);
+        } catch (error) {
+            console.error('Error submitting support ticket:', error);
+            setSubmitError(
+                error.response?.data?.message || 
+                error.response?.data?.errors?.message?.[0] ||
+                "Failed to submit support ticket. Please try again."
+            );
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const toggleFAQ = (id) => {
         setOpenFAQ(openFAQ === id ? null : id);
     };
-
-    const faqCategories = ["All", "Blood Donation", "Organ Donation", "Appointments", "Account", "Privacy"];
-    
-    const faqs = [
-        { id: 1, question: "How often do i donate blood?", answer: "You can donate blood every 8 weeks (56 days).", category: "Blood Donation" },
-        { id: 2, question: "How often do i donate blood?", answer: "You can donate blood every 8 weeks (56 days).", category: "Blood Donation" },
-        { id: 3, question: "How often do i donate blood?", answer: "You can donate blood every 8 weeks (56 days).", category: "Blood Donation" },
-        { id: 4, question: "How often do i donate blood?", answer: "You can donate blood every 8 weeks (56 days).", category: "Blood Donation" },
-        { id: 5, question: "How often do i donate blood?", answer: "You can donate blood every 8 weeks (56 days).", category: "Blood Donation" },
-        { id: 6, question: "How often do i donate blood?", answer: "You can donate blood every 8 weeks (56 days).", category: "Blood Donation" }
-    ];
 
     const filteredFAQs = activeFAQTab === "All" 
         ? faqs 
@@ -64,11 +120,11 @@ export default function Support() {
                     </button>
                 <div className="support-nav-info">
                     <MdOutlineNotificationsActive className="support-notification-icon"/>
-                    <div className="support-user-info">
+                        <div className="support-user-info">
                         <img src={profile} alt="profile" style={{ width: '40px', height: '40px' }} />
                         <div className="support-user-details">
-                            <h3>Nour Merhi</h3>
-                            <small>Blood Type O+</small>
+                            <h3>{user?.name || user?.username || "Guest"}</h3>
+                            <small>{user?.donor?.blood_type ? `Blood Type ${user.donor.blood_type}` : "Not a donor"}</small>
                         </div>
                     </div>
                 </div>
@@ -105,7 +161,13 @@ export default function Support() {
                                 <p className="support-card-description">Chat with our AI assistant</p>
                             </div>
                             <div>
-                                <button className="support-chat-button" style={{ background: '#2196F3', color: 'white' }}>Start Chat</button>
+                                <button 
+                                    className="support-chat-button" 
+                                    style={{ background: '#2196F3', color: 'white' }}
+                                    onClick={() => navigate('/chatbot')}
+                                >
+                                    Start Chat
+                                </button>
                                 <p className="support-card-hours">Available 24/7</p>
                             </div>
                         </div>
@@ -145,24 +207,34 @@ export default function Support() {
 
                         {/* FAQ List */}
                         <div className="support-faq-list">
-                            {filteredFAQs.map((faq) => (
-                                <div key={faq.id} className="support-faq-item">
-                                    <button
-                                        className="support-faq-question"
-                                        onClick={() => toggleFAQ(faq.id)}
-                                    >
-                                        <span>{faq.question}</span>
-                                        <IoChevronDown 
-                                            className={`support-faq-chevron ${openFAQ === faq.id ? 'open' : ''}`}
-                                        />
-                                    </button>
-                                    {openFAQ === faq.id && (
-                                        <div className="support-faq-answer">
-                                            {faq.answer}
-                                        </div>
-                                    )}
+                            {loading ? (
+                                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                    Loading FAQs...
                                 </div>
-                            ))}
+                            ) : filteredFAQs.length === 0 ? (
+                                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                    No FAQs found{activeFAQTab !== "All" ? ` in ${activeFAQTab}` : ""}.
+                                </div>
+                            ) : (
+                                filteredFAQs.map((faq) => (
+                                    <div key={faq.id} className="support-faq-item">
+                                        <button
+                                            className="support-faq-question"
+                                            onClick={() => toggleFAQ(faq.id)}
+                                        >
+                                            <span>{faq.question}</span>
+                                            <IoChevronDown 
+                                                className={`support-faq-chevron ${openFAQ === faq.id ? 'open' : ''}`}
+                                            />
+                                        </button>
+                                        {openFAQ === faq.id && (
+                                            <div className="support-faq-answer">
+                                                {faq.answer}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
 
@@ -188,14 +260,23 @@ export default function Support() {
 
                             <div className="support-form-group">
                                 <label htmlFor="category">Category</label>
-                                <input
-                                    type="text"
+                                <select
                                     id="category"
                                     name="category"
                                     value={formData.category}
                                     onChange={handleChange}
-                                    placeholder="Enter category"
-                                />
+                                    required
+                                >
+                                    <option value="">Select a category</option>
+                                    <option value="Blood Donation">Blood Donation</option>
+                                    <option value="Organ Donation">Organ Donation</option>
+                                    <option value="Appointments">Appointments</option>
+                                    <option value="Account">Account</option>
+                                    <option value="Privacy">Privacy</option>
+                                    <option value="Rewards">Rewards</option>
+                                    <option value="Technical">Technical</option>
+                                    <option value="Other">Other</option>
+                                </select>
                             </div>
 
                             <div className="support-form-group">
@@ -212,8 +293,36 @@ export default function Support() {
                                 <p className="char-count">Max 500 characters ({charCount}/500)</p>
                             </div>
 
-                            <button type="submit" className="support-submit-button">
-                                Send Message
+                            {submitError && (
+                                <div className="support-error-message" style={{ 
+                                    color: '#F12C31', 
+                                    marginBottom: '12px',
+                                    padding: '8px 12px',
+                                    background: 'rgba(241, 44, 49, 0.1)',
+                                    borderRadius: '6px'
+                                }}>
+                                    {submitError}
+                                </div>
+                            )}
+
+                            {submitSuccess && (
+                                <div className="support-success-message" style={{ 
+                                    color: '#4CAF50', 
+                                    marginBottom: '12px',
+                                    padding: '8px 12px',
+                                    background: 'rgba(76, 175, 80, 0.1)',
+                                    borderRadius: '6px'
+                                }}>
+                                    Support ticket submitted successfully! We'll get back to you soon.
+                                </div>
+                            )}
+
+                            <button 
+                                type="submit" 
+                                className="support-submit-button"
+                                disabled={submitting}
+                            >
+                                {submitting ? "Sending..." : "Send Message"}
                             </button>
                         </form>
                     </div>

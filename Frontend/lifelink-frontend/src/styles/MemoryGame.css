@@ -1,0 +1,244 @@
+/* Standalone / section layout */
+.memory-game-section .memory-game-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.memory-game-inner {
+    height: 100%;
+}
+
+.memory-game-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 40px;
+}
+
+.memory-game-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.memory-game-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.memory-game-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+}
+
+.memory-game-turns {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.95rem;
+}
+
+.memory-game-back-button,
+.memory-game-new-button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: none;
+    background: #6132BE;
+    color: #fff;
+    transition: background 0.2s;
+}
+
+.memory-game-back-button:hover,
+.memory-game-new-button:hover {
+    background: #7C4BDB;
+}
+
+.memory-game-back-button {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+.memory-game-back-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Win overlay */
+.memory-game-win-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 280px;
+}
+
+.memory-game-win-card {
+    background: rgba(97, 50, 190, 0.25);
+    border: 2px solid #B58CFF;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 0 24px rgba(97, 50, 190, 0.4);
+}
+
+.memory-game-win-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 12px;
+}
+
+.memory-game-win-xp {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #B58CFF;
+    margin: 0 0 8px;
+}
+
+.memory-game-win-turns {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+    margin: 0 0 20px;
+}
+
+.memory-game-win-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.memory-game-win-play-again,
+.memory-game-win-back {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: none;
+    background: #6132BE;
+    color: #fff;
+    transition: background 0.2s;
+}
+
+.memory-game-win-play-again:hover,
+.memory-game-win-back:hover {
+    background: #7C4BDB;
+}
+
+.memory-game-win-back {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.memory-game-win-back:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Embedded in Quizzlit game container */
+.quiz-question-container.memory-game-embedded {
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.memory-game-embedded .memory-game-inner {
+    width: 100%;
+    max-width: 640px;
+}
+
+.memory-game-embedded .memory-game-header {
+    width: 100%;
+}
+
+.memory-game-embedded .memory-game-content-grid {
+    margin-top: 16px;
+}
+
+.memory-game-embedded .memory-game-win-overlay {
+    width: 100%;
+}
+
+.memory-game-content-grid {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    width: 85%;
+    max-width: 600px;
+    height: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    align-self: center;
+}
+
+.memory-card {
+    perspective: 1000px;
+}
+
+.memory-card > div {
+    position: relative;
+    width: 150px;
+    height: 150px;
+}
+
+.back{
+    background-color: rgb(97, 50, 190);
+    border-radius: 8px;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+    border: 2px solid #ffffff;
+    width: 150px;
+    height: 150px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    backface-visibility: hidden;
+}
+.front {
+    width: 150px;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    background: #ffffff;
+    position: absolute;
+    top: 0;
+    left: 0;
+    backface-visibility: hidden;
+}
+
+.front img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+}
+
+.memory-card .front{
+    transform: rotateY(90deg);
+    transition: transform 0.2s ease-in;
+}
+.flipped .front{
+    transform: rotateY(0deg);
+    transition-delay: 0.2s;
+}
+
+.memory-card .back{
+    transform: rotateY(0deg);
+    transition: transform 0.2s ease-in;
+    transition-delay: 0.2s;
+}
+.flipped .back{
+    transform: rotateY(90deg);
+    transition-delay: 0s;
+}

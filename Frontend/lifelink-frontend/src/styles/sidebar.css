@@ -21,6 +21,15 @@
   flex-direction: column;
 }
 
+.overflow-sidebar{
+  max-height: 520px;
+  overflow-y: auto;
+}
+.overflow-sidebar::-webkit-scrollbar{
+  display: none;
+}
+
+
 #sidebar-donation, #sidebar-donor{
   background-color: white;
 }
