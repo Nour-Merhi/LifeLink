@@ -18,19 +18,46 @@ class AuthenticatedSessionController extends Controller
                 'password' => 'required'
             ]);
 
-            if (!Auth::attempt($creds)) {
+            $attemptResult = Auth::guard('web')->attempt($creds);
+            
+            if (!$attemptResult) {
+                \Log::warning('Login attempt failed:', [
+                    'email' => $creds['email'],
+                    'has_session' => $request->hasSession()
+                ]);
                 return response()->json([
                     'message' => 'Invalid credentials',
                     'errors' => ['email' => ['The provided credentials are incorrect.']]
                 ], 401);
             }
-
-            // Regenerate session to prevent session fixation attacks (only if session exists)
-            if ($request->hasSession()) {
-                $request->session()->regenerate();
+            
+            $user = Auth::guard('web')->user();
+            
+            if (!$user) {
+                \Log::error('Login succeeded but user is null');
+                return response()->json([
+                    'message' => 'Authentication failed',
+                    'error' => 'User not found after authentication'
+                ], 500);
             }
             
-            $user = Auth::user();
+            try {
+                if ($request->hasSession()) {
+                    $request->session()->regenerate();
+                }
+            } catch (\Exception $e) {
+                // Log but don't fail login if session regeneration fails
+                \Log::warning('Session regeneration failed during login:', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+            
+            \Log::info('Login successful:', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'role' => $user->role
+            ]);
             
             // Load relationships based on role
             $role = strtolower($user->role ?? '');
@@ -85,15 +112,25 @@ class AuthenticatedSessionController extends Controller
 
     public function logout(Request $request)
     {
+        // Support BOTH auth styles:
+        // - Cookie/session auth (SPA on same-site domains)
+        // - Sanctum personal access tokens (Bearer <token>) for cross-site clients (e.g. Vercel -> Railway)
+
+        // If this request is authenticated via a Sanctum token, revoke ONLY that token.
+        $user = $request->user();
+        if ($user && method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+            $user->currentAccessToken()->delete();
+        }
+
+        // Also logout session guard when session exists (cookie-based auth).
         Auth::guard('web')->logout();
-        
-        // Only invalidate session if it exists
+
         if ($request->hasSession()) {
             $request->session()->invalidate();
             $request->session()->regenerateToken();
         }
-        
-        return response()->json(['message'=>'Logged out']);
+
+        return response()->json(['message' => 'Logged out']);
     }
     
 
