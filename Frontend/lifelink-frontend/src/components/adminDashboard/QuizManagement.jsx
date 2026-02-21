@@ -8,7 +8,7 @@ import "../../styles/Dashboard.css";
 
 export default function QuizManagement() {
   const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState("idle");
   const [error, setError] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [generateLevel, setGenerateLevel] = useState(1);
@@ -34,6 +34,16 @@ export default function QuizManagement() {
     fetchQuestions();
   }, []);
 
+  const whenLoading = async () => {
+    setLoading('loading');
+    await wait(3000);
+
+    setLoading('processing');
+    await wait(3000);
+
+    setLoading('finalizing');
+  }
+
   const handleGenerate = () => {
     setGenerating(true);
     setGenerateError("");
@@ -46,12 +56,17 @@ export default function QuizManagement() {
       )
       .then(() => {
         setGenerateError("");
+        whenLoading();
         fetchQuestions();
       })
       .catch((err) => {
         setGenerateError(err.response?.data?.message || "Failed to generate questions");
       })
-      .finally(() => setGenerating(false));
+      .finally(() => {
+        setGenerating(false)
+        setLoading("idle")
+      }
+      );
   };
 
   return (
@@ -90,7 +105,9 @@ export default function QuizManagement() {
               ) : (
                 <FiPlus />
               )}
-              {generating ? "Generating…" : "AI Generate Questions"}
+              {generating ? 
+              loading === 'loading' ? "Loading..." : loading === 'processing' ? "Processing..." :  "Finalizing..." 
+              : "AI Generate Questions"}
             </button>
           </div>
           {generateError && (

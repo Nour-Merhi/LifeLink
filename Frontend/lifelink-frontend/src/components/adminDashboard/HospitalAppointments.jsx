@@ -64,6 +64,8 @@ export default function HospitalAppointments(){
         fetchData();
     }, [])
 
+    const sortedHospitals = hospitals.sort((a,b) => a.name.localeCompare(b.name));
+
     // Calculate statistics from appointment data
     const calculateStatistics = () => {
         const today = new Date();
@@ -406,7 +408,7 @@ export default function HospitalAppointments(){
 
             {/* Add Hospital Appointment Modal */}
             {openModal && 
-                <AddHospitalApp onClose={onClose} hospitals={hospitals} onAppointmentAdded={fetchData} />
+                <AddHospitalApp onClose={onClose} hospitals={sortedHospitals} onAppointmentAdded={fetchData} />
             }
         </section>
     )

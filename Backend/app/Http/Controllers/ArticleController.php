@@ -20,7 +20,17 @@ class ArticleController extends Controller
                 ->with('author')
                 ->orderBy('published_at', 'desc')
                 ->orderBy('created_at', 'desc')
-                ->get();
+                ->get()
+                ->map(function ($article) {
+                    $arr = $article->toArray();
+                    // Return full URL for path-based images (works cross-origin from frontend)
+                    if (!empty($arr['image']) && !str_starts_with($arr['image'], 'data:') && !str_starts_with($arr['image'], 'http')) {
+                        $arr['image_url'] = asset(ltrim($arr['image'], '/'));
+                    } else {
+                        $arr['image_url'] = $arr['image'] ?? null;
+                    }
+                    return $arr;
+                });
 
             return response()->json([
                 'articles' => $articles,
@@ -142,9 +152,14 @@ class ArticleController extends Controller
                 })
                 ->with('author')
                 ->firstOrFail();
-            
+            $data = $article->toArray();
+            if (!empty($data['image']) && !str_starts_with($data['image'], 'data:') && !str_starts_with($data['image'], 'http')) {
+                $data['image_url'] = asset(ltrim($data['image'], '/'));
+            } else {
+                $data['image_url'] = $data['image'] ?? null;
+            }
             return response()->json([
-                'article' => $article
+                'article' => $data
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([

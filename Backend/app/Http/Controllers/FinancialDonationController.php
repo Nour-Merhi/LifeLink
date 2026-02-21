@@ -131,7 +131,7 @@ class FinancialDonationController extends Controller
                 $donor = Donor::where('user_id', $user->id)->first();
                 
                 // If user is not admin, filter by donor_id
-                if ($donor && $user->role !== 'admin') {
+                if ($donor && $user->role !== 'Admin') {
                     $query->where('donor_id', $donor->id);
                 }
             } else {
@@ -179,7 +179,7 @@ class FinancialDonationController extends Controller
                 $donor = Donor::where('user_id', $user->id)->first();
                 
                 // If user is not admin and not the owner, deny access
-                if ($user->role !== 'admin' && $donation->donor_id !== $donor?->id) {
+                if ($user->role !== 'Admin' && $donation->donor_id !== $donor?->id) {
                     return response()->json([
                         'message' => 'Unauthorized'
                     ], 403);
@@ -208,12 +208,9 @@ class FinancialDonationController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // Try to find by code first, then by id
-            $donation = FinancialDonation::where(function($query) use ($id) {
-                    $query->where('code', $id)
-                          ->orWhere('id', $id);
-                })
-                ->firstOrFail();
+            $donation = is_numeric($id)
+                ? FinancialDonation::findOrFail($id)
+                : FinancialDonation::where('code', $id)->firstOrFail();
 
             $validator = Validator::make($request->all(), [
                 'status' => 'nullable|in:pending,completed,failed',
@@ -287,12 +284,9 @@ class FinancialDonationController extends Controller
     public function destroy($id)
     {
         try {
-            // Try to find by code first, then by id
-            $donation = FinancialDonation::where(function($query) use ($id) {
-                    $query->where('code', $id)
-                          ->orWhere('id', $id);
-                })
-                ->firstOrFail();
+            $donation = is_numeric($id)
+                ? FinancialDonation::findOrFail($id)
+                : FinancialDonation::where('code', $id)->firstOrFail();
 
             $donation->delete();
 

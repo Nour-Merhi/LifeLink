@@ -4,6 +4,7 @@ import { IoArrowBack, IoCalendarOutline, IoTimeOutline } from "react-icons/io5";
 import { FiTag } from "react-icons/fi";
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
+import { getApiBaseUrl } from "../config/api";
 import { useArticles } from "../context/ArticlesContext";
 import "../styles/Articles.css";
 
@@ -62,7 +63,7 @@ export default function ArticleDetail() {
         return `${minutes} min read`;
     };
 
-    const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
+    const baseURL = api?.defaults?.baseURL || getApiBaseUrl();
     const resolveImageSrc = (image) => {
         if (!image) return "/image.png";
         const img = String(image);

@@ -7,25 +7,51 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        // Change the default value of status column from 'unverified' to 'verified'
-        DB::statement("ALTER TABLE `hospitals` MODIFY COLUMN `status` ENUM('verified', 'unverified') DEFAULT 'verified'");
-        
-        // Update existing records with null status or 'unverified' status to 'verified' (optional)
-        // Uncomment the line below if you want to update existing records
-        // DB::table('hospitals')->whereNull('status')->orWhere('status', 'unverified')->update(['status' => 'verified']);
+        // Make status column a string temporarily
+        Schema::table('hospitals', function (Blueprint $table) {
+            $table->string('status', 50)->default('verified')->change();
+        });
+
+        // Optional: update existing null/unverified values to verified
+        DB::table('hospitals')
+            ->whereNull('status')
+            ->orWhere('status', 'unverified')
+            ->update(['status' => 'verified']);
+
+        // Add PostgreSQL check constraint to simulate ENUM
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM pg_constraint 
+                        WHERE conname = 'hospitals_status_check'
+                    ) THEN
+                        ALTER TABLE hospitals
+                        ADD CONSTRAINT hospitals_status_check
+                        CHECK (status IN ('verified', 'unverified'));
+                    END IF;
+                END$$;
+            ");
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        // Revert back to 'unverified' as default
-        DB::statement("ALTER TABLE `hospitals` MODIFY COLUMN `status` ENUM('verified', 'unverified') DEFAULT 'unverified'");
+        // Make column string
+        Schema::table('hospitals', function (Blueprint $table) {
+            $table->string('status', 50)->default('unverified')->change();
+        });
+
+        // Drop PostgreSQL check constraint if exists
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                ALTER TABLE hospitals
+                DROP CONSTRAINT IF EXISTS hospitals_status_check
+            ");
+        }
     }
 };

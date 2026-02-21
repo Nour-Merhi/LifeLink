@@ -2,6 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { useRef, useState } from "react";
 import { FaArrowRight, FaRegistered, FaTint } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
+import api from "../api/axios";
+
 
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -53,6 +55,7 @@ export default function Home() {
     setIsChatbotOpen(true);
     navigate('/chatbot');
    }
+   console.log(import.meta.env.VITE_API_NAME);
 
   return (
     <>
@@ -136,10 +139,6 @@ export default function Home() {
               <button onClick={handleHumanBodyClick} className="bg-red-500 text-white px-5 py-2 rounded hover:bg-red-700 transition flex items-center gap-2">
                 Start
               </button>
-              <button className="text-gray-700 px-5 py-2 rounded transition flex items-center gap-2">
-                Learn More
-                <FaArrowRight />
-              </button>
             </div>
           </div>
 
@@ -162,7 +161,7 @@ export default function Home() {
           <h2 className="text-[34px] font-extrabold  mb-2">
             Top Blood Donors
           </h2>
-          <p className="max-w-3xl mx-auto text-gray-600 text-sm">
+          <p className="max-w-3xl mx-auto text-gray-600 text-sm blood-p">
             Honoring our lifesaving champions who make a difference through their generous donations
           </p>
         </div>

@@ -29,7 +29,7 @@ export default function EditTransactionModal({ onClose, onTransactionUpdated, tr
 
         setFetchLoading(true);
         try {
-            const response = await api.get(`/api/financial-donations/${transactionId}`);
+            const response = await api.get(`/api/admin/dashboard/financial/transactions/${transactionId}`);
             const transaction = response.data.donation || response.data;
             setTransactionData(transaction);
             setEditData({

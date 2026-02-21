@@ -42,7 +42,7 @@ export default function HospitalAppRequestsTable({ hospitalId, loading = false, 
         setLoadingAppointments(true);
         setAppointmentError("");
         
-        api.get(`/api/admin/dashboard/hospital-visit-appointments/hospital/${hospitalId}`)
+        api.get(`/api/hospital/dashboard/hospital-visit-appointments/${hospitalId}`)
             .then((res) => {
                 setHospitalData(res.data);
             })
@@ -92,7 +92,7 @@ export default function HospitalAppRequestsTable({ hospitalId, loading = false, 
         setEditSlotError("");
         try {
             await api.get("/sanctum/csrf-cookie");
-            await api.patch(`/api/admin/dashboard/appointments/${editSlotModal.appointmentId}/time-slots`, {
+            await api.patch(`/api/hospital/dashboard/appointments/${editSlotModal.appointmentId}/time-slots`, {
                 op: "update",
                 old_time: editSlotModal.rawTime,
                 new_time: editSlotTime,
@@ -125,7 +125,7 @@ export default function HospitalAppRequestsTable({ hospitalId, loading = false, 
         setRemoveSlotError("");
         try {
             await api.get("/sanctum/csrf-cookie");
-            await api.patch(`/api/admin/dashboard/appointments/${removeSlotConfirm.appointmentId}/time-slots`, {
+            await api.patch(`/api/hospital/dashboard/appointments/${removeSlotConfirm.appointmentId}/time-slots`, {
                 op: "remove",
                 old_time: removeSlotConfirm.rawTime,
             });
@@ -151,7 +151,7 @@ export default function HospitalAppRequestsTable({ hospitalId, loading = false, 
             await api.get("/sanctum/csrf-cookie");
             
             const deletePromises = deleteConfirm.appointmentIds.map(appointmentId => 
-                api.delete(`/api/admin/dashboard/appointments/${appointmentId}`)
+                api.delete(`/api/hospital/dashboard/appointments/${appointmentId}`)
             );
 
             const results = await Promise.allSettled(deletePromises);

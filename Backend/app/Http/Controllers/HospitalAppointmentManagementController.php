@@ -64,7 +64,7 @@ class HospitalAppointmentManagementController extends Controller
         $user = $request->user();
         $hospitalId = null;
         
-        if ($user && $user->role === 'manager' && $user->healthCenterManager) {
+        if ($user && $user->role === 'Manager' && $user->healthCenterManager) {
             $hospitalId = $user->healthCenterManager->hospital_id;
         }
         

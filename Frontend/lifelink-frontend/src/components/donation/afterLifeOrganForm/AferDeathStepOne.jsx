@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import ScrollToTop from "../../ScrollToTop";
 
-export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAfterDeathFormData }){
+export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAfterDeathFormData, disabled = false }){
     const navigate = useNavigate();
     const { user } = useAuth();
 
@@ -77,6 +77,7 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
 
      const handleSubmit = (e) => {
         e.preventDefault();
+        if (disabled) return;
         
         // Validate required fields
         if (!afterDeathFormData.first_name || !afterDeathFormData.last_name || 
@@ -241,7 +242,7 @@ export default function AfterDeathStepOne({ nextStep, afterDeathFormData, setAft
 
                     <div className="line"></div>
                     <div className="form-actions">
-                        <button type="submit" className="next-step-btn organ-btn linear-blue">Next Step</button>
+                        <button type="submit" className="next-step-btn organ-btn linear-blue" disabled={disabled}>Next Step</button>
                     </div>
                 </form>
             </div>

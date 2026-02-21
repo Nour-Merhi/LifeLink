@@ -21,7 +21,7 @@ export default function Inventory() {
     const [editStockRows, setEditStockRows] = useState([]); // [{ blood_type, quantity, expiry_date }]
 
     useEffect(() => {
-        const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+        const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
         if (user && hospitalId) {
             fetchInventory(hospitalId);
         }
@@ -88,7 +88,7 @@ export default function Inventory() {
         }));
     }, [inventory]);
 
-    const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
 
     const openEditStock = () => {
         setEditStockError("");

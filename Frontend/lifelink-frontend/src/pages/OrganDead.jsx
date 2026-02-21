@@ -3,6 +3,8 @@ import { GoHeartFill } from "react-icons/go";
 import { GiKidneys, GiLiver } from "react-icons/gi";
 import { FaEye } from "react-icons/fa";
 
+import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import ThankModalAfterDeath from "../components/donation/ThankModals/ThankModalAfterDeath";
 
 import Step1 from "../components/donation/afterLifeOrganForm/AferDeathStepOne";
@@ -11,6 +13,8 @@ import Step3 from "../components/donation/afterLifeOrganForm/AfterDeathStepThree
 
 export default function OrganDead() {
     const [thankMess, setThankMess] = useState(false);
+    const [eligibilityLoading, setEligibilityLoading] = useState(false);
+    const [hasAfterDeathRegistration, setHasAfterDeathRegistration] = useState(false);
 
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -161,16 +165,34 @@ export default function OrganDead() {
                         </div>
                     </div>
 
+                    {step === 1 && !eligibilityLoading && hasAfterDeathRegistration && (
+                        <div style={{ 
+                            margin: "10px 0 20px", 
+                            padding: "16px 18px", 
+                            borderRadius: 10, 
+                            border: "2px solid #ca8a04", 
+                            background: "rgba(234, 179, 8, 0.15)", 
+                            color: "#854d0e",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontWeight: 500
+                        }}>
+                            You are already registered for after-death organ donation.
+                        </div>
+                    )}
+
                     {/* Step 1 Form */}
                     <Step1
                         nextStep={nextStep}
                         afterDeathFormData={formData}
                         setAfterDeathFormData={setFormData}
+                        disabled={hasAfterDeathRegistration}
                     />
 
                     <div className="faq-section">
-                        <h2 className="text-center mb-4">Frequently Asked Questions</h2>
-                        <div className="faq-item">
+                    <h2 className="text-center mb-4">Frequently Asked Questions</h2>
+                    <div className="faq-item">
                             <div className="faq-question">
                                 <h3>Can I change my mind after pledging?</h3>
                                 <p>Absolutely. You can update or withdraw your organ donation pledge at any time by re-registering or contacting us.</p>
@@ -195,7 +217,7 @@ export default function OrganDead() {
                                 <h3>Can I specify which organs to donate?</h3>
                                 <p>Yes. You can choose to donate specific organs or tissues according to your preferences.</p>
                             </div>
-                        </div>
+                    </div>
                     </div>
 
                     <div className="data-privacy">

@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\BloodType;
 use App\Models\HomeAppointment;
 use App\Models\HospitalAppointment;
+use App\Models\LivingDonor;
+use App\Models\AfterDeathPledge;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -109,7 +111,7 @@ class DonorController extends Controller
                 'email'=> $validated['email'],
                 'phone_nb'=> $validated['phone_nb'],
                 'city'=> $validated['city'] ?? null,
-                'role'=> 'donor',
+                'role'=> 'Donor',
                 'password'=> Hash::make($validated['password']),
             ]);
 
@@ -403,6 +405,34 @@ class DonorController extends Controller
     }
 
     /**
+     * Get donation registration status for a user (active blood appointment, live organ, after-death).
+     */
+    private function getDonationStatusFlags($user)
+    {
+        if (!$user) {
+            return ['hasActiveBloodAppointment' => false, 'hasLiveOrganRegistration' => false, 'hasAfterDeathRegistration' => false];
+        }
+        $userEmail = $user->email ?? null;
+        $donor = Donor::where('user_id', $user->id)->first();
+
+        $hasActiveBloodAppointment = false;
+        if ($donor) {
+            $activeStates = ['pending', 'confirmed'];
+            $hasActiveBloodAppointment = HomeAppointment::where('donor_id', $donor->id)->whereIn('state', $activeStates)->exists()
+                || HospitalAppointment::where('donor_id', $donor->id)->whereIn('state', $activeStates)->exists();
+        }
+
+        $hasLiveOrganRegistration = $userEmail && LivingDonor::where('email', $userEmail)->exists();
+        $hasAfterDeathRegistration = $userEmail && AfterDeathPledge::where('email', $userEmail)->exists();
+
+        return [
+            'hasActiveBloodAppointment' => $hasActiveBloodAppointment,
+            'hasLiveOrganRegistration' => $hasLiveOrganRegistration,
+            'hasAfterDeathRegistration' => $hasAfterDeathRegistration,
+        ];
+    }
+
+    /**
      * Check donor eligibility for blood donation (56-day rule)
      * Returns days remaining until eligible, or 0 if eligible
      */
@@ -410,25 +440,28 @@ class DonorController extends Controller
     {
         try {
             $user = Auth::user();
-            
+            $statusFlags = $this->getDonationStatusFlags($user);
+
             if (!$user) {
                 return response()->json([
                     'eligible' => true,
                     'daysRemaining' => 0,
                     'lastDonationDate' => null,
-                    'message' => 'Guest users are eligible (eligibility will be checked on submission)'
+                    'message' => 'Guest users are eligible (eligibility will be checked on submission)',
+                    ...$statusFlags
                 ], 200);
             }
 
             $donor = Donor::where('user_id', $user->id)->first();
-            
+
             if (!$donor) {
                 // No donor record means they've never donated
                 return response()->json([
                     'eligible' => true,
                     'daysRemaining' => 0,
                     'lastDonationDate' => null,
-                    'message' => 'Eligible to donate'
+                    'message' => 'Eligible to donate',
+                    ...$statusFlags
                 ], 200);
             }
 
@@ -484,7 +517,8 @@ class DonorController extends Controller
                     'eligible' => true,
                     'daysRemaining' => 0,
                     'lastDonationDate' => null,
-                    'message' => 'Eligible to donate'
+                    'message' => 'Eligible to donate',
+                    ...$statusFlags
                 ], 200);
             }
 
@@ -517,6 +551,9 @@ class DonorController extends Controller
                 'daysRemaining' => 0,
                 'lastDonationDate' => null,
                 'message' => 'Eligible to donate',
+                'hasActiveBloodAppointment' => false,
+                'hasLiveOrganRegistration' => false,
+                'hasAfterDeathRegistration' => false,
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 200);
         }

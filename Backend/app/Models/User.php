@@ -19,7 +19,6 @@ use App\Models\ChatSession;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
@@ -38,9 +37,8 @@ class User extends Authenticatable
     protected static function booted()
     {
         static::creating(function ($user) {
-            // Only generate if not already set
             if (!$user->code) {
-                $user->code = 'US-' . strtoupper(Str::random(8)); // MN-ABCDEFGH
+                $user->code = 'US-' . strtoupper(Str::random(8)); 
             }
         });
     }

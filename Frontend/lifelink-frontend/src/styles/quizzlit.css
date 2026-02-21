@@ -532,8 +532,8 @@
     }
 
     .about-cards-container {
-        grid-template-columns: 1fr;
-        gap: 30px;
+        flex-direction: column;
+        gap: 46px;
     }
 }
 
@@ -2088,5 +2088,109 @@
     .level-path-container {
         width: 80%;
     }
+}
+
+@media(max-width: 480px){
+    .quiz-hero-text{
+        margin-left: 0px;
+        margin-top: 0;
+        align-items: center;
+    }
+    .about-section{
+        padding-top: 0px;
+        margin-top: -50px;
+    }
+    .quiz-steps-section{
+        padding: 0;
+        margin: 10px 25px;
+    }
+    .quiz-steps-header{
+        flex-direction: column;
+        gap: 10px;
+    }
+    canvas{
+        transform: rotate(10deg);
+        width: 100px !important;
+    }
+    .quiz-steps-container{
+        gap: 50px;
+        padding: 0 20px;
+    }
+    .quiz-steps-wave{
+        display: none;
+    }
+    .quiz-steps-title{
+        font-size: 30px;
+    }
+    .quiz-steps-subtitle-main{
+        font-size: 20px;
+    }
+    .quiz-step-card{
+        padding: 80px 10px 10px;
+    }
+    .quiz-step-content{
+        padding: 10px 10px 30px;
+    }
+    .quiz-step-icon-container{
+        width: 60px;
+        height: 60px;
+    }
+    .quiz-step-icon{
+        width: 80px !important;
+        height: 80px !important;
+    }
+    .\!mt-\[-90px\]{
+        margin-top: -50px !important;
+    }
+    .quiz-step-content img{
+        margin-top: -50px !important;
+    }
+    .quiz-step-number{
+        margin-top: -30px !important; 
+    }
+    .quiz-step-card-title{
+        font-size: 20px;
+    }
+    .quiz-step-card-description{
+        font-size: 14px;
+    }
+    .quiz-step-card-01, 
+    .quiz-step-card-03{
+        margin-left: 0;
+        transform: rotate(5deg);
+    }
+    .quiz-step-card-02{
+        margin-right: 0;
+        transform: rotate(-5deg);
+    }
+   .quiz-ready-page{
+    padding: 30px 45px;
+   }
+   .quiz-ready-rules{
+    gap: 60px;
+    margin-top: 70px;
+   }
+   .game-interface-container{
+    max-height: 100%;
+    padding: 30px 20px;
+   }
+   .quiz-levels-container{
+    padding-left: 40px;
+   }
+   .level-path-container{
+    padding-right:17px;
+    padding-top: 28px;
+   }
+   .quiz-timer{
+    right: 20px;
+    top: -25px;
+   }
+   .quiz-question-header{
+    margin-bottom: 40px;
+   }
+   .quiz-action-buttons{
+    margin-top: 40px;
+    gap: 10px;
+   }
 }
 

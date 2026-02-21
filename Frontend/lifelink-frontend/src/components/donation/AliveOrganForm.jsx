@@ -27,7 +27,31 @@ export default function AliveOragnForm(){
     });
     const [idPicture, setIdPicture] = useState(null);
     const [idPicturePreview, setIdPicturePreview] = useState(null);
-    
+    const [hasLiveOrganRegistration, setHasLiveOrganRegistration] = useState(false);
+    const [eligibilityLoading, setEligibilityLoading] = useState(true);
+
+    // Fetch donation status (live organ registration) when user is logged in
+    useEffect(() => {
+        if (!user) {
+            setHasLiveOrganRegistration(false);
+            setEligibilityLoading(false);
+            return;
+        }
+        const fetchEligibility = async () => {
+            try {
+                setEligibilityLoading(true);
+                const response = await api.get('/api/donor/eligibility');
+                setHasLiveOrganRegistration(response.data.hasLiveOrganRegistration || false);
+            } catch (err) {
+                console.error('Error fetching eligibility:', err);
+                setHasLiveOrganRegistration(false);
+            } finally {
+                setEligibilityLoading(false);
+            }
+        };
+        fetchEligibility();
+    }, [user]);
+
     // Initialize form data with user data if available
     const getInitialFormData = () => {
         if (!user) {
@@ -406,10 +430,27 @@ export default function AliveOragnForm(){
             <div id="live-donor" className="title linear-blue">
                 <h2 className="text-center">Live Organ Donation Registration</h2>
             </div>
+
+            {!eligibilityLoading && hasLiveOrganRegistration && (
+                <div style={{ 
+                    margin: "10px 0 20px", 
+                    padding: "16px 18px", 
+                    borderRadius: 10, 
+                    border: "2px solid #ca8a04", 
+                    background: "rgba(234, 179, 8, 0.15)", 
+                    color: "#854d0e",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    fontWeight: 500
+                }}>
+                    You cannot register another. You have already registered for live organ donation.
+                </div>
+            )}
             
             <div  className="form-box-container">
 
-                    <div className="form">
+                    <div className="form" style={hasLiveOrganRegistration ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
                         <form action="#" className="form-info" onSubmit= { handleSubmit } >
                             <div className="personal-info">
                                 <div className="info-title">
@@ -942,7 +983,7 @@ export default function AliveOragnForm(){
                                 <button 
                                     type="submit" 
                                     className="next-step-btn organ-btn linear-blue position-middle"
-                                    disabled = {isDisqualified || loading}
+                                    disabled = {isDisqualified || loading || hasLiveOrganRegistration}
                                 > 
                                     {loading ? "Submitting..." : (
                                         <>

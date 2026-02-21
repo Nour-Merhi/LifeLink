@@ -23,6 +23,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {  useState } from "react";
 import api from "../../api/axios";
 import { useSystemSettings } from "../../context/SystemSettingsContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {} } = {}){
     const navigate = useNavigate();
@@ -30,29 +31,21 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
     const [openApp, setOpenApp] = useState(false);
     
     const { systemLogo, platformName } = useSystemSettings();
+    const { logout } = useAuth();
 
     const toggleManageUsers = () => {
         setOpenManageUsers((prev) => !prev);
-        closeSidebar();
     };
 
     const toggleAppointments = () => {
         setOpenApp((prev) => !prev);
-        closeSidebar();
     }
-
+    
     const handleLogout = async () => {
-        try {
-          await api.post("/api/logout");
-          // Trigger auth change to update context
-          window.dispatchEvent(new Event('auth-change'));
-          navigate("/home");
-        } catch (error) {
-          console.error('Logout error:', error);
-          // Trigger auth change anyway
-          window.dispatchEvent(new Event('auth-change'));
-          navigate("/home");
+        if (logout) {
+          await logout();
         }
+        navigate("/home", { replace: true });
       };
 
     const closeSidebar = () => {
@@ -83,7 +76,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                                 () => {
                                     setOpenApp(false);
                                     toggleManageUsers();
-                                    closeSidebar(); 
+                                    
                             }}    
                             style={{ cursor: 'pointer', userSelect: 'none', flex: 1, display: 'flex', alignItems: 'center', gap: 'p5x' }}
                         >
@@ -120,7 +113,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                                 ()=> {
                                     setOpenManageUsers(false);
                                     toggleAppointments();
-                                    closeSidebar();
+                                
                                 }}
                             style={{ cursor: 'pointer', userSelect: 'none', flex: 1, display: 'flex', alignItems: 'center', gap: '5px' }}
                         >
@@ -134,19 +127,19 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                           
                         }}>
                             <div className="link-item" onClick={() => {
-                                closeSidebar
+                                closeSidebar();
                             }}>
                                 <MdAddHomeWork className="icon-size text-white"/>
                                 <NavLink to="/admin/home-visits">Home Visits</NavLink>
                             </div>
                             <div className="link-item" onClick={() => {
-                                closeSidebar
+                                closeSidebar();
                             }}>
                                 <MdLocalHospital className="icon-size text-white"/>
                                 <NavLink to="/admin/hospital-appointments">Hospital Appointments</NavLink>
                             </div>
                             <div className="link-item" onClick={() => {
-                                closeSidebar
+                                closeSidebar();
                             }}>
                                 <BiSolidShieldPlus className="icon-size text-white"/>
                                 <NavLink to="/admin/organ-pledges">Organ Coordination</NavLink>
@@ -159,7 +152,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                 <div className="link-item" onClick={() => {
                     setOpenManageUsers(false);
                     setOpenApp(false);
-                    closeSidebar
+                    closeSidebar();
                 }}>
                     <BiSolidBadgeDollar className="icon-size text-white"/>
                     <NavLink to="/admin/financials">Financials</NavLink>
@@ -167,7 +160,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                 <div className="link-item" onClick={() => {
                     setOpenManageUsers(false);
                     setOpenApp(false);
-                    closeSidebar
+                    closeSidebar();
                 }}>
                     <RiArticleFill className="icon-size text-white"/>
                     <NavLink to="/admin/articles">Articles</NavLink>
@@ -175,7 +168,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                 <div className="link-item" onClick={() => {
                     setOpenManageUsers(false);
                     setOpenApp(false);
-                    closeSidebar
+                    closeSidebar();
                 }}>
                     <FiGift className="icon-size text-white"/>
                     <NavLink to="/admin/reward-shop">Reward Shop</NavLink>
@@ -183,7 +176,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                 <div className="link-item" onClick={() => {
                     setOpenManageUsers(false);
                     setOpenApp(false);
-                    closeSidebar
+                    closeSidebar();
                 }}>
                     <MdWorkspacePremium className="icon-size text-white"/>
                     <NavLink to="/admin/certificates">Certificates</NavLink>
@@ -191,18 +184,10 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                 <div className="link-item" onClick={() => {
                     setOpenManageUsers(false);
                     setOpenApp(false);
-                    closeSidebar
+                    closeSidebar();
                 }}>
                     <MdQuiz className="icon-size text-white"/>
                     <NavLink to="/admin/quiz-management">Quiz Management</NavLink>
-                </div>
-                <div className="link-item" onClick={() => {
-                    setOpenManageUsers(false);
-                    setOpenApp(false);
-                    closeSidebar
-                }}>
-                    <MdNotificationsActive className="icon-size text-white"/>
-                    <NavLink to="/admin/notifications">Notifications</NavLink>
                 </div>
                 
                 <div className="link-item" onClick={() => {
@@ -216,7 +201,7 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
                 <div className="link-item" onClick={() => {
                     setOpenManageUsers(false);
                     setOpenApp(false);
-                    closeSidebar
+                    closeSidebar();
                 }}>
                     <IoPersonCircle className="icon-size text-white"/>
                     <NavLink to="/admin/profile">Profile</NavLink>

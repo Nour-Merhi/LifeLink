@@ -6,7 +6,18 @@ import { MdOutlineMail } from "react-icons/md";
 import { useHospitals } from "../../context/HospitalsContext";
 import { useNavigate } from "react-router-dom";
 import AnimatedSection from "../common/AnimatedSection";
+import { API_BASE_URL } from "../../config/api";
 import "./RegisteredHospitals.css";
+
+function getHospitalImageSrc(hospital) {
+    // Prefer image_url (full URL from backend) when available
+    const src = hospital?.image_url ?? hospital?.image;
+    if (!src) return "/image.png";
+    if (typeof src === "string" && (src.startsWith("data:") || src.startsWith("http"))) return src;
+    const base = (API_BASE_URL || "").replace(/\/$/, "");
+    const path = typeof src === "string" && src.startsWith("/") ? src.slice(1) : src;
+    return base ? `${base}/${path}` : "/image.png";
+}
 
 export default function RegisteredHospitals() {
     const navigate = useNavigate();
@@ -40,9 +51,7 @@ export default function RegisteredHospitals() {
                 <div className="partner-hospitals-grid">
                     {displayedHospitals.length > 0 ? (
                         displayedHospitals.map((hospital) => {
-                            const imageSrc = hospital.image 
-                                ? (hospital.image.startsWith('http') ? hospital.image : `/image.png`)
-                                : '/image.png';
+                            const imageSrc = getHospitalImageSrc(hospital);
                             const urgentNeeds = hospital.urgent_needs || [];
                             
                             return (

@@ -72,7 +72,17 @@ class HospitalController extends Controller
                 $hospitalArray['requests'] = $requestsCount;
                 $hospitalArray['blood_stock'] = $completeBloodStocks;
                 $hospitalArray['shortage_states'] = $completeShortageStates;
-                
+                // Return full URL for path-based images (base64 and full URLs pass through)
+                if (!empty($hospitalArray['image'])) {
+                    $img = $hospitalArray['image'];
+                    if (!str_starts_with($img, 'data:') && !str_starts_with($img, 'http')) {
+                        $hospitalArray['image_url'] = asset(ltrim($img, '/'));
+                    } else {
+                        $hospitalArray['image_url'] = $img;
+                    }
+                } else {
+                    $hospitalArray['image_url'] = null;
+                }
                 return $hospitalArray;
             });
         
@@ -87,7 +97,16 @@ class HospitalController extends Controller
         if(!$hospital){
             return response()->json(['message'=> 'Hospital not found'], 404);
         }
-        return response()->json($hospital, 200);
+        $data = $hospital->toArray();
+        if (!empty($data['image'])) {
+            $img = $data['image'];
+            $data['image_url'] = (str_starts_with($img, 'data:') || str_starts_with($img, 'http'))
+                ? $img
+                : asset(ltrim($img, '/'));
+        } else {
+            $data['image_url'] = null;
+        }
+        return response()->json($data, 200);
     }
 
     /**
@@ -174,7 +193,14 @@ class HospitalController extends Controller
             $hospitalData['requests'] = $requestsCount;
             $hospitalData['blood_stock'] = $completeBloodStocks;
             $hospitalData['shortage_states'] = $completeShortageStates;
-            
+            if (!empty($hospitalData['image'])) {
+                $img = $hospitalData['image'];
+                $hospitalData['image_url'] = (str_starts_with($img, 'data:') || str_starts_with($img, 'http'))
+                    ? $img
+                    : asset(ltrim($img, '/'));
+            } else {
+                $hospitalData['image_url'] = null;
+            }
             return response()->json([
                 'hospital' => $hospitalData
             ], 200);

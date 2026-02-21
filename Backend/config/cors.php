@@ -19,11 +19,21 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    'allowed_origins' => array_filter(array_unique(array_merge(
+        [
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            'https://life-link-react-app.vercel.app',
+        ],
+        env('FRONTEND_URL') ? [
+            parse_url(env('FRONTEND_URL'), PHP_URL_SCHEME) . '://' . parse_url(env('FRONTEND_URL'), PHP_URL_HOST)
+        ] : []
+    ))),
 
     'allowed_origins_patterns' => [
         '#^http://localhost:\d+$#',  // Allow any localhost port (for Flutter web)
         '#^http://127\.0\.0\.1:\d+$#',  // Allow any 127.0.0.1 port
+        '#^https://.*\.vercel\.app$#',  // Allow any Vercel deployment
     ],
 
     'allowed_headers' => ['*'],

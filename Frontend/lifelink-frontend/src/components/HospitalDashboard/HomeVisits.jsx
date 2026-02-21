@@ -12,7 +12,7 @@ export default function HomeVisits() {
     const [refreshKey, setRefreshKey] = useState(0);
 
     // Get hospital ID from user's health center manager relationship
-    const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
 
     const fetchHomeVisits = () => {
         // Trigger refresh by updating the key, which will cause HomeAppRequestsTable to re-render

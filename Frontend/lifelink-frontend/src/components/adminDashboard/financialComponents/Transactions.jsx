@@ -54,14 +54,15 @@ export default function Transactions({ transactions, onTransactionUpdated }){
     };
 
     const handleDelete = async (transaction) => {
-        if (deleteConfirm !== transaction.id) {
-            setDeleteConfirm(transaction.id);
+        const txnId = transaction.db_id || transaction.id;
+        if (deleteConfirm !== txnId) {
+            setDeleteConfirm(txnId);
             return;
         }
 
         try {
             await api.get("/sanctum/csrf-cookie");
-            await api.delete(`/api/admin/dashboard/financial/transactions/${transaction.id || transaction.db_id}`);
+            await api.delete(`/api/admin/dashboard/financial/transactions/${transaction.db_id || transaction.id}`);
             
             if (onTransactionUpdated) {
                 onTransactionUpdated();
@@ -131,6 +132,7 @@ export default function Transactions({ transactions, onTransactionUpdated }){
                                 onChange = { (e) => setTransactionState (e.target.value) }
                             >
                                 <option value = "all-states" >All states</option>
+                                <option value = "pending" >Pending</option>
                                 <option value = "completed" >Completed</option>
                                 <option value = "failed" >Failed</option>
                             </select>
@@ -220,7 +222,7 @@ export default function Transactions({ transactions, onTransactionUpdated }){
                                         <button 
                                             className="icon-btn text-red-500"
                                             onClick={() => handleDelete(transaction)}
-                                            title={deleteConfirm === transaction.id ? "Confirm Delete" : "Delete Transaction"}
+                                            title={deleteConfirm === (transaction.db_id || transaction.id) ? "Confirm Delete" : "Delete Transaction"}
                                         >
                                             <RiDeleteBin6Line />
                                         </button>

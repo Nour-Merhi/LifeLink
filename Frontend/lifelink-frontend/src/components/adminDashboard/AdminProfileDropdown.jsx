@@ -11,14 +11,15 @@ import {
 import { FiLogOut } from "react-icons/fi";
 import profile from "../../assets/imgs/profile.svg";
 import api from "../../api/axios";
+import { getApiBaseUrl } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function AdminProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   
 
   const profileImageSrc = useMemo(() => {
@@ -87,17 +88,11 @@ export default function AdminProfileDropdown() {
   };
 
   const handleLogout = async () => {
-    try {
-      await api.post("/api/logout");
-      window.dispatchEvent(new Event('auth-change'));
-      navigate("/home");
-      setIsOpen(false);
-    } catch (error) {
-      // Still navigate to home even if logout fails
-      window.dispatchEvent(new Event('auth-change'));
-      navigate("/home");
-      setIsOpen(false);
+    setIsOpen(false);
+    if (logout) {
+      await logout();
     }
+    navigate("/home", { replace: true });
   };
 
   // Only show dropdown for admins (case-insensitive check)

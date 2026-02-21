@@ -11,8 +11,9 @@ import MapIntegration from "../components/MapIntegration";
 import "../components/home/RegisteredHospitals.css";
 
 import api from "../api/axios";
+import { getApiBaseUrl } from "../config/api";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function HospitalDetail() {
     const { id } = useParams();

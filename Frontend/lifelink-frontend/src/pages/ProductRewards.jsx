@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FiSearch, FiShoppingCart, FiX, FiMinus, FiPlus, FiCheck } from "react-icons/fi";
-import { LiaTshirtSolid } from "react-icons/lia";
-import { GiCoffeeCup } from "react-icons/gi";
-import { FaRegStickyNote } from "react-icons/fa";
-import { IoShirtOutline } from "react-icons/io5";
 import { TbGift } from "react-icons/tb";
 import Navbar from "../components/Navbar.jsx";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import RewardProductImage from "../components/common/RewardProductImage";
 import "../styles/ProductRewards.css";
 
 function formatXp(n) {
@@ -23,17 +20,9 @@ function iconForProduct(title = "") {
   return <TbGift size={22} />;
 }
 
-function resolveImageSrc(imagePath) {
-  if (!imagePath) return null;
-  const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
-  const img = String(imagePath);
-  if (img.startsWith("http")) return img;
-  return `${baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
-}
-
 export default function ProductRewards() {
-  const { user } = useAuth();
-  const isGuest = !user;
+  const { user, loading: authLoading } = useAuth();
+  const isGuest = !authLoading && !user;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -66,7 +55,20 @@ export default function ProductRewards() {
           setProducts(Array.isArray(res.data?.products) ? res.data.products : []);
         }
       } catch (e) {
-        setError(e.response?.data?.message || "Failed to load rewards shop");
+        const status = e.response?.status;
+        const data = e.response?.data;
+        if (status === 401) {
+          setError("Session expired. Please log in again to purchase rewards.");
+          // Still show products from public catalog so user can see what's available
+          try {
+            const pub = await api.get("/api/rewards/shop-public");
+            setProducts(Array.isArray(pub.data?.products) ? pub.data.products : []);
+          } catch (_) {}
+        } else if (status === 404 && data?.error === "donor_not_found") {
+          setError("Rewards are only available for donors. Please register as a donor to earn and spend XP.");
+        } else {
+          setError(data?.message || "Failed to load rewards shop");
+        }
       } finally {
         setLoading(false);
       }
@@ -130,17 +132,43 @@ export default function ProductRewards() {
 
   const purchaseItems = async (items) => {
     setBusy(true);
+    setError("");
     try {
-      await api.get("/sanctum/csrf-cookie");
       const res = await api.post("/api/donor/rewards/purchase", { items });
-      setXp(Number(res.data?.current_xp || 0));
+      setXp(Number(res.data?.current_xp ?? 0));
       setSuccessMsg(res.data?.message || "Purchase successful. Please pick up your items from the LifeLink Center.");
       setSuccessOpen(true);
       return true;
     } catch (e) {
-      console.error("Purchase failed:", e);
-      const msg = e.response?.data?.message || "Purchase failed";
+      const status = e.response?.status;
+      const data = e.response?.data;
+      let msg = "Purchase failed";
+      if (!e.response) {
+        msg = "Network error. Please check your connection and try again.";
+      } else if (status === 401) {
+        msg = "Session expired. Please log in again to purchase.";
+      } else if (status === 404 && data?.error === "donor_not_found") {
+        msg = "Rewards are only available for donors. Please register as a donor to earn and spend XP.";
+      } else if (status === 422) {
+        msg = data?.message || "Purchase could not be completed.";
+      } else if (data?.message) {
+        msg = data.message;
+      } else if (data?.errors && typeof data.errors === "object") {
+        const first = Object.values(data.errors).flat()[0];
+        if (first) msg = first;
+      } else if (data?.error && status !== 404) {
+        msg = String(data.error);
+      }
+      if (data?.error_detail) {
+        msg += ` (${data.error_detail})`;
+      }
       setError(msg);
+      // Sync XP from response so UI shows correct balance (e.g. insufficient XP)
+      const responseXp = data?.current_xp;
+      if (typeof responseXp === "number" || (typeof responseXp === "string" && responseXp !== "")) {
+        setXp(Number(responseXp));
+      }
+      console.error("Purchase failed:", status, data, e.message);
       return false;
     } finally {
       setBusy(false);
@@ -245,15 +273,23 @@ export default function ProductRewards() {
 
                 <div className="product-image">
                   {p?.image_path ? (
-                    <img
-                      src={resolveImageSrc(p.image_path)}
+                    <RewardProductImage
+                      productId={p.id}
+                      imagePath={p.image_path}
+                      usePublicEndpoint
                       alt={p.title}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
+                      className="product-image-img"
+                      fallback={
+                        <div className="product-image-placeholder" aria-hidden>
+                          {iconForProduct(p.title)}
+                        </div>
+                      }
                     />
-                  ) : null}
+                  ) : (
+                    <div className="product-image-placeholder" aria-hidden>
+                      {iconForProduct(p.title)}
+                    </div>
+                  )}
                 </div>
 
                 <div className="product-top">

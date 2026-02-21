@@ -647,9 +647,6 @@ class AppointmentsController extends Controller
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         } elseif (!in_array($role, ['admin', 'superadmin'], true) && $role !== 'administrator') {
-            // Some projects use "Admin" casing; keep it permissive but not open.
-            // If your admin role differs, add it here.
-            // Allow also "donation center" ? not needed.
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -769,9 +766,23 @@ class AppointmentsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Appointment $appointment)
+    public function destroy(Request $request, Appointment $appointment)
     {
         try {
+            $user = $request->user();
+            $role = strtolower((string)($user->role ?? ''));
+            if ($role === 'manager') {
+                if (!$user->relationLoaded('healthCenterManager')) {
+                    $user->load('healthCenterManager');
+                }
+                $managerHospitalId = $user->healthCenterManager->hospital_id ?? null;
+                if (!$managerHospitalId || (int)$managerHospitalId !== (int)$appointment->hospital_id) {
+                    return response()->json(['message' => 'Forbidden'], 403);
+                }
+            } elseif (!in_array($role, ['admin', 'superadmin', 'administrator'], true)) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
             // Check if there are any home appointments linked to this appointment
             $homeAppointmentsCount = \App\Models\HomeAppointment::where('appointment_id', $appointment->id)
                 ->where('state', '!=', 'canceled')

@@ -6,6 +6,7 @@ use App\Models\AfterDeathPledge;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 class AfterDeathPledgeThankYou extends Mailable
 {

@@ -425,6 +425,7 @@
     color: #999;
     line-height: 1.6;
     margin: 0;
+    text-align: justify;
 }
 
 /* Article Image */
@@ -478,6 +479,7 @@
 .article-body p {
     margin: 1rem 0;
     color: #d5d5d5;
+    text-align: justify;
 }
 
 .article-body ul,
@@ -490,6 +492,7 @@
 .article-body li {
     margin: 0.75rem 0;
     line-height: 1.7;
+    text-align: justify;
 }
 
 .article-body strong {

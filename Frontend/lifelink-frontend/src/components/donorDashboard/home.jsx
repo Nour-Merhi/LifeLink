@@ -6,9 +6,11 @@ import { IoMdArrowForward } from "react-icons/io";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
 import { IoClose } from "react-icons/io5";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Home(){
     const navigate = useNavigate();
+    const { user, loading: authLoading } = useAuth();
     const [dashboardData, setDashboardData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -62,10 +64,29 @@ export default function Home(){
     };
 
     useEffect(() => {
+        // Wait for auth to finish loading and ensure user is authenticated
+        if (authLoading) {
+            return;
+        }
+
+        if (!user) {
+            setError("Please log in to view your dashboard");
+            setLoading(false);
+            // Redirect to login after a short delay
+            setTimeout(() => {
+                navigate("/login", { replace: true });
+            }, 2000);
+            return;
+        }
+
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
                 setError("");
+                
+                // Ensure CSRF cookie is fetched before making authenticated request
+                await api.get("/sanctum/csrf-cookie");
+                
                 const response = await api.get("/api/donor/dashboard");
                 
                 console.log("Dashboard API response:", response.data);
@@ -84,6 +105,10 @@ export default function Home(){
                     errorMessage = err.response.data.message;
                 } else if (err.response?.status === 401) {
                     errorMessage = "Please log in to view your dashboard";
+                    // Redirect to login on 401
+                    setTimeout(() => {
+                        navigate("/login", { replace: true });
+                    }, 2000);
                 } else if (err.response?.status === 403) {
                     errorMessage = "You don't have permission to access this page";
                 } else if (err.response?.status === 404) {
@@ -99,9 +124,9 @@ export default function Home(){
         };
 
         fetchDashboardData();
-    }, []);
+    }, [user, authLoading, navigate]);
 
-    if (loading) {
+    if (authLoading || loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <p className="text-gray-500">Loading...</p>

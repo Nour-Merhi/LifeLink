@@ -11,6 +11,7 @@ import {
 import { FiEdit, FiPlus, FiUpload, FiTrash2 } from "react-icons/fi";
 import api from "../../api/axios";
 import ConfirmDeleteDialog from "../common/ConfirmDeleteDialog";
+import RewardProductImage from "../common/RewardProductImage";
 import "../../styles/Dashboard.css";
 
 function formatXp(n) {
@@ -21,13 +22,6 @@ function formatXp(n) {
   }
 }
 
-function resolveImageSrc(imagePath) {
-  if (!imagePath) return null;
-  const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
-  const img = String(imagePath);
-  if (img.startsWith("http")) return img;
-  return `${baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
-}
 
 function ProductModal({ mode = "create", initial = null, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
@@ -287,10 +281,12 @@ export default function RewardShop() {
                   <tr key={p.id}>
                     <td style={{ width: 90 }}>
                       {p.image_path ? (
-                        <img
-                          src={resolveImageSrc(p.image_path)}
+                        <RewardProductImage
+                          productId={p.id}
+                          imagePath={p.image_path}
                           alt={p.title}
                           style={{ width: 60, height: 44, objectFit: "cover", borderRadius: 10, border: "1px solid rgba(0,0,0,0.08)" }}
+                          fallback={<span className="muted">—</span>}
                         />
                       ) : (
                         <span className="muted">—</span>

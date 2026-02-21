@@ -22,6 +22,7 @@ export default function AddPhlebotomistForm({
         special: false,
     });
     const [showPasswordHints, setShowPasswordHints] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
     const [addPhlebotomistData, setAddPhlebotomistData] = useState({
         first_name: "",
@@ -90,19 +91,31 @@ export default function AddPhlebotomistForm({
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setSubmitError("");
 
         const isStrong = Object.values(passwordChecks).every(Boolean);
-        if(!isStrong){
+        if (!isStrong) {
             setPasswordMes("Please use a strong password that meets all requirements.");
             return;
         }
-        setLoading (true);
+        if (!addPhlebotomistData.hospital_id) {
+            setSubmitError("Please select a hospital.");
+            return;
+        }
+        if (!workingDates.length) {
+            setSubmitError("Please select at least one working day.");
+            return;
+        }
+        if (!addPhlebotomistData.start_time || !addPhlebotomistData.end_time) {
+            setSubmitError("Please set start and end working times.");
+            return;
+        }
 
-        try{
-            // First, get the CSRF cookie from Sanctum
+        setLoading(true);
+
+        try {
             await api.get("/sanctum/csrf-cookie");
 
-            // Then, make the POST request
             const response = await api.post(
                 "/api/admin/dashboard/add-phlebotomist",
                 addPhlebotomistData
@@ -125,7 +138,7 @@ export default function AddPhlebotomistForm({
                     years_of_experience: '',
                     max_appointments: '',
                     working_dates: [],
-                  });
+                });
                 setWorkingDates([]);
                 setPasswordMes("");
                 setPasswordChecks({
@@ -135,18 +148,28 @@ export default function AddPhlebotomistForm({
                     number: false,
                     special: false,
                 });
-                
-                // Call callback to refresh table
+                setSubmitError("");
+
                 if (onPhlebotomistAdded) {
                     onPhlebotomistAdded();
                 } else {
                     onClose();
                 }
             }, 1200);
-        }catch (error){
-            console.error("❌ Error adding hospital:", error);
-            alert(error);
-        }finally{
+        } catch (error) {
+            console.error("❌ Error adding phlebotomist:", error);
+            const errors = error.response?.data?.errors;
+            const msg = error.response?.data?.message || error.message || "Failed to add phlebotomist.";
+            const detail = error.response?.data?.error; // Backend exception message (e.g. SQLSTATE)
+            if (errors && typeof errors === "object") {
+                const list = Object.entries(errors)
+                    .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+                    .join(" ");
+                setSubmitError(list || msg);
+            } else {
+                setSubmitError(detail ? `${msg}: ${detail}` : msg);
+            }
+        } finally {
             setLoading(false);
         }
     };
@@ -173,6 +196,11 @@ export default function AddPhlebotomistForm({
 
                     <div className="modal-form">
                         <form onSubmit={handleSubmit}>
+                            {submitError && (
+                                <div className="error-message" style={{ marginBottom: "1rem", padding: "0.75rem", background: "#fef2f2", color: "#b91c1c", borderRadius: "6px" }}>
+                                    {submitError}
+                                </div>
+                            )}
                             <div className="form-group">
                                 <div>
                                     <label htmlFor="first_name">First Name</label>
@@ -419,7 +447,7 @@ export default function AddPhlebotomistForm({
             ): (
                 <div className="loader">
                   <SpinnerDotted size={60} thickness={125} speed={100} color="#f01010ff" />                
-                  <h3>Adding Hospital...</h3>
+                  <h3>Adding Phlebotomist...</h3>
                 </div>
             )
             }

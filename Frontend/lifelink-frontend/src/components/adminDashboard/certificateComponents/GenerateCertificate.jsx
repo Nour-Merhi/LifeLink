@@ -83,9 +83,10 @@ export default function GenerateCertificate() {
       .finally(() => setLoadingHospitals(false));
   }, []);
 
+  const sortedHospitals = hospitals.sort((a, b) => a.name.localeCompare(b.name));
   const selectedDonor = donors.find((d) => String(d.id) === String(donorId));
   const displayName = donorName || (selectedDonor ? formatDonorName(selectedDonor) : "");
-  const selectedHospital = hospitals.find((h) => String(h.id) === String(hospitalId));
+  const selectedHospital = sortedHospitals.find((h) => String(h.id) === String(hospitalId));
   const displayHospital = selectedHospital ? (`at ${selectedHospital.name ?? selectedHospital.hospital_name ?? `Hospital ${selectedHospital.id}`}`) : "";
 
   function formatDonorName(d) {
@@ -343,7 +344,7 @@ export default function GenerateCertificate() {
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #d1d5db" }}
                 >
                   <option value="">Select hospital (optional)</option>
-                  {hospitals.map((h) => (
+                  {sortedHospitals.map((h) => (
                     <option key={h.id} value={h.id}>
                       {h.name || h.hospital_name || `Hospital ${h.id}`}
                     </option>

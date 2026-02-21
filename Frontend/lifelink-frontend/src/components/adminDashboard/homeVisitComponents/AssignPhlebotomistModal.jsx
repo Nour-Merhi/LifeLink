@@ -130,26 +130,42 @@ export default function AssignPhlebotomistModal({ onClose, orders = [], onAssign
         setAssigning(true);
 
         try {
-            // Assign phlebotomist to all selected orders
-            const assignmentPromises = orders.map(async (order) => {
-                const orderCode = order.id || order.code;
-                // Get CSRF cookie first
-                await api.get("/sanctum/csrf-cookie");
-                return api.post(`/api/admin/dashboard/home-visit-orders/${encodeURIComponent(orderCode)}/assign-phlebotomist`, {
+            // Assign phlebotomist to all selected orders (use code for URL; backend accepts code or numeric id)
+            const orderCode = (order) => order.code ?? order.id;
+            const assignmentPromises = orders.map((order) => {
+                const code = orderCode(order);
+                return api.post(`/api/admin/dashboard/home-visit-orders/${encodeURIComponent(String(code))}/assign-phlebotomist`, {
                     phlebotomist_id: selectedPhlebotomist.id
                 });
             });
 
-            await Promise.all(assignmentPromises);
+            const results = await Promise.allSettled(assignmentPromises);
+            const failed = results.filter((r) => r.status === 'rejected');
+            const succeeded = results.filter((r) => r.status === 'fulfilled');
 
-            // Success - notify parent to refetch orders
-            if (onAssignSuccess) {
-                onAssignSuccess();
+            if (failed.length > 0) {
+                const messages = failed.map((f) => {
+                    const err = f.reason;
+                    const data = err?.response?.data;
+                    if (data?.errors?.phlebotomist_id?.[0]) return data.errors.phlebotomist_id[0];
+                    return data?.message || data?.error || err?.message || 'Request failed';
+                });
+                const unique = [...new Set(messages)];
+                setError(succeeded.length > 0
+                    ? `Assigned to ${succeeded.length} order(s). Failed for ${failed.length}: ${unique.join('; ')}`
+                    : unique.join('; '));
+                if (succeeded.length > 0 && onAssignSuccess) onAssignSuccess();
+                return;
             }
+
+            if (onAssignSuccess) onAssignSuccess();
             onClose();
         } catch (err) {
             console.error('Error assigning phlebotomist:', err);
-            setError(err.response?.data?.message || err.response?.data?.error || 'Failed to assign phlebotomist');
+            const data = err?.response?.data;
+            const msg = data?.message || data?.error;
+            const validationMsg = data?.errors?.phlebotomist_id?.[0];
+            setError(validationMsg || msg || 'Failed to assign phlebotomist');
         } finally {
             setAssigning(false);
         }

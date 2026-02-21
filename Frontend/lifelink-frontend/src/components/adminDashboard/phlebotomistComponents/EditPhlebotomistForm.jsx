@@ -27,7 +27,6 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
 
     useEffect(() => {
         if (phlebotomistData) {
-            // Extract data from nested structure (raw backend data has user and hospital relationships)
             const user = phlebotomistData.user || {};
             const backendStatus = (phlebotomistData.status || '').toString().toLowerCase();
             const forceUnavailable = backendStatus === 'inactive';
@@ -50,7 +49,6 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
             setWorkingDates(phlebotomistData.working_dates || []);
             setFetchLoading(false);
         } else if (phlebotomistCode) {
-            // Fetch phlebotomist data
             fetchPhlebotomistDetails();
         } else {
             setFetchLoading(false);
@@ -235,7 +233,7 @@ export default function EditPhlebotomistForm({ onClose, onPhlebotomistUpdated, p
                                     type="text"
                                     id="middle_name"
                                     name="middle_name"
-                                    value={editPhlebotomistData.middle_name || ""}
+                                    value={editPhlebotomistData.middle_name}
                                     onChange={handleChange}
                                     placeholder="Enter middle name (optional)"
                                 />

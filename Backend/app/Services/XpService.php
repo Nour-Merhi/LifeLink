@@ -56,7 +56,7 @@ class XpService
     {
         return self::awardXp(
             $donorId,
-            150,
+            500,
             'blood',
             $referenceType,
             $referenceId,

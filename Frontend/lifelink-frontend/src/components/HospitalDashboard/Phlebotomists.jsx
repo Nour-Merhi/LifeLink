@@ -13,8 +13,8 @@ export default function Phlebotomists() {
     const [error, setError] = useState("");
     const [addModalOpen, setAddModalOpen] = useState(false);
 
-    // Get hospital ID from user's health center manager relationship
-    const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    // Get hospital ID: mobile login returns user.hospital_id; session login returns healthCenterManager.hospital_id
+    const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
     const hospitalName =
         user?.health_center_manager?.hospital?.name ||
         user?.healthCenterManager?.hospital?.name ||
@@ -35,8 +35,8 @@ export default function Phlebotomists() {
         setLoading(true);
         setError("");
         
-        api.get("/api/admin/dashboard/get-phlebotomists", {
-            params: { hospital_id: hospitalId }
+        api.get("/api/hospital/dashboard/phlebotomists", {
+            params: hospitalId ? { hospital_id: hospitalId } : {}
         })
             .then(res => {
                 setPhlebotomists(res.data.phlebotomists || []);

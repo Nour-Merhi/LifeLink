@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { IoPersonCircle } from "react-icons/io5";
 import { BsArrowRight } from "react-icons/bs";
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from "recharts";
 
 import AddPatientCaseForm from "./AddPatientCaseForm"
 
-export default function FinancialDashboard({ metricsData, topDonors, activeCases, onPatientCaseAdded }){
+export default function FinancialDashboard({ metricsData, topDonors, activeCases, transactions = [], onPatientCaseAdded }){
     const [selectedPeriod, setSelectedPeriod] = useState("last-month");
     const [openModal, setOpenModal] = useState(false)
 
@@ -18,6 +27,73 @@ export default function FinancialDashboard({ metricsData, topDonors, activeCases
         }
         setOpenModal(false);
     }
+
+    // Build chart data from transactions (completed only), aggregated by date
+    const chartData = useMemo(() => {
+        const now = new Date();
+        let startDate;
+        switch (selectedPeriod) {
+            case "last-week":
+                startDate = new Date(now);
+                startDate.setDate(startDate.getDate() - 7);
+                break;
+            case "last-quarter":
+                startDate = new Date(now);
+                startDate.setMonth(startDate.getMonth() - 3);
+                break;
+            case "last-year":
+                startDate = new Date(now);
+                startDate.setFullYear(startDate.getFullYear() - 1);
+                break;
+            default: // last-month
+                startDate = new Date(now);
+                startDate.setMonth(startDate.getMonth() - 1);
+                break;
+        }
+
+        const completed = (transactions || []).filter(
+            (t) => t.status === "completed" && new Date(t.date || t.created_at) >= startDate
+        );
+
+        const byDate = {};
+        completed.forEach((t) => {
+            const d = t.date || t.created_at || "";
+            const key = d.slice(0, 10);
+            if (!byDate[key]) byDate[key] = { date: key, amount: 0, count: 0 };
+            byDate[key].amount += Number(t.amount) || 0;
+            byDate[key].count += 1;
+        });
+
+        const sorted = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+        return sorted.map((d) => ({
+            ...d,
+            label: new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }),
+        }));
+    }, [transactions, selectedPeriod]);
+
+    // Top 5 donors by total amount (from API or derived from transactions)
+    const topDonorsList = useMemo(() => {
+        const apiList = Array.isArray(topDonors) ? topDonors : [];
+        if (apiList.length > 0) return apiList.slice(0, 5);
+
+        const completed = (transactions || []).filter((t) => t.status === "completed");
+        const byDonor = {};
+        completed.forEach((t) => {
+            const key = (t.donor_name || t.name || "Anonymous").trim() || "Anonymous";
+            if (!byDonor[key]) byDonor[key] = { name: key, amount: 0, date: t.date || t.created_at };
+            byDonor[key].amount += Number(t.amount) || 0;
+            if ((t.date || t.created_at) > (byDonor[key].date || "")) byDonor[key].date = t.date || t.created_at;
+        });
+
+        return Object.values(byDonor)
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, 5)
+            .map((d) => ({
+                name: d.name,
+                date: d.date ? String(d.date).slice(0, 10) : "",
+                amount: "$" + Number(d.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            }));
+    }, [topDonors, transactions]);
 
     return(
         <section className="financial-dashboard">
@@ -54,32 +130,64 @@ export default function FinancialDashboard({ metricsData, topDonors, activeCases
                             </select>
                         </div>
                     </div>
-                    <div className="chart-placeholder">
-                        {/* Chart will go here */}
-                        <p className="placeholder-text">Chart visualization area</p>
+                    <div className="chart-placeholder" style={{ minHeight: 280 }}>
+                        {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#6132BE" stopOpacity={0.4} />
+                                            <stop offset="95%" stopColor="#6132BE" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#6b7280" />
+                                    <YAxis
+                                        tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v}`}
+                                        tick={{ fontSize: 12 }}
+                                        stroke="#6b7280"
+                                    />
+                                    <Tooltip
+                                        formatter={(value) => [`$${Number(value).toLocaleString()}`, "Amount"]}
+                                        labelFormatter={(label) => `Date: ${label}`}
+                                        contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="amount"
+                                        stroke="#6132BE"
+                                        strokeWidth={2}
+                                        fill="url(#colorAmount)"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <p className="placeholder-text">No donation data for the selected period</p>
+                        )}
                     </div>
                 </div>
 
                 {/* Top Donors */}
                 <div className="top-donors">
-                    <h3 className="panel-header">Top Donors This Month</h3>
+                    <h3 className="panel-header">Top 5 Donors</h3>
                     <div className="donors-list">
-                        {topDonors.map((donor, index) => (
-                            <div key={index} className="donor-item">
-                                <div className="donor-info">
-                                    <IoPersonCircle className="transaction-donor-avatar" />
-                                    <div className="transaction-donor-details">
-                                        <span className="transaction-donor-name">{donor.name}</span>
-                                        <small className="transaction-donor-date">{donor.date}</small>
+                        {topDonorsList.length === 0 ? (
+                            <p className="placeholder-text" style={{ padding: "1rem", margin: 0 }}>No donors yet</p>
+                        ) : (
+                            topDonorsList.map((donor, index) => (
+                                <div key={index} className="donor-item">
+                                    <div className="donor-info">
+                                        <IoPersonCircle className="transaction-donor-avatar" />
+                                        <div className="transaction-donor-details">
+                                            <span className="transaction-donor-name">{donor.name || "Anonymous"}</span>
+                                            <small className="transaction-donor-date">{donor.date}</small>
+                                        </div>
                                     </div>
+                                    <span className="transaction-donor-amount">{donor.amount}</span>
                                 </div>
-                                <span className="transaction-donor-amount">{donor.amount}</span>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
-                    <a href="#" className="view-all-link">
-                        View All Donors <BsArrowRight />
-                    </a>
                 </div>
             </div>
 
@@ -87,14 +195,14 @@ export default function FinancialDashboard({ metricsData, topDonors, activeCases
             <div className="active-cases-section">
                 <div className="section-header">
                     <h3>Active Cases</h3>
-                    <button className="add-btn">
-                        <button type="button" onClick={() => setOpenModal(true)}>+ Create Patient Case</button>
-                    </button>
+                    <button type="button" className="add-btn" onClick={() => setOpenModal(true)}>+ Create Patient Case</button>
                 </div>
 
                 <div className="cases-grid">
                     {activeCases.map((caseItem) => {
-                        const fundingPercentage = Math.round((caseItem.currentFunding / caseItem.targetFunding) * 100);
+                        const fundingPercentage = caseItem.targetFunding > 0
+                            ? Math.round((caseItem.currentFunding / caseItem.targetFunding) * 100)
+                            : 0;
                         
                         return (
                             <div key={caseItem.id} className="case-card">

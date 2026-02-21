@@ -217,7 +217,7 @@ button:disabled{
   
   @supports (height: 100svh){
     .hero-section{
-      min-height: clamp(560px, 100svh, 860px);
+      min-height: clamp(560px, 111svh, 860px);
     }
   }
   .hero-content{
@@ -230,7 +230,11 @@ button:disabled{
     margin-top: 0;
   }
   .wave{
-    height: 70%;
+    height: 60%;
+  }
+  .blood-p{
+    font-size: 14px;
+    max-width: 450px;
   }
   .first-illustration{
     width: 100%;
@@ -262,7 +266,7 @@ button:disabled{
     max-width: 300px;
   }
   .hero-info > h1{
-    font-size: 50px;
+    font-size: 30px;
   }
   .hero-content{
     padding: 0 14px;

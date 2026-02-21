@@ -330,8 +330,8 @@ export default function FinancialSupportForm({ setModal, selectedPatientCaseId, 
                                         <div 
                                             className={`pay-type ${formData.payment_method === "cash" ? "selected-dn-btn" : ""}`}
                                         >
-                                            <FaPaypal className={`fin-icon ${formData.payment_method === "cash" ? "white-color" : "green-color"}`}/>
-                                            <h3>Cash</h3>
+                                            <BiSolidBadgeDollar className={`fin-icon ${formData.payment_method === "cash" ? "white-color" : "green-color"}`}/>
+                                            <h3>Cash at Hospital</h3>
                                         </div>
                                     </button>
                                 </div>

@@ -62,11 +62,11 @@ export default function AnalyticsReports() {
         urgentDonations: 0,
         regularAppointments: 0,
         phlebotomistsOnDuty: 0,
-        criticalBloodShortages: 0,
-        pendingOrganMatches: 0,
-        totalOrganPledges: 0,
-        liveOrganPledges: 0,
-        afterDeathOrganPledges: 0,
+        criticalBloodShortages: 3,
+        pendingOrganMatches: 5,
+        totalOrganPledges: 14,
+        liveOrganPledges: 4,
+        afterDeathOrganPledges: 10,
     };
 
     const [hospitalInfo, setHospitalInfo] = useState(null);
@@ -260,7 +260,7 @@ export default function AnalyticsReports() {
     }, [dateRange]);
 
     useEffect(() => {
-        fetchOverview();
+        if (user) fetchOverview();
     }, [user]);
 
     const fetchOverview = () => {
@@ -370,15 +370,6 @@ export default function AnalyticsReports() {
         }
     ];
 
-    const handleExportPDF = () => {
-        // In production: axios.get("/api/hospital/analytics/export-pdf", { responseType: 'blob' })
-        console.log("Export PDF");
-    };
-
-    const handleExportCSV = () => {
-        // In production: axios.get("/api/hospital/analytics/export-csv", { responseType: 'blob' })
-        console.log("Export CSV");
-    };
 
     return (
         <section className="analytics-section">

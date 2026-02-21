@@ -11,6 +11,7 @@ import { FiLogOut } from "react-icons/fi";
 
 
 import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
 import { useSystemSettings } from "../../context/SystemSettingsContext";
 
@@ -18,18 +19,13 @@ export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {}
     const navigate = useNavigate();
     const { systemLogo, platformName } = useSystemSettings();
 
+    const { logout } = useAuth();
+    
     const handleLogout = async () => {
-        try {
-          await api.post("/api/logout");
-          // Trigger auth change to update context
-          window.dispatchEvent(new Event('auth-change'));
-          navigate("/home");
-        } catch (error) {
-          console.error('Logout error:', error);
-          // Trigger auth change anyway
-          window.dispatchEvent(new Event('auth-change'));
-          navigate("/home");
+        if (logout) {
+          await logout();
         }
+        navigate("/home", { replace: true });
       };
 
     const closeSidebar = () => {

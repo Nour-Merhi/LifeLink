@@ -82,6 +82,55 @@ class RewardProductController extends Controller
         return response()->json(['message' => 'Reward product updated', 'product' => $this->serialize($rewardProduct)], 200);
     }
 
+    /**
+     * Stream reward product image (for admin table display when public URL fails e.g. Railway ephemeral storage).
+     */
+    public function streamImage(Request $request, RewardProduct $rewardProduct)
+    {
+        if ($resp = $this->requireAdmin()) return $resp;
+        return $this->streamImageInternal($rewardProduct);
+    }
+
+    /**
+     * Stream reward product image for public/donor rewards shop (no auth required).
+     */
+    public function streamImagePublic(Request $request, RewardProduct $rewardProduct)
+    {
+        return $this->streamImageInternal($rewardProduct);
+    }
+
+    private function streamImageInternal(RewardProduct $rewardProduct)
+    {
+        if (!$rewardProduct->image_path) {
+            return response()->json(['message' => 'No image'], 404);
+        }
+
+        $path = $rewardProduct->image_path;
+        if (str_starts_with($path, '/storage/')) {
+            $path = ltrim(str_replace('/storage/', '', $path), '/');
+        }
+
+        if (!Storage::disk('public')->exists($path)) {
+            return response()->json(['message' => 'Image file not found'], 404);
+        }
+
+        $file = Storage::disk('public')->get($path);
+        $mime = 'image/jpeg';
+        $ext = strtolower(pathinfo($rewardProduct->image_path, PATHINFO_EXTENSION));
+        if (in_array($ext, ['png'], true)) {
+            $mime = 'image/png';
+        } elseif (in_array($ext, ['webp'], true)) {
+            $mime = 'image/webp';
+        } elseif (in_array($ext, ['gif'], true)) {
+            $mime = 'image/gif';
+        }
+
+        return response($file, 200, [
+            'Content-Type' => $mime,
+            'Content-Length' => strlen($file),
+        ]);
+    }
+
     public function uploadImage(Request $request, RewardProduct $rewardProduct)
     {
         if ($resp = $this->requireAdmin()) return $resp;

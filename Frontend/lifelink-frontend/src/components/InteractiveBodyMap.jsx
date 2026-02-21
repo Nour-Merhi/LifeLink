@@ -122,8 +122,8 @@ export default function InteractiveBodyMap() {
 
     svg.style.height = "100%";
     svg.style.width = "auto";
-    svg.style.maxWidth = "100%";
-    svg.style.maxHeight = "100%";
+    svg.style.maxWidth = "90%";
+    svg.style.maxHeight = "90%";
     svg.style.display = "block";
 
     const onPointerOver = (e) => {
@@ -258,7 +258,7 @@ export default function InteractiveBodyMap() {
                 ) : null}
               </div>
 
-              <div ref={svgWrapRef} className="mx-auto max-w-[520px] h-[860px] md:max-w-[560px] md:h-[1120px] flex items-center justify-center">
+              <div ref={svgWrapRef} className="mx-auto -mt-10 max-w-[520px] h-[560px] md:max-w-[560px] md:h-[1020px] flex items-center justify-center">
                 <BodySvg />
               </div>
             </div>
@@ -280,7 +280,6 @@ export default function InteractiveBodyMap() {
                 >
                   <div className="rounded-xl border border-white/10 bg-zinc-950/85 backdrop-blur px-3 py-2 shadow-xl">
                     <div className="text-sm font-medium">{titleFromId(hoveredId)}</div>
-                    <div className="text-xs text-zinc-300">Click to learn more</div>
                   </div>
                 </motion.div>
               ) : null}

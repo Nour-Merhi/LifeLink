@@ -7,16 +7,17 @@ import { IoCalendar, IoHeart, IoGift, IoSettings } from "react-icons/io5";
 
 
 import { NavLink, useNavigate } from "react-router-dom";
-import api from "../../api/axios";
 import { useSystemSettings } from "../../context/SystemSettingsContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Sidebar({ openSidebar = false, setOpenSidebar = () => {} } = {}){
     const navigate = useNavigate();
     const { systemLogo, platformName } = useSystemSettings();
+    const { logout } = useAuth();
 
     const handleLogout = async () => {
         try {
-          await api.post("/api/logout");
+          await logout();
           // Trigger auth change to update context
           window.dispatchEvent(new Event('auth-change'));
           navigate("/home");

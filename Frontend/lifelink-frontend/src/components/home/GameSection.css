@@ -229,12 +229,12 @@
     }
 
     .game-section-actions {
-
+        gap: 10px;
         width: 100%;
     }
 
     .game-start-button {
-        width: 100%;
+        width: 50%;
         padding: 1rem 2rem;
     }
 

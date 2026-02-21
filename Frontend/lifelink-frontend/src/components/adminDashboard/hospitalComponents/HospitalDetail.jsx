@@ -8,10 +8,11 @@ import { MdOutlineMail } from "react-icons/md";
 import { IoTimeOutline, IoPersonOutline, IoCalendarOutline, IoStatsChart } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
+import { getApiBaseUrl } from "../../../config/api";
 import MapIntegration from "../../MapIntegration";
 import "../../../styles/Dashboard.css";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function HospitalDetail() {
     const { hospitalCode } = useParams();

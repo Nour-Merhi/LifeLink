@@ -11,6 +11,24 @@ import Level2 from "../../assets/levelsIcons/level-2.svg";
 import xpIcon from "../../assets/imgs/xpIcon.svg";
 import level3 from "../../assets/levelsIcons/level-3.svg";
 import api from "../../api/axios";
+import { API_BASE_URL } from "../../config/api";
+import CertificateImage from "../common/CertificateImage";
+
+function getCertificateImageSrc(c) {
+  const url = c?.image_url ?? null;
+  if (url && typeof url === "string" && (url.startsWith("http") || url.startsWith("data:"))) return url;
+  if (url && typeof url === "string") {
+    const base = (API_BASE_URL || "").replace(/\/$/, "");
+    const path = url.startsWith("/") ? url.slice(1) : url;
+    return base ? `${base}/${path}` : url;
+  }
+  if (c?.image_path && API_BASE_URL) {
+    const base = API_BASE_URL.replace(/\/$/, "");
+    const path = (c.image_path.startsWith("storage/") ? c.image_path : `storage/${c.image_path}`).replace(/^\/+/, "");
+    return `${base}/${path}`;
+  }
+  return null;
+}
 
 export default function Rewards() {
     const [rewardsData, setRewardsData] = useState(null);
@@ -148,12 +166,16 @@ export default function Rewards() {
                 <div className="mb-8 modern-certificates-grid">
                     {certificates.map((certificate) => (
                         <div key={certificate.id} className="modern-certificate-card">
-                            {certificate.image_url ? (
+                            {certificate.image_path ? (
                                 <div className="modern-certificate-image-wrapper">
-                                    <img 
-                                        src={certificate.image_url} 
+                                    <CertificateImage
+                                        certificateId={certificate.id}
+                                        imagePath={certificate.image_path}
+                                        imageUrl={getCertificateImageSrc(certificate)}
                                         alt={certificate.description_option || "Certificate"}
                                         className="modern-certificate-image"
+                                        fallbackClassName="modern-certificate-placeholder"
+                                        isAdmin={false}
                                     />
                                     <div className="modern-certificate-overlay">
                                         <button

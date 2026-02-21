@@ -667,6 +667,36 @@ class HospitalAppointmentController extends Controller
     }
 
     /**
+     * Hospital manager: get hospital visit appointments for their hospital only.
+     */
+    public function getHospitalAppointmentsForHospitalForManager(Request $request, $hospitalId = null)
+    {
+        $hospitalId = $hospitalId ?? $request->query('hospital_id');
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        $user->loadMissing('healthCenterManager');
+        $role = strtolower((string)($user->role ?? ''));
+        if (!in_array($role, ['manager', 'health_center_manager', 'hospital_manager'], true)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        $managerHospitalId = $user->healthCenterManager->hospital_id ?? null;
+        if (!$managerHospitalId) {
+            return response()->json([
+                'hospital' => null,
+                'urgent_appointments' => [],
+                'regular_appointments' => [],
+                'message' => 'Hospital not found for this manager',
+            ], 404);
+        }
+        if ($hospitalId && (int)$hospitalId !== (int)$managerHospitalId) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        return $this->getHospitalAppointmentsForHospital($request, $managerHospitalId);
+    }
+
+    /**
      * Get hospital appointments for a specific hospital (similar to getHospitalHomeVisitAppointments)
      */
     public function getHospitalAppointmentsForHospital(Request $request, $hospitalId = null)
@@ -1336,14 +1366,14 @@ class HospitalAppointmentController extends Controller
 
             DB::commit();
 
-            // Send confirmation email (non-blocking)
+            // Send confirmation email via queue so HTTP response isn't blocked
             try {
                 $donor->loadMissing(['user', 'bloodType']);
                 $hospitalAppointment->loadMissing(['hospital', 'appointment']);
 
                 $recipientEmail = $donor->user->email ?? null;
                 if ($recipientEmail) {
-                    Mail::to($recipientEmail)->send(new HospitalDonationRegistered($donor, $hospitalAppointment));
+                    Mail::to($recipientEmail)->queue(new HospitalDonationRegistered($donor, $hospitalAppointment));
                 } else {
                     \Log::warning('Skipping hospital donation registered email: donor user email is missing.', [
                         'donor_id' => $donor->id ?? null,
@@ -1351,7 +1381,7 @@ class HospitalAppointmentController extends Controller
                     ]);
                 }
             } catch (\Exception $e) {
-                \Log::error('Failed to send hospital donation registered email:', [
+                \Log::error('Failed to queue hospital donation registered email:', [
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
                 ]);

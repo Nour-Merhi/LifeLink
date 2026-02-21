@@ -48,12 +48,22 @@ use App\Http\Controllers\MobileControllers\MobileAuthController;
 use App\Http\Controllers\ChatbotController;
 
 
+
+Route::get('/health', fn () => response()->json(['status' => 'ok']));
+
+
 Route::post('/register', [RegisterController::class, 'register']);
 // Public (no auth) email domain check for registration UI
 Route::get('/email/check', [EmailCheckController::class, 'check'])->middleware('throttle:30,1');
 Route::post('/login', [AuthenticatedSessionController::class, 'login']);
 // Mobile auth (token-based for Flutter)
-Route::post('/mobile/login', [MobileAuthController::class, 'login']);
+Route::post('/mobile/login', [MobileAuthController::class, 'login'])
+    // Force this endpoint to stay stateless even if "stateful SPA" middleware
+    // is accidentally enabled in some environments.
+    ->withoutMiddleware([
+        \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        \App\Http\Middleware\SanctumCsrfMiddleware::class,
+    ]);
 Route::get('/system-settings', [SystemSettingsPublicController::class, 'show']);
 Route::get('/public/donation-stats', [PublicDonationStatsController::class, 'index']);
 Route::middleware('auth:sanctum')->get('/user', [AuthenticatedSessionController::class, 'user']);
@@ -77,6 +87,7 @@ Route::middleware('auth:sanctum')->prefix('/donor')->group(function(){
     Route::post('/rewards/purchase', [RewardsController::class, 'purchase']);
     // Certificates for donor
     Route::get('/certificates', [CertificateController::class, 'myCertificates']);
+    Route::get('/certificates/{id}/image', [CertificateController::class, 'donorImage']);
     Route::get('/certificates/{id}/download', [CertificateController::class, 'download']);
     // Home appointment ratings (donor only)
     Route::get('/home-appointments/{homeAppointment}/rating', [HomeAppointmentRatingController::class, 'show']);
@@ -129,6 +140,16 @@ Route::middleware('auth:sanctum')->prefix('/hospital/dashboard')->group(function
     Route::delete('/organ-coordination/living-donors/{code}', [HospitalDashboardController::class, 'deleteLivingDonor']);
     Route::put('/organ-coordination/after-death-pledges/{code}', [HospitalDashboardController::class, 'updateAfterDeathPledge']);
     Route::delete('/organ-coordination/after-death-pledges/{code}', [HospitalDashboardController::class, 'deleteAfterDeathPledge']);
+
+    // Phlebotomists for this hospital (manager-scoped)
+    Route::get('/phlebotomists/{hospitalId?}', [MobilePhlebotomistsController::class, 'indexForHospital']);
+    // Home visit appointments for this hospital (manager-scoped)
+    Route::get('/home-visit-appointments/{hospitalId?}', [HomeVisitController::class, 'getHospitalHomeVisitAppointmentsForManager']);
+    // Hospital visit appointments for this hospital (manager-scoped)
+    Route::get('/hospital-visit-appointments/{hospitalId?}', [HospitalAppointmentController::class, 'getHospitalAppointmentsForHospitalForManager']);
+    // Appointment time-slots and delete (manager can update/delete their hospital's appointments)
+    Route::patch('/appointments/{appointment}/time-slots', [AppointmentsController::class, 'updateTimeSlot']);
+    Route::delete('/appointments/{appointment}', [AppointmentsController::class, 'destroy']);
 
     // Hospital donor management (manager-scoped)
     Route::get('/donors', [HospitalDonorManagementController::class, 'getDonors']);
@@ -223,6 +244,7 @@ Route::middleware('auth:sanctum')->prefix('/admin/dashboard')->group(function(){
     Route::get('/certificates', [CertificateController::class, 'index']);
     Route::post('/certificates', [CertificateController::class, 'store']);
     Route::get('/certificates/{id}', [CertificateController::class, 'show']);
+    Route::get('/certificates/{id}/image', [CertificateController::class, 'image']);
     Route::post('/certificates/{id}/image', [CertificateController::class, 'updateImage']);
     Route::delete('/certificates/{id}', [CertificateController::class, 'destroy']);
 
@@ -245,6 +267,7 @@ Route::middleware('auth:sanctum')->prefix('/admin/dashboard')->group(function(){
     Route::get('/financial/patient-cases/{id}', [FinancialController::class, 'getPatientCaseDetails']);
     Route::put('/financial/patient-cases/{id}', [FinancialController::class, 'updatePatientCase']);
     Route::get('/financial/transactions', [FinancialController::class, 'getTransactions']);
+    Route::get('/financial/transactions/{id}', [FinancialController::class, 'getTransactionDetails']);
     Route::put('/financial/transactions/{id}', [FinancialDonationController::class, 'update']); // Update transaction (admin only)
     Route::delete('/financial/transactions/{id}', [FinancialDonationController::class, 'destroy']); // Delete transaction (admin only)
 
@@ -256,6 +279,7 @@ Route::middleware('auth:sanctum')->prefix('/admin/dashboard')->group(function(){
     // Rewards shop products (admin only)
     Route::get('/reward-products', [RewardProductController::class, 'index']);
     Route::post('/reward-products', [RewardProductController::class, 'store']); // supports multipart + image
+    Route::get('/reward-products/{rewardProduct}/image', [RewardProductController::class, 'streamImage']); // stream image for display
     Route::put('/reward-products/{rewardProduct}', [RewardProductController::class, 'update']);
     Route::post('/reward-products/{rewardProduct}/image', [RewardProductController::class, 'uploadImage']); // multipart
     Route::delete('/reward-products/{rewardProduct}', [RewardProductController::class, 'destroy']);
@@ -344,7 +368,7 @@ Route::get('/test', function () {
 // Public route for blood types
 Route::get('/blood-types', [DonorController::class, 'getBloodTypes']);
 
-//Hospital Route
+// Public hospital listing (used by organ donation forms, etc.)
 Route::get('/hospital', [HospitalController::class, 'index']);
 Route::get('/hospital/{id}', [HospitalController::class, 'getHospital']);
 
@@ -356,9 +380,7 @@ Route::post('/organ/after-death-pledge', [AfterDeathPledgeController::class, 'st
 
 
 
-//Appointments Routes
-Route::get('/hospital', [HospitalsController::class, 'index']);
-Route::get('/hospital/{id}', [HospitalsController::class, 'getHospital']);
+//Appointments Routes (hospital listing handled above)
 
 // Public Article Routes
 Route::get('/articles', [ArticleController::class, 'index']);
@@ -369,6 +391,7 @@ Route::get('/blood-heroes', [BloodHeroesController::class, 'index']);
 
 // Public Rewards Shop (products only, for guests)
 Route::get('/rewards/shop-public', [RewardsController::class, 'shopPublic']);
+Route::get('/rewards/products/{rewardProduct}/image', [RewardProductController::class, 'streamImagePublic']);
 
 //Hospital Appointment Route 
 Route::post('/hospital/appointments', [HospitalAppointmentController::class, 'store']);

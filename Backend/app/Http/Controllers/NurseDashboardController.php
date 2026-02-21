@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use App\Services\XpService;
 
 class NurseDashboardController extends Controller
 {
@@ -539,6 +540,23 @@ class NurseDashboardController extends Controller
             }
 
             $homeAppointment->save();
+
+            // Award XP if donation was just completed
+            if ($newState === 'completed' && $oldState !== 'completed' && $homeAppointment->donor_id) {
+                try {
+                    XpService::awardBloodDonationXp(
+                        $homeAppointment->donor_id,
+                        HomeAppointment::class,
+                        $homeAppointment->id
+                    );
+                } catch (\Exception $e) {
+                    Log::warning('Failed to award XP for home appointment:', [
+                        'appointment_id' => $homeAppointment->id,
+                        'donor_id' => $homeAppointment->donor_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             // If appointment is finished (completed/canceled), free up the phlebotomist.
             // This must work even if an admin triggers the status change.
@@ -1401,8 +1419,9 @@ class NurseDashboardController extends Controller
                 ], 404);
             }
 
-            // Verify the appointment is assigned to this phlebotomist
-            $homeAppointment = HomeAppointment::where('id', $appointmentId)
+            // Verify the appointment is assigned to this phlebotomist (cast id for PostgreSQL)
+            $appointmentIdInt = is_numeric($appointmentId) ? (int) $appointmentId : 0;
+            $homeAppointment = HomeAppointment::where('id', $appointmentIdInt)
                 ->where('phlebotomist_id', $phlebotomist->id)
                 ->first();
 
@@ -1413,29 +1432,30 @@ class NurseDashboardController extends Controller
                 ], 404);
             }
 
-            // Update phlebotomist availability to onDuty
-            // Enforce: inactive => unavailable
-            if (strtolower((string)($phlebotomist->status ?? '')) === 'inactive') {
-                $phlebotomist->availability = 'unavailable';
-            } else {
-                $phlebotomist->availability = 'onDuty';
-            }
-            $phlebotomist->save();
+            // Update phlebotomist availability and appointment state in one transaction
+            $newAvailability = (strtolower((string)($phlebotomist->status ?? '')) === 'inactive')
+                ? 'unavailable'
+                : 'onDuty';
 
-            // Update appointment status to confirmed
-            $homeAppointment->state = 'confirmed';
-            $homeAppointment->save();
+            DB::transaction(function () use ($phlebotomist, $newAvailability, $homeAppointment) {
+                DB::table('mobile_phlebotomists')
+                    ->where('id', $phlebotomist->id)
+                    ->update(['availability' => $newAvailability, 'updated_at' => now()]);
+                DB::table('home_appointments')
+                    ->where('id', $homeAppointment->id)
+                    ->update(['state' => 'confirmed', 'updated_at' => now()]);
+            });
 
             return response()->json([
                 'message' => 'Appointment started successfully. Your status has been set to on duty and the appointment is now confirmed.',
                 'phlebotomist' => [
                     'id' => $phlebotomist->id,
-                    'availability' => $phlebotomist->availability
+                    'availability' => $newAvailability
                 ],
                 'appointment' => [
                     'id' => $homeAppointment->id,
                     'code' => $homeAppointment->code,
-                    'state' => $homeAppointment->state
+                    'state' => 'confirmed'
                 ]
             ], 200);
 
@@ -1503,16 +1523,16 @@ class NurseDashboardController extends Controller
                 ->leftJoin('hospitals as h', 'h.id', '=', 'mp.hospital_id')
                 ->whereNotNull('r.phlebotomist_id')
                 ->where('ha.state', '=', 'completed')
-                ->selectRaw('
+                ->selectRaw("
                     mp.id as phlebotomist_id,
                     mp.code as phlebotomist_code,
                     u.email as email,
-                    CONCAT_WS(" ", u.first_name, u.middle_name, u.last_name) as name,
+                    CONCAT_WS(' ', u.first_name, u.middle_name, u.last_name) as name,
                     h.name as hospital_name,
                     ROUND(AVG(r.rating), 2) as avg_rating,
                     COUNT(r.id) as ratings_count,
                     COUNT(DISTINCT ha.id) as completed_rated_count
-                ')
+                ")
                 ->groupBy('mp.id', 'mp.code', 'u.email', 'u.first_name', 'u.middle_name', 'u.last_name', 'h.name')
                 ->orderByDesc('avg_rating')
                 ->orderByDesc('ratings_count')
@@ -1548,16 +1568,16 @@ class NurseDashboardController extends Controller
                 ->leftJoin('home_appointment_ratings as r', 'r.home_appointment_id', '=', 'ha.id')
                 ->whereNotNull('ha.phlebotomist_id')
                 ->where('ha.state', '=', 'completed')
-                ->selectRaw('
+                ->selectRaw("
                     mp.id as phlebotomist_id,
                     mp.code as phlebotomist_code,
                     u.email as email,
-                    CONCAT_WS(" ", u.first_name, u.middle_name, u.last_name) as name,
+                    CONCAT_WS(' ', u.first_name, u.middle_name, u.last_name) as name,
                     h.name as hospital_name,
                     COUNT(ha.id) as completed_count,
                     COUNT(r.id) as ratings_count,
                     ROUND(AVG(r.rating), 2) as avg_rating
-                ')
+                ")
                 ->groupBy('mp.id', 'mp.code', 'u.email', 'u.first_name', 'u.middle_name', 'u.last_name', 'h.name')
                 ->orderByDesc('completed_count')
                 ->orderByDesc('ratings_count')

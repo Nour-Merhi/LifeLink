@@ -89,11 +89,6 @@
     margin-bottom: 50px;
     padding: 0 40px;
 }
-.hospital-grid{
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-
-}
 
 .partner-hospital-card {
     background-color: rgba(99, 99, 99, 0.2);
@@ -401,7 +396,7 @@
     font-size: 1.1rem;
     color: #b3b3b3;
     line-height: 1.6;
-    max-width: 800px;
+    text-align: justify;
 }
 
 .hospital-detail-image-container {

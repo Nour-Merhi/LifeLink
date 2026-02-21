@@ -3,8 +3,17 @@ import { RiArticleLine } from "react-icons/ri";
 import { IoArrowForward } from "react-icons/io5";
 import { useEffect, useRef, useState } from "react";
 import { useArticles } from "../../context/ArticlesContext";
-import api from "../../api/axios";
+import { API_BASE_URL } from "../../config/api";
 import "../../styles/Articles.css";
+
+function getArticleImageSrc(article) {
+  const src = article?.image_url ?? article?.image;
+  if (!src) return "/image.png";
+  if (typeof src === "string" && (src.startsWith("http") || src.startsWith("data:"))) return src;
+  const base = (API_BASE_URL || "").replace(/\/$/, "");
+  const path = typeof src === "string" && src.startsWith("/") ? src.slice(1) : src;
+  return base ? `${base}/${path}` : "/image.png";
+}
 
 export default function ArticlesSection() {
   const navigate = useNavigate();
@@ -75,14 +84,7 @@ export default function ArticlesSection() {
             {displayedArticles.map((article, index) => {
               const articleId = article.id;
               const isVisible = visibleArticles.includes(articleId);
-              const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
-
-              // Resolve backend image URLs (uploads/articles/...) correctly
-              const imageSrc = article.image
-                ? (String(article.image).startsWith("http")
-                    ? article.image
-                    : `${baseURL}${String(article.image).startsWith("/") ? "" : "/"}${article.image}`)
-                : "/image.png";
+              const imageSrc = getArticleImageSrc(article);
               
               return (
                 <article
@@ -103,7 +105,8 @@ export default function ArticlesSection() {
                       alt={article.title}
                       className="w-full h-48 object-cover transition-transform duration-600 hover:scale-110"
                       onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/400x250?text=Article+Image';
+                        e.target.onerror = null;
+                        e.target.src = '/image.png';
                       }}
                     />
                     <span className="article-category absolute top-3 left-3 bg-red-600 text-white text-xs font-semibold px-3 py-1 rounded-full uppercase">

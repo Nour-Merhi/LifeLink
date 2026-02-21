@@ -1,27 +1,28 @@
 import axios from "axios";
 
+export const AUTH_TOKEN_STORAGE_KEY = "lifelink_auth_token";
+
 const api = axios.create({
-  baseURL: "http://localhost:8000",
-  withCredentials: true, // 🔥 THIS IS CRITICAL
+  // Prefer env in Vercel builds; fall back to Railway URL for local dev.
+  baseURL:
+    import.meta.env.VITE_API_URL ||
+    "https://lifelink-laravel-app-production.up.railway.app",
+  // We use Bearer tokens for production cross-site auth (Vercel -> Railway),
+  // so we do NOT rely on cookies/CSRF.
+  withCredentials: false,
+  timeout: 30000,
   headers: {
     Accept: "application/json",
+    "Content-Type": "application/json",
   },
 });
 
-// Helper function to get cookie by name
-const getCookie = (name) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-};
-
-// Request interceptor to add X-XSRF-TOKEN header from cookie
 api.interceptors.request.use(
-  (config) => {
-    const token = getCookie('XSRF-TOKEN');
+  async (config) => {
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (token) {
-      config.headers['X-XSRF-TOKEN'] = decodeURIComponent(token);
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -29,6 +30,28 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export function setAuthToken(token) {
+  if (!token) return;
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+export function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
 
 export default api;
 

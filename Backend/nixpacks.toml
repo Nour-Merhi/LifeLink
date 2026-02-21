@@ -1,0 +1,5 @@
+# Nixpacks config for Laravel (Railway)
+# Ensures PHP 8.2 + Composer. Build/start from railway.toml.
+
+[phases.setup]
+nixPkgs = ["php82", "php82Packages.composer"]

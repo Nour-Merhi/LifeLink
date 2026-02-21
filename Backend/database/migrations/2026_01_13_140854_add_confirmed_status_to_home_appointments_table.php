@@ -12,8 +12,26 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Modify the enum to include 'confirmed'
-        DB::statement("ALTER TABLE `home_appointments` MODIFY COLUMN `state` ENUM('pending', 'confirmed', 'completed', 'canceled') DEFAULT 'pending'");
+        Schema::table('home_appointments', function (Blueprint $table) {
+            $table->string('state', 50)->default('pending')->change();
+        });
+
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM pg_constraint 
+                        WHERE conname = 'home_appointments_state_check'
+                    ) THEN
+                        ALTER TABLE home_appointments
+                        ADD CONSTRAINT home_appointments_state_check
+                        CHECK (state IN ('pending', 'confirmed', 'completed', 'canceled'));
+                    END IF;
+                END$$;
+            ");
+        }
     }
 
     /**
@@ -21,8 +39,15 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert back to original enum (without 'confirmed')
-        // Note: This will fail if there are any records with 'confirmed' status
-        DB::statement("ALTER TABLE `home_appointments` MODIFY COLUMN `state` ENUM('pending', 'completed', 'canceled') DEFAULT 'pending'");
+        Schema::table('home_appointments', function (Blueprint $table) {
+            $table->string('state', 50)->default('pending')->change();
+        });
+
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                ALTER TABLE home_appointments
+                DROP CONSTRAINT IF EXISTS home_appointments_state_check
+            ");
+        }
     }
 };

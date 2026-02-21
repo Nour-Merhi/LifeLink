@@ -3,13 +3,24 @@ import Calendar from "./Calender"
 import Searchbar from "./Searchbar"
 
 import { useState, useEffect } from "react"
-import axios from "axios";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
+/** Extract donor blood type string (e.g. "A+", "O-") from user. Handles multiple API formats. */
+function getDonorBloodType(user) {
+  if (!user) return null;
+  const donor = user.donor;
+  if (!donor) return null;
+  const bt = donor.bloodType || donor.blood_type;
+  if (!bt) return null;
+  if (typeof bt === "string") return bt.trim() || null;
+  const s = `${bt.type || ""}${bt.rh_factor || ""}`.trim();
+  return s || null;
+}
+
 export default function HospitalBloodBooking({ pageType }) {
   const prefix = pageType === "home" ? "home_" : "hospital_"
-  const { user } = useAuth();
+  const { user, fetchUser } = useAuth();
   const userScope = user?.id ? `u${user.id}_` : "guest_";
   const storagePrefix = `${prefix}${userScope}`;
   const scopedKey = (k) => `${storagePrefix}${k}`;
@@ -20,9 +31,12 @@ export default function HospitalBloodBooking({ pageType }) {
     eligible: true, 
     daysRemaining: 0, 
     lastDonationDate: null,
+    hasActiveBloodAppointment: false,
     loading: true 
   });
   const isEligible = eligibility.eligible;
+  const hasActiveBloodAppointment = eligibility.hasActiveBloodAppointment;
+  const canRegister = isEligible && !hasActiveBloodAppointment;
 
   const [step, setStep] = useState("hospitals")
   const [date, setDate] = useState(null)
@@ -52,12 +66,21 @@ export default function HospitalBloodBooking({ pageType }) {
     appointment_date: date || '',
   })
 
+  // Ensure we have full user with donor.bloodType (mobile login returns minimal user without donor)
+  useEffect(() => {
+    const isDonor = user?.role?.toLowerCase() === "donor" || user?.donor_id;
+    const missingDonorData = !user?.donor || (!user.donor.bloodType && !user.donor.blood_type);
+    if (user?.id && isDonor && missingDonorData && fetchUser) {
+      fetchUser();
+    }
+  }, [user?.id, user?.role, user?.donor_id, user?.donor, fetchUser]);
+
   // Fetch eligibility from backend
   useEffect(() => {
     const fetchEligibility = async () => {
       if (!user) {
         // Guest users are eligible (will be checked on submission)
-        setEligibility({ eligible: true, daysRemaining: 0, lastDonationDate: null, loading: false });
+        setEligibility({ eligible: true, daysRemaining: 0, lastDonationDate: null, hasActiveBloodAppointment: false, loading: false });
         return;
       }
 
@@ -68,12 +91,13 @@ export default function HospitalBloodBooking({ pageType }) {
           eligible: response.data.eligible,
           daysRemaining: response.data.daysRemaining || 0,
           lastDonationDate: response.data.lastDonationDate,
+          hasActiveBloodAppointment: response.data.hasActiveBloodAppointment || false,
           loading: false
         });
       } catch (error) {
         console.error('Error fetching eligibility:', error);
         // On error, default to eligible (don't block user)
-        setEligibility({ eligible: true, daysRemaining: 0, lastDonationDate: null, loading: false });
+        setEligibility({ eligible: true, daysRemaining: 0, lastDonationDate: null, hasActiveBloodAppointment: false, loading: false });
       }
     };
 
@@ -133,7 +157,7 @@ export default function HospitalBloodBooking({ pageType }) {
     localStorage.removeItem(legacyKey("time"));
     localStorage.removeItem(legacyKey("step"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEligible]);
+  }, [canRegister]);
   
   useEffect(() => {
     localStorage.setItem(scopedKey("step"), step)
@@ -161,7 +185,7 @@ export default function HospitalBloodBooking({ pageType }) {
     setLoading(true);
     setError("");
 
-    axios.get('http://localhost:8000/api/blood/hospital_donation')
+    api.get("/api/blood/hospital_donation")
       .then((res) => {
         const hospitalsData = res.data.hospitals || res.data || [];
         const urgentData = res.data.urgent_hospitals || [];
@@ -200,10 +224,10 @@ export default function HospitalBloodBooking({ pageType }) {
       
       const appointmentType = hospital.appointment_type; // 'urgent' or 'regular'
       const url = appointmentType 
-        ? `http://localhost:8000/api/blood/hospital_donation/${hospital.id}?appointment_type=${appointmentType}`
-        : `http://localhost:8000/api/blood/hospital_donation/${hospital.id}`;
+        ? `/api/blood/hospital_donation/${hospital.id}?appointment_type=${appointmentType}`
+        : `/api/blood/hospital_donation/${hospital.id}`;
       
-      axios.get(url)
+      api.get(url)
         .then((res) => {
           const appointmentsData = res.data.appointments || [];
           const timeSlotsData = res.data.time_slots || [];
@@ -298,8 +322,18 @@ export default function HospitalBloodBooking({ pageType }) {
     if (term.trim() === "") {
       setFilteredHospitals(showHospitals);
     } else {
-      const filtered = showHospitals.filter(h =>
-        h.name.toLowerCase().includes(term.toLowerCase())
+      const termLower = term.trim().toLowerCase();
+      const searchable = [...urgentHospitals];
+      regularHospitals.forEach((h) => {
+        if (!searchable.some((x) => x.id === h.id)) searchable.push(h);
+      });
+      showHospitals.forEach((h) => {
+        if (!searchable.some((x) => x.id === h.id)) searchable.push(h);
+      });
+      const filtered = searchable.filter(
+        (h) =>
+          (h.name && h.name.toLowerCase().includes(termLower)) ||
+          (h.address && h.address.toLowerCase().includes(termLower))
       );
       setFilteredHospitals(filtered);
     }
@@ -333,18 +367,35 @@ export default function HospitalBloodBooking({ pageType }) {
                       Last donation: {new Date(eligibility.lastDonationDate).toLocaleDateString()}
                     </span>
                   )}
-                </p>
+            </div>
+          )}
+          {!eligibility.loading && hasActiveBloodAppointment && (
+            <div style={{ 
+              margin: "10px 0 14px", 
+              padding: "16px 18px", 
+              borderRadius: 10, 
+              border: "2px solid #ca8a04", 
+              background: "rgba(234, 179, 8, 0.15)", 
+              color: "#854d0e",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              fontWeight: 500
+            }}>
+              <div>
+                You cannot register another appointment. Please wait until your current appointment is completed and 56 days have passed, or if it is cancelled you can register again.
               </div>
             </div>
           )}
         <Hospitals
-          disableSelection={!isEligible}
+          disableSelection={!canRegister}
           showHospitals={hospitalsToShow}
           urgentHospitals={pageType === "hospital" ? urgentHospitals : []}
           regularHospitals={pageType === "hospital" ? regularHospitals : []}
           searchQuery={ searchQuery }
+          donorBloodType={getDonorBloodType(user)}
           onSelect={(h) => { 
-            if (!isEligible) return;
+            if (!canRegister) return;
             setHospital(h); 
             setStep("calendar"); 
           }}

@@ -3,8 +3,9 @@ import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import { IoPersonCircle } from "react-icons/io5";
 import api from "../../../api/axios";
+import { getApiBaseUrl } from "../../../config/api";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function ViewPatientCaseModal({ onClose, patientCaseId }) {
     const [loading, setLoading] = useState(true);

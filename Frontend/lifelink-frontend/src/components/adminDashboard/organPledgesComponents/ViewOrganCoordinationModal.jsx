@@ -139,45 +139,57 @@ export default function ViewOrganCoordinationModal({ onClose, data, mode, code: 
                             {(details.id_picture || details.id_photo || details.father_id_photo || details.mother_id_photo) && (
                                 <div className="modal-section">
                                     <h3 className="modal-section-title">ID Photos</h3>
-                                    <div className="modal-grid">
+                                    <div className="view-organ-id-photos">
                                         {details.id_picture && (
-                                            <div className="modal-field">
-                                                <span className="label">Personal ID</span>
-                                                <span className="value">
-                                                    <a href={details.id_picture} target="_blank" rel="noreferrer">
-                                                        Open
-                                                    </a>
-                                                </span>
+                                            <div className="view-organ-id-photo-item">
+                                                <span className="view-organ-id-photo-label">Personal ID</span>
+                                                <button
+                                                    type="button"
+                                                    className="view-organ-id-photo-preview"
+                                                    onClick={() => window.open(details.id_picture, "_blank", "noopener,noreferrer")}
+                                                    title="Open in new tab"
+                                                >
+                                                    <img src={details.id_picture} alt="Personal ID" />
+                                                </button>
                                             </div>
                                         )}
                                         {details.id_photo && (
-                                            <div className="modal-field">
-                                                <span className="label">Personal ID</span>
-                                                <span className="value">
-                                                    <a href={details.id_photo} target="_blank" rel="noreferrer">
-                                                        Open
-                                                    </a>
-                                                </span>
+                                            <div className="view-organ-id-photo-item">
+                                                <span className="view-organ-id-photo-label">Personal ID</span>
+                                                <button
+                                                    type="button"
+                                                    className="view-organ-id-photo-preview"
+                                                    onClick={() => window.open(details.id_photo, "_blank", "noopener,noreferrer")}
+                                                    title="Open in new tab"
+                                                >
+                                                    <img src={details.id_photo} alt="Personal ID" />
+                                                </button>
                                             </div>
                                         )}
                                         {details.father_id_photo && (
-                                            <div className="modal-field">
-                                                <span className="label">Father ID</span>
-                                                <span className="value">
-                                                    <a href={details.father_id_photo} target="_blank" rel="noreferrer">
-                                                        Open
-                                                    </a>
-                                                </span>
+                                            <div className="view-organ-id-photo-item">
+                                                <span className="view-organ-id-photo-label">Father ID</span>
+                                                <button
+                                                    type="button"
+                                                    className="view-organ-id-photo-preview"
+                                                    onClick={() => window.open(details.father_id_photo, "_blank", "noopener,noreferrer")}
+                                                    title="Open in new tab"
+                                                >
+                                                    <img src={details.father_id_photo} alt="Father ID" />
+                                                </button>
                                             </div>
                                         )}
                                         {details.mother_id_photo && (
-                                            <div className="modal-field">
-                                                <span className="label">Mother ID</span>
-                                                <span className="value">
-                                                    <a href={details.mother_id_photo} target="_blank" rel="noreferrer">
-                                                        Open
-                                                    </a>
-                                                </span>
+                                            <div className="view-organ-id-photo-item">
+                                                <span className="view-organ-id-photo-label">Mother ID</span>
+                                                <button
+                                                    type="button"
+                                                    className="view-organ-id-photo-preview"
+                                                    onClick={() => window.open(details.mother_id_photo, "_blank", "noopener,noreferrer")}
+                                                    title="Open in new tab"
+                                                >
+                                                    <img src={details.mother_id_photo} alt="Mother ID" />
+                                                </button>
                                             </div>
                                         )}
                                     </div>

@@ -13,7 +13,6 @@ return new class extends Migration
             if (!Schema::hasColumn('home_appointment_ratings', 'phlebotomist_id')) {
                 $table->foreignId('phlebotomist_id')
                     ->nullable()
-                    ->after('home_appointment_id')
                     ->constrained('mobile_phlebotomists')
                     ->nullOnDelete();
 
@@ -21,14 +20,22 @@ return new class extends Migration
             }
         });
 
-        // Backfill existing ratings to snapshot the phlebotomist assigned at that time.
-        // This uses the current home_appointments.phlebotomist_id for existing data.
-        if (Schema::hasColumn('home_appointment_ratings', 'phlebotomist_id')) {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                UPDATE home_appointment_ratings AS r
+                SET phlebotomist_id = ha.phlebotomist_id
+                FROM home_appointments AS ha
+                WHERE ha.id = r.home_appointment_id
+                  AND r.phlebotomist_id IS NULL
+                  AND ha.phlebotomist_id IS NOT NULL
+            ");
+        } else {
+            // MySQL version
             DB::table('home_appointment_ratings as r')
                 ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
                 ->whereNull('r.phlebotomist_id')
                 ->whereNotNull('ha.phlebotomist_id')
-                ->update(['r.phlebotomist_id' => DB::raw('ha.phlebotomist_id')]);
+                ->update(['phlebotomist_id' => DB::raw('ha.phlebotomist_id')]);
         }
     }
 
@@ -43,4 +50,3 @@ return new class extends Migration
         });
     }
 };
-

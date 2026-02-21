@@ -40,6 +40,7 @@ import QuizManagement from "./components/adminDashboard/QuizManagement.jsx";
 import Login from "./pages/Login";
 import Register from "./pages/Register"
 import axios from "axios";
+import api from "./api/axios";
 
 /* Articles */
 import ArticlePage from "./pages/articlePage.jsx";
@@ -103,8 +104,8 @@ import Chatbot from "./components/Chatbot.jsx"
 
 function App() {
   useEffect(() => {
-    axios
-      .get("http://127.0.0.1:8000/api/test")
+    api
+      .get("/api/test")
       .then((res) => {
         console.log(res.data);
       })

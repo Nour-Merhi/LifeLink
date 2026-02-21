@@ -7,8 +7,37 @@ import { SpinnerDotted } from 'spinners-react';
 import "../../styles/BloodDonation.css"
 
 
-export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [], disableSelection = false }) {
+
+/**
+ * Returns true if the donor can see this hospital based on blood type.
+ * - Hospital needs "all" (null/empty) → show to all donors
+ * - Hospital needs specific type (e.g. O+) → show only to donors with that exact blood type
+ * - Guest (no donorBloodType) → show all hospitals
+ */
+function canDonorSeeHospital(donorBloodType, hospital) {
+  const needed = hospital?.blood_type_needed;
+  if (!needed || needed === '' || String(needed).toLowerCase() === 'all') return true;
+  if (!donorBloodType) return true; // guest sees all
+  const neededNorm = String(needed).trim().toUpperCase();
+  const donorNorm = String(donorBloodType).trim().toUpperCase();
+  return donorNorm === neededNorm;
+}
+
+function filterByBloodType(list, donorBloodType) {
+  if (!list || !Array.isArray(list)) return [];
+  if (!donorBloodType) return list;
+  return list.filter((h) => canDonorSeeHospital(donorBloodType, h));
+}
+
+export default function Hospitals({ onSelect, showHospitals, searchQuery, urgentHospitals = [], regularHospitals = [], disableSelection = false, donorBloodType = null }) {
     const isSearching = searchQuery && searchQuery.trim() !== "";
+
+    // Urgent: filter by donor blood type (only show if donor matches needed type)
+    const filteredUrgentHospitals = filterByBloodType(urgentHospitals, donorBloodType);
+    // Regular: always show all (blood type = "all" for regular appointments)
+    const filteredRegularHospitals = regularHospitals || [];
+    // Search results: filter by blood type (urgent hospitals filtered, regular pass through)
+    const filteredShowHospitals = filterByBloodType(showHospitals, donorBloodType);
     
     const toNumber = (v) => {
       const n = Number(v);
@@ -31,10 +60,10 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
       return toNumber(h.available_slots);
     };
 
-    // Calculate hasResults based on current state
+    // Calculate hasResults based on current state (use filtered lists)
     const hasResults = isSearching 
-        ? (showHospitals && showHospitals.length > 0)
-        : ((urgentHospitals && urgentHospitals.length > 0) || (regularHospitals && regularHospitals.length > 0) || (showHospitals && showHospitals.length > 0));
+        ? (filteredShowHospitals && filteredShowHospitals.length > 0)
+        : ((filteredUrgentHospitals && filteredUrgentHospitals.length > 0) || (filteredRegularHospitals && filteredRegularHospitals.length > 0) || (filteredShowHospitals && filteredShowHospitals.length > 0));
 
     return (
     <div className="search-hospital">
@@ -45,9 +74,9 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
       {isSearching && hasResults && (
         <div className="urgent-needs">
           <h1>Search Results:</h1>
-          {showHospitals.map((h) => {
+          {filteredShowHospitals.map((h) => {
             // Determine appointment type: if hospital has urgent flag or appears in urgent list, use urgent, otherwise regular
-            const isUrgent = h.has_urgent || urgentHospitals.some(uh => uh.id === h.id);
+            const isUrgent = h.has_urgent || filteredUrgentHospitals.some(uh => uh.id === h.id);
             const appointmentType = isUrgent ? 'urgent' : 'regular';
             const slotsCount = getSlotsCount(h, appointmentType);
             const isDisabled = disableSelection || slotsCount <= 0;
@@ -90,11 +119,11 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
         <>
         {hasResults ? ( 
           <>
-            {/* Urgent Need Section - Dynamic */}
-            {urgentHospitals && urgentHospitals.length > 0 && (
+            {/* Urgent Need Section - filtered by donor blood type */}
+            {filteredUrgentHospitals && filteredUrgentHospitals.length > 0 && (
               <div className="urgent-needs">
                 
-                {urgentHospitals.map((h) => {
+                {filteredUrgentHospitals.map((h) => {
                   // Format due date and time for display
                   const formatDueDate = (dateStr) => {
                     if (!dateStr) return '';
@@ -183,13 +212,12 @@ export default function Hospitals({ onSelect, showHospitals, searchQuery, urgent
             <h1 className="register-hospital">Registered Hospitals:</h1>
             
               {(() => {
-                // Use regularHospitals from backend, or fallback to filtering showHospitals
-                const hospitalsToShow = regularHospitals.length > 0 
-                  ? regularHospitals 
-                  : showHospitals.filter(h => {
-                      // If backend didn't provide regularHospitals, filter hospitals that don't have urgent
-                      return !urgentHospitals.some(uh => uh.id === h.id) || h.has_regular;
-                    });
+                // Regular hospitals: show all (no blood type filter). Fallback to showHospitals if backend didn't provide regularHospitals.
+                const hospitalsToShow = filteredRegularHospitals.length > 0 
+                  ? filteredRegularHospitals 
+                  : (showHospitals || []).filter(h => 
+                      !filteredUrgentHospitals.some(uh => uh.id === h.id) || h.has_regular
+                    );
                 
                 return hospitalsToShow.map((h) => (
                 (() => {

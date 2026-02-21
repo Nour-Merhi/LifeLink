@@ -26,6 +26,8 @@ class SystemSettingsPublicController extends Controller
             return response()->json([
                 'platform_name' => $settings->platform_name,
                 'system_logo' => $settings->system_logo, // stored as base64 data URL (or null)
+                'contact_phone' => $settings->contact_phone,
+                'system_email' => $settings->system_email,
             ], 200);
         } catch (\Exception $e) {
             \Log::error('Error fetching public system settings:', [

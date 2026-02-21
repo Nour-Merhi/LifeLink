@@ -9,7 +9,7 @@ export default function HospitalApp() {
     const [refreshKey, setRefreshKey] = useState(0);
     const [openModal, setOpenModal] = useState(false);
     // Get hospital ID from user's health center manager relationship
-    const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
 
     const fetchHospitalAppointments = () => {
         // Trigger refresh by updating the key, which will cause HospitalAppRequestsTable to re-render

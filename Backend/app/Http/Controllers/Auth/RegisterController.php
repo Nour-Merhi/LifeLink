@@ -120,27 +120,51 @@ class RegisterController extends Controller
 
             DB::commit();
 
-            // Send welcome email (in background to avoid blocking)
+            // Load donor relationship with blood type before returning
+            $user->load(['donor.bloodType']);
+
+            // Prepare response data
+            $responseData = [
+                'message' => 'Registration successful',
+                'user' => [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'donor' => $user->donor ? [
+                        'id' => $user->donor->id,
+                        'code' => $user->donor->code,
+                        'blood_type_id' => $user->donor->blood_type_id,
+                        'bloodType' => $user->donor->bloodType ? [
+                            'type' => $user->donor->bloodType->type,
+                            'rh_factor' => $user->donor->bloodType->rh_factor,
+                        ] : null,
+                    ] : null,
+                ]
+            ];
+
+            // Return success immediately - frontend will handle login
+            $response = response()->json($responseData, 201);
+
             try {
-                Mail::to($user->email)->send(new WelcomeEmail($user->first_name));
+                if (config('queue.default') !== 'sync') {
+                    Mail::to($user->email)->queue(new WelcomeEmail($user->first_name));
+                } else {
+                    \Log::info('Welcome email should be sent manually (no queue configured):', [
+                        'user_id' => $user->id,
+                        'email' => $user->email
+                    ]);
+                }
             } catch (\Exception $mailException) {
                 // Log email error but don't fail registration
-                \Log::warning('Failed to send welcome email:', [
+                \Log::warning('Failed to queue welcome email:', [
                     'user_id' => $user->id,
                     'error' => $mailException->getMessage()
                 ]);
             }
 
-            // Auto-login the user after registration using web guard (session-based)
-            Auth::guard('web')->login($user);
-
-            // Load donor relationship with blood type
-            $user->load(['donor.bloodType']);
-
-            return response()->json([
-                'message' => 'Registration successful',
-                'user' => $user
-            ], 201);
+            return $response;
 
         } catch (\Illuminate\Database\QueryException $e) {
             DB::rollBack();

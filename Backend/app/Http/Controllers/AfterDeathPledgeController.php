@@ -176,8 +176,9 @@ class AfterDeathPledgeController extends Controller
             }
 
             // Send thank-you email to the donor
+            // Use queue() so response returns immediately; avoids mobile timeout when SMTP is slow
             try {
-                Mail::to($validated['email'])->send(new AfterDeathPledgeThankYou($pledge));
+                Mail::to($validated['email'])->queue(new AfterDeathPledgeThankYou($pledge));
             } catch (\Exception $e) {
                 \Log::error('Failed to send after-death pledge thank-you email:', [
                     'pledge_id' => $pledge->id,

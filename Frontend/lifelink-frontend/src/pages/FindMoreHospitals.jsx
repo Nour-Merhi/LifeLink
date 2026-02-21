@@ -6,8 +6,18 @@ import { LuPhone } from "react-icons/lu";
 import { MdOutlineMail } from "react-icons/md";
 import Navbar from "../components/Navbar";
 import { useHospitals } from "../context/HospitalsContext";
+import { API_BASE_URL } from "../config/api";
 import "../components/home/RegisteredHospitals.css";
 import { useNavigate } from "react-router-dom";
+
+function getHospitalImageSrc(hospital) {
+    const src = hospital?.image_url ?? hospital?.image;
+    if (!src) return "/image.png";
+    if (typeof src === "string" && (src.startsWith("data:") || src.startsWith("http"))) return src;
+    const base = (API_BASE_URL || "").replace(/\/$/, "");
+    const path = typeof src === "string" && src.startsWith("/") ? src.slice(1) : src;
+    return base ? `${base}/${path}` : "/image.png";
+}
 
 export default function FindMoreHospitals() {
     const navigate = useNavigate();
@@ -75,9 +85,7 @@ export default function FindMoreHospitals() {
                         <div className="partner-hospitals-grid hospital-grid">
                             {filteredHospitals.length > 0 ? (
                                 filteredHospitals.map((hospital) => {
-                                    const imageSrc = hospital.image 
-                                        ? (hospital.image.startsWith('http') ? hospital.image : `/image.png`)
-                                        : '/image.png';
+                                    const imageSrc = getHospitalImageSrc(hospital);
                                     const urgentNeeds = hospital.urgent_needs || [];
                                     
                                     return (

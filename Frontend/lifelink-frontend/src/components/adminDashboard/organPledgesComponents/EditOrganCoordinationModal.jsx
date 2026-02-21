@@ -27,7 +27,6 @@ const ORGANS = [
 
 const normalizeOrgans = (arr) => {
     if (!Array.isArray(arr)) return [];
-    // Normalize typo variant to canonical id
     return Array.from(
         new Set(
             arr
@@ -108,7 +107,6 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
             const res = await api.get("/api/admin/dashboard/get-hospitals");
             setHospitals(res.data?.hospitals || []);
         } catch (e) {
-            // non-blocking; user can still save without changing hospital
         } finally {
             setLoadingHospitals(false);
         }
@@ -319,7 +317,7 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                     ) : (
                         <>
                             {isLiving && (
-                                <div className="donor-detail-tabs" style={{ marginBottom: 12 }}>
+                                <div className="donor-detail-tabs" >
                                     <button
                                         type="button"
                                         className={`tab-btn ${activeTab === "status" ? "active" : ""}`}
@@ -327,13 +325,16 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                                     >
                                         Status
                                     </button>
-                                    <button
-                                        type="button"
-                                        className={`tab-btn ${activeTab === "appointments" ? "active" : ""}`}
-                                        onClick={() => setActiveTab("appointments")}
-                                    >
-                                        Appointments
-                                    </button>
+
+                                    {form.ethics_status === "approved" && (
+                                        <button
+                                            type="button"
+                                            className={`tab-btn ${activeTab === "appointments" ? "active" : ""}`}
+                                            onClick={() => setActiveTab("appointments")}
+                                        >
+                                            Appointments
+                                        </button>
+                                    )}
                                 </div>
                             )}
                             {isLiving ? (
@@ -421,23 +422,29 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                                             {apptError && <div className="error-message modal-error-container">{apptError}</div>}
                                             {apptSuccess && <div style={{ color: "#16a34a", marginTop: 10 }}>{apptSuccess}</div>}
 
-                                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-                                                <button type="button" className="btn-save" onClick={suggestAppointments} disabled={apptSaving}>
+                                            <div style={{ display: "flex",gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+                                                <button type="button" className="submit-btn" onClick={suggestAppointments} disabled={apptSaving}>
                                                     {apptSaving ? "Sending..." : "Save & Email Options"}
                                                 </button>
 
-                                                <button type="button" className="btn-cancel" onClick={() => updateAppointmentStatus("in_progress")} disabled={apptSaving}>
-                                                    Mark In Progress
-                                                </button>
-                                                <button type="button" className="btn-cancel" onClick={() => updateAppointmentStatus("completed")} disabled={apptSaving}>
-                                                    Mark Completed
-                                                </button>
+                                                    {details?.appointment_status !== "in_progress" && (
+                                                        <button type="button" className="btn-cancel" onClick={() => updateAppointmentStatus("in_progress")} disabled={apptSaving}>
+                                                            Mark In Progress
+                                                        </button>
+                                                    )}
+
+                                                {details?.appointment_status === "in_progress"  && (
+                                                    <button type="button" className="btn-cancel" onClick={() => updateAppointmentStatus("completed")} disabled={apptSaving}>
+                                                        Mark Completed
+                                                    </button>
+                                                )}
                                             </div>
 
-                                            <div style={{ marginTop: 12 }}>
-                                                <div style={{ fontWeight: 700, marginBottom: 6 }}>Cancel appointment</div>
+                                            <div style={{ marginTop: 30 }}>
+                                                <div style={{ fontWeight: 700, marginBottom: 3 }}>Cancel appointment</div>
+                                                <div className="flex flex-col gap-2">
                                                 <input
-                                                    className="value"
+                                                    className="value mb-5"
                                                     type="text"
                                                     value={cancelReason}
                                                     onChange={(e) => setCancelReason(e.target.value)}
@@ -446,12 +453,12 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                                                 <button
                                                     type="button"
                                                     className="btn-cancel"
-                                                    style={{ marginTop: 10 }}
                                                     onClick={() => updateAppointmentStatus("cancelled")}
                                                     disabled={apptSaving}
                                                 >
                                                     Mark Cancelled
                                                 </button>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -582,10 +589,11 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                                         <div className="modal-field">
                                             <span className="label">Hospital</span>
                                             <select
-                                                className="value"
+                                                className="value max-w-[300px]"
                                                 value={form.hospital_id}
                                                 onChange={(e) => onChange("hospital_id", e.target.value)}
                                                 disabled={form.hospital_selection !== "specific" || loadingHospitals}
+                                            
                                             >
                                                 <option value="">
                                                     {form.hospital_selection !== "specific"
@@ -612,7 +620,7 @@ export default function EditOrganCoordinationModal({ onClose, mode, code, onSave
                     <button type="button" className="btn-cancel" onClick={onClose} disabled={saving}>
                         Cancel
                     </button>
-                    <button type="button" className="btn-save" onClick={handleSave} disabled={saving || loading}>
+                    <button type="button" className="submit-btn" onClick={handleSave} disabled={saving || loading}>
                         {saving ? "Saving..." : "Save Changes"}
                     </button>
                 </div>

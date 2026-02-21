@@ -136,7 +136,6 @@ class HomeAppointmentController extends Controller
                         $hasUrgent = true;
                         $urgentAvailableSlots++;
 
-                        // Track earliest urgent due date/time
                         try {
                             $appointmentDueDate = Carbon::parse($appointment->due_date);
                             if (!$urgentDueDate) {
@@ -180,8 +179,6 @@ class HomeAppointmentController extends Controller
             return $hospitalArray;
         });
 
-                // Separate urgent and regular hospitals
-                // A hospital can appear in BOTH lists if it has both urgent and regular appointments
                 $urgentHospitals = $hospitalsWithSlots->filter(function($hospital) {
                     return $hospital['has_urgent'] === true;
                 })->values();
@@ -267,11 +264,9 @@ class HomeAppointmentController extends Controller
         try {
             DB::beginTransaction();
 
-            // Check if user exists by email
             $user = User::where('email', $validated['email'])->first();
             
             if (!$user) {
-                // Create new user
                 $user = User::create([
                     'first_name' => $validated['first_name'],
                     'last_name' => $validated['last_name'],
@@ -281,7 +276,6 @@ class HomeAppointmentController extends Controller
                     'password' => Hash::make(Str::random(16)), 
                 ]);
             } else {
-                // Update existing user info (but check phone_nb uniqueness if changed)
                 $phoneChanged = $user->phone_nb !== $validated['phone_nb'];
                 
                 if ($phoneChanged && User::where('phone_nb', $validated['phone_nb'])->where('id', '!=', $user->id)->exists()) {
@@ -291,7 +285,6 @@ class HomeAppointmentController extends Controller
                     ], 422);
                 }
                 
-                // Update user info
                 $user->update([
                     'first_name' => $validated['first_name'],
                     'last_name' => $validated['last_name'],
@@ -299,10 +292,8 @@ class HomeAppointmentController extends Controller
                 ]);
             }
 
-            // Get or create Donor
             $donor = Donor::where('user_id', $user->id)->first();
             
-            // Check eligibility: last donation must be at least 56 days ago
             $lastDonationDate = null;
             if ($donor) {
                 // Get the most recent completed hospital appointment
@@ -351,11 +342,9 @@ class HomeAppointmentController extends Controller
                     $lastDonationDate = Carbon::parse($donor->last_donation);
                 }
             } elseif (!empty($validated['last_donation']) && $validated['last_donation'] !== '') {
-                // For new donors, use the provided last_donation
                 $lastDonationDate = Carbon::parse($validated['last_donation']);
             }
             
-            // Check eligibility if we have a last donation date
             if ($lastDonationDate) {
                 $today = Carbon::today();
                 $daysSinceLastDonation = $lastDonationDate->diffInDays($today);
@@ -364,13 +353,14 @@ class HomeAppointmentController extends Controller
                     DB::rollBack();
                     $daysRemaining = 56 - $daysSinceLastDonation;
                     return response()->json([
-                        'message' => "You are not eligible to donate yet. You must wait at least 56 days between donations. You can donate again in {$daysRemaining} day" . ($daysRemaining !== 1 ? 's' : '') . "."
+                        'message' => "You are not eligible to donate yet. 
+                        You must wait at least 56 days between donations. 
+                        You can donate again in {$daysRemaining} day" . ($daysRemaining !== 1 ? 's' : '') . "."
                     ], 422);
                 }
             }
             
             if (!$donor) {
-                // Create new donor
                 $donor = Donor::create([
                     'user_id' => $user->id,
                     'gender' => $validated['gender'],
@@ -379,7 +369,6 @@ class HomeAppointmentController extends Controller
                     'last_donation' => $validated['last_donation'] ?? null,
                 ]);
             } else {
-                // Update existing donor info
                 $donor->update([
                     'gender' => $validated['gender'],
                     'date_of_birth' => $validated['date_of_birth'],
@@ -388,48 +377,41 @@ class HomeAppointmentController extends Controller
                 ]);
             }
 
-            // Find the appointment based on hospital_id, date, donation_type, and time
             $appointments = Appointment::where('hospital_id', $validated['hospital_id'])
                 ->where('appointment_date', $validated['appointment_date'])
                 ->where('donation_type', 'Home Blood Donation')
                 ->where('state', 'pending')
                 ->get();
 
-            // Extract start time from appointment_time (handle "09:00 - 10:00" or "09:00" formats)
             $requestedTime = $validated['appointment_time'];
             $requestedStartTime = $requestedTime;
             if (strpos($requestedTime, ' - ') !== false) {
                 $requestedStartTime = trim(explode(' - ', $requestedTime)[0]);
             }
             
-            // Find appointment that has the selected time in its time_slots
             $appointment = null;
             foreach ($appointments as $apt) {
                 $timeSlots = $apt->time_slots ?? [];
                 
-                // Check if the selected time matches any slot (handle both object and string formats)
                 foreach ($timeSlots as $slot) {
                     $slotStart = '';
                     $slotTimeDisplay = '';
                     
                     if (is_array($slot) || is_object($slot)) {
-                        // Handle object format: {start: "09:00", end: "10:00"}
                         $slotArray = (array) $slot;
                         $slotStart = $slotArray['start'] ?? '';
                         $slotEnd = $slotArray['end'] ?? '';
                         $slotTimeDisplay = $slotStart . ($slotEnd ? ' - ' . $slotEnd : '');
                     } else {
-                        // Handle string format (fallback)
                         $slotTimeDisplay = (string) $slot;
                         $slotStart = $slotTimeDisplay;
                     }
                     
-                    // Match if the requested time matches the slot display or start time
                     if ($requestedTime === $slotTimeDisplay || 
                         $requestedTime === $slotStart ||
                         $requestedStartTime === $slotStart) {
                         $appointment = $apt;
-                        break 2; // Break out of both loops
+                        break 2; 
                     }
                 }
             }
@@ -441,12 +423,10 @@ class HomeAppointmentController extends Controller
                 ], 404);
             }
 
-            // Validate urgent appointment constraints
             if ($appointment->appointment_type === 'urgent') {
                 $appointmentDate = Carbon::parse($appointment->appointment_date);
                 $today = Carbon::today();
                 
-                // Check if appointment date is today
                 if (!$appointmentDate->isSameDay($today)) {
                     DB::rollBack();
                     return response()->json([
@@ -454,7 +434,6 @@ class HomeAppointmentController extends Controller
                     ], 422);
                 }
                 
-                // Check if appointment time is within 24 hours
                 $appointmentDateTime = Carbon::parse($appointment->appointment_date . ' ' . $requestedStartTime);
                 $now = Carbon::now();
                 $hoursDiff = $now->diffInHours($appointmentDateTime, false);
@@ -474,8 +453,6 @@ class HomeAppointmentController extends Controller
                 }
             }
 
-            // Use the extracted start time for storing
-            // Create Home Appointment
             $homeAppointmentData = [
                 'donor_id' => $donor->id,
                 'hospital_id' => $validated['hospital_id'],
@@ -492,9 +469,9 @@ class HomeAppointmentController extends Controller
                 'state' => 'pending',
             ];
             
-            // Only set phlebotomist_id if it's nullable (will be assigned later by admin)
-            // Check if column allows null before attempting to set it
             $homeAppointment = HomeAppointment::create($homeAppointmentData);
+
+            DB::commit();
 
             try {
                 $donor->loadMissing(['user', 'bloodType']);
@@ -502,7 +479,7 @@ class HomeAppointmentController extends Controller
 
                 $recipientEmail = $donor->user->email ?? null;
                 if ($recipientEmail) {
-                    Mail::to($recipientEmail)->send(new HomeDonationRegistered($donor, $homeAppointment));
+                    Mail::to($recipientEmail)->queue(new HomeDonationRegistered($donor, $homeAppointment));
                 } else {
                     \Log::warning('Skipping home donation registered email: donor user email is missing.', [
                         'donor_id' => $donor->id ?? null,
@@ -510,13 +487,11 @@ class HomeAppointmentController extends Controller
                     ]);
                 }
             } catch (\Exception $e) {
-                \Log::error('Failed to send home donation registered email:', [
+                \Log::error('Failed to queue home donation registered email:', [
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
                 ]);
             }
-
-            DB::commit();
 
             return response()->json([
                 'message' => 'Home appointment created successfully',

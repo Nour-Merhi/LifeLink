@@ -2,8 +2,26 @@ import { useState } from "react";
 import { IoSearchSharp } from "react-icons/io5";
 import { SpinnerDotted } from "spinners-react";
 import api from "../../../api/axios";
+import { API_BASE_URL } from "../../../config/api";
 import ConfirmDeleteDialog from "../../common/ConfirmDeleteDialog";
+import CertificateImage from "../../common/CertificateImage";
 import "../../../styles/Dashboard.css";
+
+function getCertificateImageSrc(c) {
+  const url = c?.image_url ?? null;
+  if (url && typeof url === "string" && (url.startsWith("http") || url.startsWith("data:"))) return url;
+  if (url && typeof url === "string") {
+    const base = (API_BASE_URL || "").replace(/\/$/, "");
+    const path = url.startsWith("/") ? url.slice(1) : url;
+    return base ? `${base}/${path}` : url;
+  }
+  if (c?.image_path && API_BASE_URL) {
+    const base = API_BASE_URL.replace(/\/$/, "");
+    const path = (c.image_path.startsWith("storage/") ? c.image_path : `storage/${c.image_path}`).replace(/^\/+/, "");
+    return `${base}/${path}`;
+  }
+  return null;
+}
 
 export default function CertificateTable({
   certificates = [],
@@ -132,15 +150,32 @@ export default function CertificateTable({
                     <td className="col-address !text-center">{c.description_option || "—"}</td>
                     <td className="col-certificate">
                       <div className="certificate-image-cell">
-                        {c.image_url ? (
-                          <img
-                            src={c.image_url}
+                        {c.image_path ? (
+                          <CertificateImage
+                            certificateId={c.id}
+                            imagePath={c.image_path}
+                            imageUrl={getCertificateImageSrc(c)}
                             alt={`Certificate for ${c.donor_name}`}
                             className="certificate-thumb"
+                            isAdmin={true}
+                            onError={(e) => {
+                              const cell = e?.target?.parentNode;
+                              if (cell) {
+                                let placeholder = cell.querySelector(".certificate-no-image");
+                                if (!placeholder) {
+                                  placeholder = document.createElement("span");
+                                  placeholder.className = "certificate-no-image";
+                                  placeholder.textContent = "No image";
+                                  cell.appendChild(placeholder);
+                                }
+                                placeholder.style.display = "";
+                              }
+                            }}
                           />
-                        ) : (
+                        ) : null}
+                        {!c.image_path ? (
                           <span className="certificate-no-image">No image</span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                     <td className="col-date">{formatDate(c.created_at)}</td>

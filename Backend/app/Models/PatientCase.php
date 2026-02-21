@@ -75,13 +75,13 @@ class PatientCase extends Model
         return $now->diffInDays($dueDate);
     }
 
-    // Get donor count for this case
+    // Get donor count for this case (DB-agnostic)
     public function getDonorsCountAttribute()
     {
-        return $this->financialDonations()
+        return (int) $this->financialDonations()
             ->where('status', 'completed')
-            ->distinct('donor_id')
-            ->count();
+            ->selectRaw('COUNT(DISTINCT donor_id) as c')
+            ->value('c');
     }
 
     // Update current funding when donations are completed

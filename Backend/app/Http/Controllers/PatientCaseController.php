@@ -16,9 +16,10 @@ class PatientCaseController extends Controller
     {
         try {
             // Get only active cases
+            // Order by severity (high first) then due_date - use CASE for MySQL/PostgreSQL compatibility
             $query = PatientCase::where('status', 'active')
                 ->with('hospital')
-                ->orderByRaw("FIELD(severity, 'high', 'medium', 'low')") // high, medium, low
+                ->orderByRaw("CASE severity WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END")
                 ->orderBy('due_date', 'asc'); // Urgent cases first (earliest due date)
 
             // Calculate additional fields for each case
@@ -29,11 +30,11 @@ class PatientCaseController extends Controller
                 // Calculate days remaining
                 $daysRemaining = (int) max(0, Carbon::now()->diffInDays(Carbon::parse($case->due_date), false));
                 
-                // Get donor count
-                $donorsCount = $case->financialDonations()
+                // Get donor count (DB-agnostic: COUNT(DISTINCT donor_id))
+                $donorsCount = (int) $case->financialDonations()
                     ->where('status', 'completed')
-                    ->distinct('donor_id')
-                    ->count();
+                    ->selectRaw('COUNT(DISTINCT donor_id) as c')
+                    ->value('c');
                 
                 // Calculate funding percentage
                 $fundingPercentage = $case->target_amount > 0 
@@ -98,11 +99,11 @@ class PatientCaseController extends Controller
             $daysRemaining = max(0, Carbon::now()->diffInDays(Carbon::parse($patientCase->due_date), false));
             $daysRemaining = (int) $daysRemaining;
             
-            // Get donor count
-            $donorsCount = $patientCase->financialDonations()
+            // Get donor count (DB-agnostic)
+            $donorsCount = (int) $patientCase->financialDonations()
                 ->where('status', 'completed')
-                ->distinct('donor_id')
-                ->count();
+                ->selectRaw('COUNT(DISTINCT donor_id) as c')
+                ->value('c');
             
             // Calculate funding percentage
             $fundingPercentage = $patientCase->target_amount > 0 

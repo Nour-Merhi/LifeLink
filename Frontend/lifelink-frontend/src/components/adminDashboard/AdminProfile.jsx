@@ -6,8 +6,9 @@ import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import profile from "../../assets/imgs/profile.svg";
 import "../../styles/Dashboard.css";
 import api from "../../api/axios";
+import { getApiBaseUrl } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function AdminProfile() {
     const { user, fetchUser } = useAuth();

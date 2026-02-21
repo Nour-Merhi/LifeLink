@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import registerImg from "../assets/illustrations/register.svg"; 
 
 const Register = () => {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailWarning, setEmailWarning] = useState("");
@@ -134,7 +136,7 @@ const Register = () => {
       // First, get the CSRF cookie from Sanctum
       await api.get("/sanctum/csrf-cookie");
 
-      // Then, make the registration request
+      // Then, make the registration request with timeout
       const response = await api.post("/api/register", {
         username: formData.username,
         email: formData.email,
@@ -143,12 +145,38 @@ const Register = () => {
         dob: formData.dob,
         bloodType: formData.bloodType,
         city: formData.city || null,
+      }, {
+        timeout: 15000 // 15 second timeout
       });
 
-      // Registration successful - trigger window event to refresh navbar
-      window.dispatchEvent(new Event('auth-change'));
-      navigate("/home");
+      // Check if registration was successful
+      if (response.status === 201 && response.data?.user) {
+        // Set user state immediately from registration response
+        if (setUser) {
+          setUser(response.data.user);
+        }
+        
+        // Trigger auth change event
+        window.dispatchEvent(new Event('auth-change'));
+        
+        // Navigate to home
+        navigate("/home", { replace: true });
+      } else {
+        setError("Registration completed but user data not received. Please try logging in.");
+      }
     } catch (err) {
+      // Handle timeout errors
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError("Registration request timed out. The account may have been created. Please try logging in.");
+        return;
+      }
+      
+      // Handle network errors
+      if (!err.response) {
+        setError("Unable to connect to server. Please check your connection and try again.");
+        return;
+      }
+
       if (err.response?.data?.errors) {
         // Handle validation errors
         const errors = err.response.data.errors;

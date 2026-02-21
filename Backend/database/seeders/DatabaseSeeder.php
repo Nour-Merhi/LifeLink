@@ -25,6 +25,9 @@ class DatabaseSeeder extends Seeder
         // Seed quiz levels and questions
         $this->call(QuizLevelsSeeder::class);
 
+        // Fake data: Lebanon hospitals, donors, phlebotomists, appointments, XP, ratings (leaderboards)
+        $this->call(FakeDataSeeder::class);
+
         // User::factory(10)->create();
 
     }

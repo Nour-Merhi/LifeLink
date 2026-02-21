@@ -99,7 +99,7 @@ class CertificateController extends Controller
             try {
                 $donor = Donor::with('user')->find($certificate->donor_id);
                 if ($donor && $donor->user && $donor->user->email) {
-                    Mail::to($donor->user->email)->send(new CertificateIssued($certificate));
+                    Mail::to($donor->user->email)->queue(new CertificateIssued($certificate));
                 } else {
                     \Log::warning('Skipping certificate issued email: donor user email is missing.', [
                         'donor_id' => $certificate->donor_id,
@@ -152,6 +152,29 @@ class CertificateController extends Controller
                 'image_url' => $certificate->image_path ? asset('storage/' . $certificate->image_path) : null,
                 'created_at' => $certificate->created_at?->toIso8601String(),
             ],
+        ]);
+    }
+
+    /**
+     * Stream certificate image for admin dashboard (display in UI).
+     */
+    public function image(string $id)
+    {
+        $certificate = Certificate::findOrFail($id);
+        if (!$certificate->image_path || !Storage::disk('public')->exists($certificate->image_path)) {
+            return response()->json(['message' => 'Certificate image not found'], 404);
+        }
+        $path = Storage::disk('public')->path($certificate->image_path);
+        $ext = strtolower(pathinfo($certificate->image_path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+            default => 'image/png',
+        };
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline',
         ]);
     }
 
@@ -257,6 +280,45 @@ class CertificateController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => 'Failed to download certificate'], 500);
+        }
+    }
+
+    /**
+     * Stream certificate image for donor dashboard (display in UI). Same as download but inline.
+     */
+    public function donorImage(string $id)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthorized'], 401);
+            }
+            $donor = Donor::where('user_id', $user->id)->first();
+            if (!$donor) {
+                return response()->json(['message' => 'Donor profile not found'], 404);
+            }
+            $certificate = Certificate::findOrFail($id);
+            if ($certificate->donor_id !== $donor->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+            if (!$certificate->image_path || !Storage::disk('public')->exists($certificate->image_path)) {
+                return response()->json(['message' => 'Certificate image not found'], 404);
+            }
+            $path = Storage::disk('public')->path($certificate->image_path);
+            $ext = strtolower(pathinfo($certificate->image_path, PATHINFO_EXTENSION));
+            $mime = match ($ext) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'webp' => 'image/webp',
+                'gif' => 'image/gif',
+                default => 'image/png',
+            };
+            return response()->file($path, [
+                'Content-Type' => $mime,
+                'Content-Disposition' => 'inline',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error streaming donor certificate image: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to load certificate image'], 500);
         }
     }
 

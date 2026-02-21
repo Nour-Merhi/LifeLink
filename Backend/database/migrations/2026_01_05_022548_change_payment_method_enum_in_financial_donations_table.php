@@ -12,16 +12,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Temporarily change to VARCHAR to allow value updates
-        DB::statement("ALTER TABLE `financial_donations` MODIFY COLUMN `payment_method` VARCHAR(50) DEFAULT 'credit card'");
+        // Make payment_method a string temporarily
+        Schema::table('financial_donations', function (Blueprint $table) {
+            $table->string('payment_method', 50)->default('credit card')->change();
+        });
 
-        // Update any existing 'paypal' values to 'cash'
+        // Update existing values: 'paypal' → 'cash'
         DB::table('financial_donations')
             ->where('payment_method', 'paypal')
             ->update(['payment_method' => 'cash']);
 
-        // Change back to ENUM with new values
-        DB::statement("ALTER TABLE `financial_donations` MODIFY COLUMN `payment_method` ENUM('credit card', 'wish', 'cash') DEFAULT 'credit card'");
+        // Add check constraint for PostgreSQL to simulate ENUM
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                ALTER TABLE financial_donations
+                ADD CONSTRAINT payment_method_check
+                CHECK (payment_method IN ('credit card','wish','cash'))
+            ");
+        }
     }
 
     /**
@@ -29,15 +37,22 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Temporarily change to VARCHAR
-        DB::statement("ALTER TABLE `financial_donations` MODIFY COLUMN `payment_method` VARCHAR(50) DEFAULT 'credit card'");
+        // Make payment_method a string again
+        Schema::table('financial_donations', function (Blueprint $table) {
+            $table->string('payment_method', 50)->default('credit card')->change();
+        });
 
-        // Update any existing 'cash' values to 'paypal'
+        // Revert values: 'cash' → 'paypal'
         DB::table('financial_donations')
             ->where('payment_method', 'cash')
             ->update(['payment_method' => 'paypal']);
 
-        // Change back to ENUM with old values
-        DB::statement("ALTER TABLE `financial_donations` MODIFY COLUMN `payment_method` ENUM('credit card', 'wish', 'paypal') DEFAULT 'credit card'");
+        // Drop PostgreSQL check constraint if exists
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                ALTER TABLE financial_donations
+                DROP CONSTRAINT IF EXISTS payment_method_check
+            ");
+        }
     }
 };

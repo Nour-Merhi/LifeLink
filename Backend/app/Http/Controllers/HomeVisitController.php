@@ -7,6 +7,7 @@ use App\Models\Appointment;
 use App\Models\Hospital;
 use App\Models\BloodType;
 use App\Models\MobilePhlebotomist;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Services\XpService;
@@ -156,6 +157,36 @@ class HomeVisitController extends Controller
                 'error' => 'Failed to fetch home visit orders'
             ], 500);
         }
+    }
+
+    /**
+     * Hospital manager: get home visit appointments for their hospital only.
+     */
+    public function getHospitalHomeVisitAppointmentsForManager(Request $request, $hospitalId = null)
+    {
+        $hospitalId = $hospitalId ?? $request->query('hospital_id');
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        $user->loadMissing('healthCenterManager');
+        $role = strtolower((string)($user->role ?? ''));
+        if (!in_array($role, ['manager', 'health_center_manager', 'hospital_manager'], true)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        $managerHospitalId = $user->healthCenterManager->hospital_id ?? null;
+        if (!$managerHospitalId) {
+            return response()->json([
+                'hospital' => null,
+                'urgent_appointments' => [],
+                'regular_appointments' => [],
+                'error' => 'Hospital not found for this manager',
+            ], 404);
+        }
+        if ($hospitalId && (int)$hospitalId !== (int)$managerHospitalId) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        return $this->getHospitalHomeVisitAppointments($request, $managerHospitalId);
     }
 
     /**

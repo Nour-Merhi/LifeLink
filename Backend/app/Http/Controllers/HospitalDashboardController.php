@@ -18,12 +18,14 @@ use App\Models\AfterDeathPledge;
 use App\Models\HospitalSetting;
 use App\Models\BloodType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use App\Mail\LivingOrganAppointmentSuggestions;
 use App\Mail\LivingOrganAppointmentCompleted;
 use App\Mail\LivingOrganAppointmentCancelled;
 use App\Mail\LivingOrganMedicalClearedThankYou;
+use App\Services\XpService;
 
 class HospitalDashboardController extends Controller
 {
@@ -33,8 +35,13 @@ class HospitalDashboardController extends Controller
 
         if (!$hospitalId && $request->user()) {
             $user = $request->user();
+            try {
+                $user->loadMissing('healthCenterManager');
+            } catch (\Throwable $e) {
+                \Log::warning('resolveHospitalId: could not load healthCenterManager', ['user_id' => $user->id ?? null, 'error' => $e->getMessage()]);
+            }
             $role = strtolower((string)($user->role ?? ''));
-            if ($role === 'manager' && $user->healthCenterManager) {
+            if (in_array($role, ['manager', 'health_center_manager', 'hospital_manager'], true) && $user->healthCenterManager) {
                 $hospitalId = $user->healthCenterManager->hospital_id;
             }
         }
@@ -715,7 +722,7 @@ class HospitalDashboardController extends Controller
             // Final thank-you email when medical state becomes cleared
             try {
                 if ($donor->medical_status === 'cleared' && $oldMedical !== 'cleared' && $donor->email) {
-                    Mail::to($donor->email)->send(new LivingOrganMedicalClearedThankYou($donor));
+                    Mail::to($donor->email)->queue(new LivingOrganMedicalClearedThankYou($donor));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ medical cleared thank you email (hospital update)', [
@@ -727,7 +734,7 @@ class HospitalDashboardController extends Controller
             // Step 6 email (if it got cancelled here)
             try {
                 if ($donor->appointment_status === 'cancelled' && $oldAppointmentStatus !== 'cancelled' && $donor->email) {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ appointment cancelled email (hospital update)', [
@@ -794,7 +801,7 @@ class HospitalDashboardController extends Controller
 
             try {
                 if ($donor->email) {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentSuggestions($donor, $slots, $dashboardUrl));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentSuggestions($donor, $slots, $dashboardUrl));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ appointment suggestions email (hospital)', [
@@ -858,7 +865,7 @@ class HospitalDashboardController extends Controller
 
             if ($donor->appointment_status === 'completed' && $oldStatus !== 'completed' && $donor->email) {
                 try {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentCompleted($donor));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentCompleted($donor));
                 } catch (\Exception $e) {
                     \Log::warning('Failed to send living organ appointment completed email (hospital)', [
                         'living_donor_code' => $donor->code,
@@ -869,7 +876,7 @@ class HospitalDashboardController extends Controller
 
             if ($donor->appointment_status === 'cancelled' && $oldStatus !== 'cancelled' && $donor->email) {
                 try {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
                 } catch (\Exception $e) {
                     \Log::warning('Failed to send living organ appointment cancelled email (hospital)', [
                         'living_donor_code' => $donor->code,
@@ -1085,9 +1092,9 @@ class HospitalDashboardController extends Controller
             ];
             
             // === TODAY'S APPOINTMENTS ===
-            // Note: HospitalAppointment uses 'hospital_Id' (capital I) and relationship is 'appointments' (singular belongsTo)
+            // Note: HospitalAppointment uses 'hospital_id' (capital I) and relationship is 'appointments' (singular belongsTo)
             try {
-                $todayAppointmentsList = HospitalAppointment::where('hospital_Id', $hospitalId)
+                $todayAppointmentsList = HospitalAppointment::where('hospital_id', $hospitalId)
                     ->where('state', 'pending')
                     ->with([
                         'donor.user',
@@ -1258,7 +1265,7 @@ class HospitalDashboardController extends Controller
             $recentEvents = $recentEvents->merge($recentHomeVisits);
             
             // Recent donor arrivals (hospital appointments for today)
-            $recentDonorArrivals = HospitalAppointment::where('hospital_Id', $hospitalId)
+            $recentDonorArrivals = HospitalAppointment::where('hospital_id', $hospitalId)
                 ->whereHas('appointment', function($query) use ($today) {
                     $query->whereDate('appointment_date', $today)
                           ->where('state', 'pending');
@@ -1299,7 +1306,7 @@ class HospitalDashboardController extends Controller
 
             $totalCompletedDonations = HomeAppointment::where('hospital_id', $hospitalId)
                 ->where('state', 'completed')
-                ->count() + HospitalAppointment::where('hospital_Id', $hospitalId)
+                ->count() + HospitalAppointment::where('hospital_id', $hospitalId)
                 ->where('state', 'completed')
                 ->count();
 
@@ -1325,7 +1332,7 @@ class HospitalDashboardController extends Controller
                     ->whereBetween('created_at', [$monthStart, $monthEnd])
                     ->count();
                 
-                $hospitalDonations = HospitalAppointment::where('hospital_Id', $hospitalId)
+                $hospitalDonations = HospitalAppointment::where('hospital_id', $hospitalId)
                     ->where('state', 'completed')
                     ->whereBetween('created_at', [$monthStart, $monthEnd])
                     ->count();
@@ -1500,7 +1507,7 @@ class HospitalDashboardController extends Controller
                     ->join('appointments', 'hospital_appointments.appointment_id', '=', 'appointments.id')
                     ->join('donors', 'hospital_appointments.donor_id', '=', 'donors.id')
                     ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
-                    ->where('hospital_appointments.hospital_Id', $hospitalId)
+                    ->where('hospital_appointments.hospital_id', $hospitalId)
                     ->where('hospital_appointments.state', '!=', 'canceled')
                     ->where('appointments.donation_type', 'like', '%Blood%')
                     ->select('hospital_appointments.donor_id as donor_id', 'blood_types.type', 'blood_types.rh_factor')
@@ -1571,7 +1578,7 @@ class HospitalDashboardController extends Controller
                     ->join('appointments', 'hospital_appointments.appointment_id', '=', 'appointments.id')
                     ->join('donors', 'hospital_appointments.donor_id', '=', 'donors.id')
                     ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
-                    ->where('hospital_appointments.hospital_Id', $hospitalId)
+                    ->where('hospital_appointments.hospital_id', $hospitalId)
                     ->where('hospital_appointments.state', '=', 'completed')
                     ->where('appointments.donation_type', 'like', $bloodDonationLike)
                     ->select(
@@ -1683,7 +1690,7 @@ class HospitalDashboardController extends Controller
                     ->join('donors', 'hospital_appointments.donor_id', '=', 'donors.id')
                     ->join('users', 'donors.user_id', '=', 'users.id')
                     ->join('blood_types', 'donors.blood_type_id', '=', 'blood_types.id')
-                    ->where('hospital_appointments.hospital_Id', $hospitalId)
+                    ->where('hospital_appointments.hospital_id', $hospitalId)
                     ->where('hospital_appointments.state', '=', 'completed')
                     ->where('appointments.donation_type', 'like', $bloodDonationLike)
                     ->orderBy('hospital_appointments.updated_at', 'desc')
@@ -1871,8 +1878,6 @@ class HospitalDashboardController extends Controller
                     throw new \InvalidArgumentException("Blood type not found in DB: {$bt}");
                 }
 
-                // Replace existing stock rows for this blood type/hospital.
-                // We keep "used" history but fully replace current stock (available/expired).
                 BloodInventory::where('hospital_id', $hospitalId)
                     ->where('blood_type_id', $bloodType->id)
                     ->whereIn('status', ['available', 'expired'])
@@ -1934,10 +1939,11 @@ class HospitalDashboardController extends Controller
     public function getAppointments(Request $request, $hospitalId = null)
     {
         try {
-            // Get hospital ID from authenticated user if not provided
             if (!$hospitalId && $request->user()) {
                 $user = $request->user();
-                if ($user->role === 'manager' && $user->healthCenterManager) {
+                $user->loadMissing('healthCenterManager');
+                $role = strtolower((string)($user->role ?? ''));
+                if (in_array($role, ['manager', 'health_center_manager', 'hospital_manager'], true) && $user->healthCenterManager) {
                     $hospitalId = $user->healthCenterManager->hospital_id;
                 }
             }
@@ -1989,7 +1995,7 @@ class HospitalDashboardController extends Controller
             }
 
             // Fetch Hospital Appointments
-            $hospitalAppointmentsQuery = HospitalAppointment::where('hospital_Id', $hospitalId)
+            $hospitalAppointmentsQuery = HospitalAppointment::where('hospital_id', $hospitalId)
                 ->with([
                     'donor.user',
                     'donor.bloodType',
@@ -2240,36 +2246,57 @@ class HospitalDashboardController extends Controller
             ], 422);
         }
 
+        $prevState = null;
         try {
             if ($type === 'home') {
                 $booking = HomeAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
             } else {
-                $booking = HospitalAppointment::where('hospital_Id', $hospitalId)->findOrFail($id);
+                $booking = HospitalAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
             }
+
+            $tableName = $type === 'home' ? 'home_appointments' : 'hospital_appointments';
+            $hasCompletedAt = Schema::hasColumn($tableName, 'completed_at');
+            $hasExpiresAt = Schema::hasColumn($tableName, 'expires_at');
 
             if (array_key_exists('state', $validated)) {
                 $prevState = $booking->state;
                 $booking->state = $validated['state'];
 
                 // Store completion moment (do not rely on updated_at since other edits can change it)
-                if ($validated['state'] === 'completed' && $prevState !== 'completed') {
-                    $booking->completed_at = now();
-                    // expiry: collectedAt + 42 days (whole blood)
-                    try {
-                        $booking->expires_at = Carbon::parse($booking->completed_at)->addDays(42)->toDateString();
-                    } catch (\Exception $e) {
+                if ($hasCompletedAt && $hasExpiresAt) {
+                    if ($validated['state'] === 'completed' && $prevState !== 'completed') {
+                        $booking->completed_at = now();
+                        try {
+                            $booking->expires_at = Carbon::parse($booking->completed_at)->addDays(42)->toDateString();
+                        } catch (\Exception $e) {
+                            $booking->expires_at = null;
+                        }
+                    }
+                    if ($validated['state'] !== 'completed') {
+                        $booking->completed_at = null;
                         $booking->expires_at = null;
                     }
                 }
-                if ($validated['state'] !== 'completed') {
-                    $booking->completed_at = null;
-                    $booking->expires_at = null;
-                }
             }
-            if (array_key_exists('appointment_time', $validated)) {
+            if (array_key_exists('appointment_time', $validated) && Schema::hasColumn($tableName, 'appointment_time')) {
                 $booking->appointment_time = $validated['appointment_time'];
             }
             $booking->save();
+
+            // Award XP if donation was just completed
+            if (array_key_exists('state', $validated) && $validated['state'] === 'completed' && $prevState !== 'completed' && $booking->donor_id) {
+                try {
+                    $refClass = $type === 'home' ? HomeAppointment::class : HospitalAppointment::class;
+                    XpService::awardBloodDonationXp($booking->donor_id, $refClass, $booking->id);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to award XP for appointment booking:', [
+                        'type' => $type,
+                        'id' => $id,
+                        'donor_id' => $booking->donor_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -2295,11 +2322,17 @@ class HospitalDashboardController extends Controller
                 'id' => $id,
                 'hospital_id' => $hospitalId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            return response()->json([
+            $payload = [
                 'success' => false,
                 'message' => 'Failed to update booking',
-            ], 500);
+            ];
+            if (config('app.debug')) {
+                $payload['error_detail'] = $e->getMessage();
+                $payload['trace'] = $e->getTraceAsString();
+            }
+            return response()->json($payload, 500);
         }
     }
 
@@ -2329,7 +2362,7 @@ class HospitalDashboardController extends Controller
             if ($type === 'home') {
                 $booking = HomeAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
             } else {
-                $booking = HospitalAppointment::where('hospital_Id', $hospitalId)->findOrFail($id);
+                $booking = HospitalAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
             }
 
             $booking->delete();
@@ -2392,7 +2425,7 @@ class HospitalDashboardController extends Controller
             if ($type === 'home') {
                 $booking = HomeAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
             } else {
-                $booking = HospitalAppointment::where('hospital_Id', $hospitalId)->findOrFail($id);
+                $booking = HospitalAppointment::where('hospital_id', $hospitalId)->findOrFail($id);
             }
 
             // Restrict to completed bookings for blood donations

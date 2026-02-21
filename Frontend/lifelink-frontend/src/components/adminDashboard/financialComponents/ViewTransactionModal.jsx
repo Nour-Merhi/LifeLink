@@ -21,7 +21,7 @@ export default function ViewTransactionModal({ onClose, transactionId }) {
         setLoading(true);
         setError("");
         try {
-            const response = await api.get(`/api/financial-donations/${transactionId}`);
+            const response = await api.get(`/api/admin/dashboard/financial/transactions/${transactionId}`);
             setTransactionData(response.data.donation || response.data);
         } catch (error) {
             console.error('Error fetching transaction details:', error);

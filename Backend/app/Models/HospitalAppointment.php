@@ -18,7 +18,7 @@ class HospitalAppointment extends Model
 
     protected $fillable = [
         'donor_id',
-        'hospital_Id',
+        'hospital_id',
         'appointment_id',
         'appointment_time',
         'state',
@@ -48,7 +48,7 @@ class HospitalAppointment extends Model
     }
 
     public function hospital(){
-        return $this->belongsTo(Hospital::class, 'hospital_Id'); // Note: migration uses hospital_Id
+        return $this->belongsTo(Hospital::class, 'hospital_id'); // Note: migration uses hospital_Id
     }
     public function donor(){
         return $this->belongsTo(Donor::class, 'donor_id');

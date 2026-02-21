@@ -44,6 +44,8 @@ export default function HomeAppTable({ hospitals = [], loading = false, error = 
             .finally(() => setLoadingAppointments(false));
     };
 
+    const sortedHospitals = hospitals.sort((a,b) => a.name.localeCompare(b.name));
+
     const toggleDate = (date) => {
         setExpandedDates(prev => ({
             ...prev,
@@ -149,7 +151,7 @@ export default function HomeAppTable({ hospitals = [], loading = false, error = 
                             }}
                         >
                             <option value="">-- Select a Hospital --</option>
-                            {hospitals.map(hospital => (
+                            {sortedHospitals.map(hospital => (
                                 <option key={hospital.id} value={hospital.id}>
                                     {hospital.name}
                                 </option>

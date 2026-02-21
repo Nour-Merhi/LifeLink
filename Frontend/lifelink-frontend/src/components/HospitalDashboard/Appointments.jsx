@@ -46,7 +46,7 @@ export default function Appointments() {
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [selectedAppointmentForAssign, setSelectedAppointmentForAssign] = useState(null);
 
-    const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
 
     useEffect(() => {
         if (user && hospitalId) {
@@ -129,7 +129,9 @@ export default function Appointments() {
             }
         } catch (err) {
             console.error('Error updating appointment:', err);
-            setEditError(err.response?.data?.message || err.message || "Failed to update appointment");
+            const detail = err.response?.data?.error_detail;
+            const msg = err.response?.data?.message || err.message || "Failed to update appointment";
+            setEditError(detail ? `${msg}: ${detail}` : msg);
         } finally {
             setEditLoading(false);
         }

@@ -6,9 +6,10 @@ use App\Models\Donor;
 use App\Models\HomeAppointment;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\SerializesModels;
 
-class HomeDonationRegistered extends Mailable
+class HomeDonationRegistered extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

@@ -50,39 +50,43 @@ class MobilePhlebotomistsController extends Controller
             ->groupBy('home_appointment_ratings.phlebotomist_id')
             ->get()
             ->keyBy('phlebotomist_id');
-        
-        // Calculate performance statistics for each phlebotomist
-        $phlebotomists = $phlebotomists->map(function ($phlebotomist) {
-            // Enforce: inactive => unavailable
+
+        // Single query: appointment counts per phlebotomist (avoids N+1)
+        $appointmentStats = HomeAppointment::query()
+            ->whereNotNull('phlebotomist_id')
+            ->selectRaw("phlebotomist_id, count(*) as total,
+                count(case when state = 'completed' then 1 end) as completed,
+                count(case when state = 'pending' then 1 end) as pending,
+                count(case when state = 'canceled' then 1 end) as canceled")
+            ->groupBy('phlebotomist_id')
+            ->get()
+            ->keyBy('phlebotomist_id');
+
+        // Attach performance stats from pre-aggregated data (no per-row DB writes or queries)
+        $phlebotomists = $phlebotomists->map(function ($phlebotomist) use ($appointmentStats) {
+            // Display as unavailable if inactive (do not save in list endpoint to avoid N writes)
             if ($this->shouldForceUnavailable($phlebotomist) && $phlebotomist->availability !== 'unavailable') {
                 $phlebotomist->availability = 'unavailable';
-                $phlebotomist->save();
             }
 
-            // Get all appointments assigned to this phlebotomist
-            $allAppointments = HomeAppointment::where('phlebotomist_id', $phlebotomist->id)->get();
-            $totalAppointments = $allAppointments->count();
-            $completedAppointments = $allAppointments->where('state', 'completed')->count();
-            $pendingAppointments = $allAppointments->where('state', 'pending')->count();
-            $canceledAppointments = $allAppointments->where('state', 'canceled')->count();
-            
-            // Calculate success rate: completed / (total - canceled)
-            // This gives the actual success rate based on appointments that were not canceled
+            $row = $appointmentStats->get($phlebotomist->id);
+            $totalAppointments = $row ? (int) $row->total : 0;
+            $completedAppointments = $row ? (int) $row->completed : 0;
+            $pendingAppointments = $row ? (int) $row->pending : 0;
+            $canceledAppointments = $row ? (int) $row->canceled : 0;
+
             $nonCanceledAppointments = $totalAppointments - $canceledAppointments;
-            $successRate = $nonCanceledAppointments > 0 
+            $successRate = $nonCanceledAppointments > 0
                 ? round(($completedAppointments / $nonCanceledAppointments) * 100, 1)
                 : 0;
-            
-            // Add performance data to phlebotomist object - use append() to ensure it's included in JSON
+
             $phlebotomist->total_appointments = $totalAppointments;
             $phlebotomist->completed_appointments = $completedAppointments;
             $phlebotomist->pending_appointments = $pendingAppointments;
             $phlebotomist->canceled_appointments = $canceledAppointments;
             $phlebotomist->success_rate = $successRate;
-            
-            // Make the attributes visible in JSON
             $phlebotomist->makeVisible(['total_appointments', 'completed_appointments', 'pending_appointments', 'canceled_appointments', 'success_rate']);
-            
+
             return $phlebotomist;
         })->values();
 
@@ -166,6 +170,32 @@ class MobilePhlebotomistsController extends Controller
     }
 
     /**
+     * Hospital manager: list phlebotomists for their hospital only.
+     */
+    public function indexForHospital(Request $request, $hospitalId = null)
+    {
+        $hospitalId = $hospitalId ?? $request->input('hospital_id');
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        $user->loadMissing('healthCenterManager');
+        $role = strtolower((string)($user->role ?? ''));
+        if (!in_array($role, ['manager', 'health_center_manager', 'hospital_manager'], true)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        $managerHospitalId = $user->healthCenterManager->hospital_id ?? null;
+        if (!$managerHospitalId) {
+            return response()->json(['message' => 'Hospital not found for this manager'], 404);
+        }
+        if ($hospitalId && (int)$hospitalId !== (int)$managerHospitalId) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        $request->merge(['hospital_id' => $managerHospitalId]);
+        return $this->index($request);
+    }
+
+    /**
      * Show the form for creating a new resource.
      */
     public function create()
@@ -178,7 +208,8 @@ class MobilePhlebotomistsController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        try {
+            $validated = $request->validate([
             'licence_number' => 'required|string|max:100',
             'first_name' => 'required|string|max:100',
             'middle_name' => 'nullable|string|max:100',
@@ -193,6 +224,12 @@ class MobilePhlebotomistsController extends Controller
             'max_appointments' => 'required|integer|min:1',
             'years_of_experience' => 'nullable|integer|min:0',
         ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        }
 
         try {
             DB::beginTransaction();
@@ -204,29 +241,21 @@ class MobilePhlebotomistsController extends Controller
                 'email' => $validated['email'],
                 'phone_nb' => $validated['phone_nb'],
                 'password' => Hash::make($validated['password']),
-                'role' => 'phlebotomist',
+                'role' => 'Phlebotomist',
             ]);
 
-            // Get manager for the hospital (may be null)
             $manager = HealthCenterManager::where('hospital_id', $validated['hospital_id'])->first();
-            
-            if (!$manager) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'No health center manager found for this hospital'
-                ], 404);
-            }
 
             $mobilePhlebotomist = MobilePhlebotomist::create([
-                'license_number' => $validated['licence_number'], // Frontend uses British spelling
-                'availability' => 'available', // Default availability
+                'license_number' => $validated['licence_number'], 
+                'availability' => 'available', 
                 'max_appointments' => $validated['max_appointments'],
                 'start_time' => $validated['start_time'],
                 'end_time' => $validated['end_time'],
                 'working_dates' => $validated['working_dates'],
                 'user_id' => $user->id,
                 'hospital_id' => $validated['hospital_id'],
-                'manager_id' => $manager->id,
+                'manager_id' => $manager?->id,
             ]);
 
             DB::commit();
@@ -260,9 +289,8 @@ class MobilePhlebotomistsController extends Controller
                 'phlebotomist_id' => 'required|exists:mobile_phlebotomists,id'
             ]);
 
-            // Find the home appointment by code
             $homeAppointment = HomeAppointment::where('code', $orderCode)
-                ->orWhere('id', $orderCode)
+                ->when(is_numeric($orderCode), fn ($q) => $q->orWhere('id', (int) $orderCode))
                 ->first();
 
             if (!$homeAppointment) {
@@ -289,32 +317,34 @@ class MobilePhlebotomistsController extends Controller
                 ], 404);
             }
 
-            // Check if phlebotomist is unavailable
-            if ($phlebotomist->availability === 'unavailable') {
+            // Check if phlebotomist is unavailable (case-insensitive for robustness)
+            if (strtolower((string) ($phlebotomist->availability ?? '')) === 'unavailable') {
                 return response()->json([
                     'message' => 'Cannot assign unavailable phlebotomist',
                     'error' => 'The selected phlebotomist is unavailable and cannot be assigned to appointments'
                 ], 422);
             }
 
-            // Check if phlebotomist belongs to the same hospital as the home appointment
-            if ($phlebotomist->hospital_id !== $homeAppointment->hospital_id) {
+            // Check if phlebotomist belongs to the same hospital as the home appointment (type-safe comparison)
+            if ((int) $phlebotomist->hospital_id !== (int) $homeAppointment->hospital_id) {
                 return response()->json([
                     'message' => 'Cannot assign phlebotomist from different hospital',
                     'error' => 'The selected phlebotomist must belong to the same hospital as the appointment'
                 ], 422);
             }
 
-            // Update the home appointment with phlebotomist ID
-            $homeAppointment->phlebotomist_id = $validated['phlebotomist_id'];
-            $homeAppointment->save();
-
-            // Load relationships for response
-            $homeAppointment->load(['mobilePhlebotomist.user', 'donor.user']);
+            // Update only phlebotomist_id via query to avoid model serialization / attribute issues (e.g. weight(kg) column)
+            $phlebotomistId = (int) $validated['phlebotomist_id'];
+            HomeAppointment::where('id', $homeAppointment->id)->update(['phlebotomist_id' => $phlebotomistId]);
 
             return response()->json([
                 'message' => 'Phlebotomist assigned successfully',
-                'home_appointment' => $homeAppointment
+                'home_appointment' => [
+                    'id' => $homeAppointment->id,
+                    'code' => $homeAppointment->code,
+                    'phlebotomist_id' => $phlebotomistId,
+                    'state' => $homeAppointment->state,
+                ],
             ], 200);
 
         } catch (\Illuminate\Validation\ValidationException $e) {

@@ -181,7 +181,7 @@ class LivingDonorController extends Controller
             // Step 1: Email donor after registration (thank you + wait for approval)
             try {
                 if ($livingDonor->email) {
-                    Mail::to($livingDonor->email)->send(new LivingOrganPledgeSubmitted($livingDonor));
+                    Mail::to($livingDonor->email)->queue(new LivingOrganPledgeSubmitted($livingDonor));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ pledge submitted email', [
@@ -441,7 +441,7 @@ class LivingDonorController extends Controller
             // Final thank-you email when medical state becomes cleared
             try {
                 if ($donor->medical_status === 'cleared' && $oldMedical !== 'cleared' && $donor->email) {
-                    Mail::to($donor->email)->send(new LivingOrganMedicalClearedThankYou($donor));
+                    Mail::to($donor->email)->queue(new LivingOrganMedicalClearedThankYou($donor));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ medical cleared thank you email (admin update)', [
@@ -453,7 +453,7 @@ class LivingDonorController extends Controller
             // If it got cancelled here, email donor (Step 6)
             try {
                 if ($donor->appointment_status === 'cancelled' && $oldAppointmentStatus !== 'cancelled' && $donor->email) {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ appointment cancelled email (admin update)', [
@@ -558,7 +558,7 @@ class LivingDonorController extends Controller
 
             try {
                 if ($donor->email) {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentSuggestions($donor, $slots, $dashboardUrl));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentSuggestions($donor, $slots, $dashboardUrl));
                 }
             } catch (\Exception $e) {
                 \Log::warning('Failed to send living organ appointment suggestions email', [
@@ -615,7 +615,7 @@ class LivingDonorController extends Controller
             // Step 5: completed email
             if ($donor->appointment_status === 'completed' && $oldStatus !== 'completed' && $donor->email) {
                 try {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentCompleted($donor));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentCompleted($donor));
                 } catch (\Exception $e) {
                     \Log::warning('Failed to send living organ appointment completed email', [
                         'living_donor_code' => $donor->code,
@@ -627,7 +627,7 @@ class LivingDonorController extends Controller
             // Step 6: cancelled email
             if ($donor->appointment_status === 'cancelled' && $oldStatus !== 'cancelled' && $donor->email) {
                 try {
-                    Mail::to($donor->email)->send(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
+                    Mail::to($donor->email)->queue(new LivingOrganAppointmentCancelled($donor, $donor->appointment_cancel_reason));
                 } catch (\Exception $e) {
                     \Log::warning('Failed to send living organ appointment cancelled email', [
                         'living_donor_code' => $donor->code,

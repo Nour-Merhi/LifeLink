@@ -7,13 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    /**
-     * Store expiry for each donated blood unit batch (per booking).
-     *
-     * Rules:
-     * - collected_at is completed_at (time the booking was marked completed)
-     * - expires_at = completed_at + 42 days
-     */
     public function up(): void
     {
         Schema::table('home_appointments', function (Blueprint $table) {
@@ -24,18 +17,31 @@ return new class extends Migration
             $table->date('expires_at')->nullable()->after('completed_at');
         });
 
-        // Backfill: expires_at = completed_at + 42 days (fallback to updated_at if completed_at is null)
-        DB::statement("
-            UPDATE home_appointments
-            SET expires_at = DATE(DATE_ADD(COALESCE(completed_at, updated_at), INTERVAL 42 DAY))
-            WHERE state = 'completed' AND expires_at IS NULL
-        ");
-
-        DB::statement("
-            UPDATE hospital_appointments
-            SET expires_at = DATE(DATE_ADD(COALESCE(completed_at, updated_at), INTERVAL 42 DAY))
-            WHERE state = 'completed' AND expires_at IS NULL
-        ");
+        // Backfill: expires_at = completed_at + 42 days
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                UPDATE home_appointments
+                SET expires_at = COALESCE(completed_at, updated_at) + INTERVAL '42 days'
+                WHERE state = 'completed' AND expires_at IS NULL
+            ");
+            DB::statement("
+                UPDATE hospital_appointments
+                SET expires_at = COALESCE(completed_at, updated_at) + INTERVAL '42 days'
+                WHERE state = 'completed' AND expires_at IS NULL
+            ");
+        } else {
+            // MySQL version
+            DB::statement("
+                UPDATE home_appointments
+                SET expires_at = DATE(DATE_ADD(COALESCE(completed_at, updated_at), INTERVAL 42 DAY))
+                WHERE state = 'completed' AND expires_at IS NULL
+            ");
+            DB::statement("
+                UPDATE hospital_appointments
+                SET expires_at = DATE(DATE_ADD(COALESCE(completed_at, updated_at), INTERVAL 42 DAY))
+                WHERE state = 'completed' AND expires_at IS NULL
+            ");
+        }
     }
 
     public function down(): void
@@ -49,4 +55,3 @@ return new class extends Migration
         });
     }
 };
-

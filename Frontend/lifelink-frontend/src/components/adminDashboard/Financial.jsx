@@ -22,52 +22,73 @@ export default function Financial() {
     const [patientCases, setPatientCases] = useState([]);
     const [transactions, setTransactions] = useState([]);
 
-    // Fetch all financial data
+    // Fetch all financial data (resilient: show page with partial data if some requests fail)
     const fetchFinancialData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
+        setLoading(true);
+        setError(null);
 
-            // Fetch all data in parallel
-            const [metricsRes, topDonorsRes, activeCasesRes, patientCasesRes, transactionsRes] = await Promise.all([
-                api.get('/api/admin/dashboard/financial/metrics'),
-                api.get('/api/admin/dashboard/financial/top-donors'),
-                api.get('/api/admin/dashboard/financial/active-cases'),
-                api.get('/api/admin/dashboard/financial/patient-cases'),
-                api.get('/api/admin/dashboard/financial/transactions'),
-            ]);
+        const endpoints = [
+            { key: 'metrics', url: '/api/admin/dashboard/financial/metrics' },
+            { key: 'topDonors', url: '/api/admin/dashboard/financial/top-donors' },
+            { key: 'activeCases', url: '/api/admin/dashboard/financial/active-cases' },
+            { key: 'patientCases', url: '/api/admin/dashboard/financial/patient-cases' },
+            { key: 'transactions', url: '/api/admin/dashboard/financial/transactions' },
+        ];
 
-            // Add icons to metrics
-            const metricsWithIcons = (metricsRes.data.metrics || []).map((metric, index) => {
-                const icons = [
-                    <LuCircleDollarSign />,
-                    <PiHandHeart />,
-                    <RiMegaphoneLine />,
-                    <RiUserHeartLine />
-                ];
-                const bgColors = ["#EAFFE5", "#F5E9FF", "#EBEAFF", "#FFE5E5"];
-                const iconColors = ["#16a34a", "#6132BE", "#285BFF", "#F12C31"];
+        const results = await Promise.allSettled(
+            endpoints.map(({ url }) => api.get(url))
+        );
 
-                return {
-                    ...metric,
-                    icon: icons[index] || <BiSolidBadgeDollar />,
-                    bgColor: bgColors[index] || "#EAFFE5",
-                    iconColor: iconColors[index] || "#16a34a"
-                };
-            });
+        const errors = [];
+        let metrics = [];
+        let topDonors = [];
+        let activeCases = [];
+        let patientCases = [];
+        let transactions = [];
 
-            setMetricsData(metricsWithIcons);
-            setTopDonors(topDonorsRes.data.topDonors || []);
-            setActiveCases(activeCasesRes.data.activeCases || []);
-            setPatientCases(patientCasesRes.data.patientCases || []);
-            setTransactions(transactionsRes.data.transactions || []);
+        results.forEach((result, index) => {
+            const { key } = endpoints[index];
+            if (result.status === 'fulfilled' && result.value?.data) {
+                const data = result.value.data;
+                if (key === 'metrics') metrics = data.metrics || [];
+                else if (key === 'topDonors') topDonors = data.topDonors || [];
+                else if (key === 'activeCases') activeCases = data.activeCases || [];
+                else if (key === 'patientCases') patientCases = data.patientCases || [];
+                else if (key === 'transactions') transactions = data.transactions || [];
+            } else {
+                const err = result.status === 'rejected' ? result.reason : null;
+                if (err) {
+                    console.error(`Financial ${key} failed:`, err);
+                    errors.push(`${key}: ${err.response?.data?.error || err.message || 'Failed'}`);
+                }
+            }
+        });
 
-        } catch (err) {
-            console.error('Error fetching financial data:', err);
-            setError(err.response?.data?.error || 'Failed to load financial data');
-        } finally {
-            setLoading(false);
-        }
+        // Add icons to metrics
+        const metricsWithIcons = metrics.map((metric, index) => {
+            const icons = [
+                <LuCircleDollarSign key="1" />,
+                <PiHandHeart key="2" />,
+                <RiMegaphoneLine key="3" />,
+                <RiUserHeartLine key="4" />
+            ];
+            const bgColors = ["#EAFFE5", "#F5E9FF", "#EBEAFF", "#FFE5E5"];
+            const iconColors = ["#16a34a", "#6132BE", "#285BFF", "#F12C31"];
+            return {
+                ...metric,
+                icon: icons[index] || <BiSolidBadgeDollar key="0" />,
+                bgColor: bgColors[index] || "#EAFFE5",
+                iconColor: iconColors[index] || "#16a34a"
+            };
+        });
+
+        setMetricsData(metricsWithIcons);
+        setTopDonors(topDonors);
+        setActiveCases(activeCases);
+        setPatientCases(patientCases);
+        setTransactions(transactions);
+        setError(errors.length > 0 ? errors.join('; ') : null);
+        setLoading(false);
     };
 
     useEffect(() => {
@@ -84,18 +105,20 @@ export default function Financial() {
         );
     }
 
-    if (error) {
-        return (
-            <section className="financial-section">
-                <div style={{ textAlign: 'center', padding: '4rem', color: '#F12C31' }}>
-                    <p>Error: {error}</p>
-                </div>
-            </section>
-        );
-    }
-
     return (
         <section className="financial-section">
+            {error && (
+                <div style={{
+                    marginBottom: '1rem',
+                    padding: '0.75rem 1rem',
+                    background: '#fef2f2',
+                    color: '#b91c1c',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                }}>
+                    Some data could not be loaded: {error}
+                </div>
+            )}
             {/* Header */}
             <div className="dashboard-title">
                 <div>
@@ -145,6 +168,7 @@ export default function Financial() {
                     metricsData={metricsData} 
                     topDonors={topDonors} 
                     activeCases={activeCases}
+                    transactions={transactions}
                     onPatientCaseAdded={fetchFinancialData}
                 />
             }

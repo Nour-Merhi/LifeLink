@@ -11,8 +11,9 @@ import {
   IoWarning,
 } from "react-icons/io5";
 import profile from "../../assets/imgs/profile.svg";
+import { getApiBaseUrl } from "../../config/api";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function HospitalManagerProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false);

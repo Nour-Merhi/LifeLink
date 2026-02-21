@@ -3,14 +3,35 @@ import Sidebar from "../../components/adminDashboard/sidebar";
 import { Outlet } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import "../../styles/Dashboard.css";
 
 export default function AdminDashboard(){
-    const { user, loading } = useAuth()
+    const { user, loading, fetchUser } = useAuth()
     const [openSidebar, setOpenSidebar] = useState(false);
+    const [verifying, setVerifying] = useState(true);
+    const didVerifyRef = useRef(false);
 
-    if (loading){
+    useEffect(() => {
+        if (didVerifyRef.current) return;
+        if (loading) return;
+
+        didVerifyRef.current = true;
+
+        const verifyAuth = async () => {
+            if (user) {
+                try {
+                    await fetchUser(false, true);
+                } catch (_) {
+                }
+            }
+            setVerifying(false);
+        };
+
+        verifyAuth();
+    }, [loading, fetchUser]); 
+
+    if (loading || verifying){
         return <div>Loading...</div>;
     }
 
@@ -18,7 +39,7 @@ export default function AdminDashboard(){
         return <Navigate to="/login" replace />;
     }
 
-    if (user.role.toLowerCase() !== "admin"){
+    if (user.role?.toLowerCase() !== "admin"){
         return <Navigate to="/login" replace />;
     }
     return (

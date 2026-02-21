@@ -53,16 +53,16 @@ class FinancialController extends Controller
                 ? round((($activeCampaigns - $lastMonthActiveCampaigns) / $lastMonthActiveCampaigns) * 100, 2)
                 : 0;
 
-            // Patients Funded (cases with status 'done' or fully funded)
+            // Patients Funded (cases with status 'done'/'funded' or fully funded)
             $patientsFunded = PatientCase::where(function($query) {
-                    $query->where('status', 'done')
+                    $query->whereIn('status', ['done', 'funded'])
                         ->orWhereRaw('current_funding >= target_amount');
                 })
                 ->count();
 
             // Last month patients funded for comparison
             $lastMonthPatientsFunded = PatientCase::where(function($query) use ($lastMonthEnd) {
-                    $query->where('status', 'done')
+                    $query->whereIn('status', ['done', 'funded'])
                         ->orWhereRaw('current_funding >= target_amount');
                 })
                 ->where('updated_at', '<=', $lastMonthEnd)
@@ -120,41 +120,54 @@ class FinancialController extends Controller
     }
 
     /**
-     * Get top donors for current month
+     * Get top 5 donors by total donation amount (all time)
      */
     public function getTopDonors()
     {
         try {
-            $currentMonthStart = Carbon::now()->startOfMonth();
-
-            $topDonorsQuery = FinancialDonation::where('status', 'completed')
-                ->where('created_at', '>=', $currentMonthStart)
+            // Registered donors (have donor_id)
+            $registered = FinancialDonation::where('status', 'completed')
                 ->whereNotNull('donor_id')
                 ->select('donor_id', DB::raw('SUM(donation_amount) as total_amount'), DB::raw('MAX(created_at) as last_donation_date'))
                 ->groupBy('donor_id')
-                ->orderBy('total_amount', 'desc')
+                ->orderByRaw('SUM(donation_amount) DESC')
                 ->limit(10)
-                ->get();
+                ->get()
+                ->map(function ($item) {
+                    $donor = Donor::with('user')->find($item->donor_id);
+                    $user = $donor?->user;
+                    $name = 'Anonymous';
+                    if ($user) {
+                        $name = trim(($user->first_name ?? '') . ' ' . ($user->middle_name ?? '') . ' ' . ($user->last_name ?? ''));
+                        if ($name === '') $name = 'Anonymous';
+                    }
+                    return ['name' => $name, 'total_amount' => (float) $item->total_amount, 'date' => Carbon::parse($item->last_donation_date)->format('Y-m-d')];
+                });
 
-            $topDonors = $topDonorsQuery->map(function ($item) {
-                $donor = Donor::with('user')->find($item->donor_id);
-                $user = $donor?->user;
-                
-                $name = 'Anonymous';
-                if ($user) {
-                    $name = trim(($user->first_name ?? '') . ' ' . ($user->middle_name ?? '') . ' ' . ($user->last_name ?? ''));
+            // Guest donors (donor_id null)
+            $guestDonations = FinancialDonation::where('status', 'completed')->whereNull('donor_id')->get();
+            $guestByKey = [];
+            foreach ($guestDonations as $d) {
+                $key = trim($d->name ?? '') ?: (trim($d->email ?? '') ?: 'Anonymous');
+                if ($key === '') $key = 'Anonymous';
+                if (!isset($guestByKey[$key])) $guestByKey[$key] = ['name' => $key, 'total_amount' => 0, 'last_date' => null];
+                $guestByKey[$key]['total_amount'] += (float) $d->donation_amount;
+                $dt = $d->created_at;
+                if (!$guestByKey[$key]['last_date'] || ($dt && $dt > $guestByKey[$key]['last_date'])) {
+                    $guestByKey[$key]['last_date'] = $dt;
                 }
+            }
+            $guests = collect($guestByKey)->map(fn ($item) => [
+                'name' => $item['name'],
+                'total_amount' => $item['total_amount'],
+                'date' => $item['last_date'] ? Carbon::parse($item['last_date'])->format('Y-m-d') : '',
+            ])->values();
 
-                return [
-                    'name' => $name,
-                    'date' => Carbon::parse($item->last_donation_date)->format('Y-m-d'),
-                    'amount' => '$' . number_format($item->total_amount, 2),
-                ];
-            });
+            $all = $registered->concat($guests)->sortByDesc('total_amount')->take(5)->map(function ($item) {
+                return ['name' => $item['name'], 'date' => $item['date'] ?? '', 'amount' => '$' . number_format($item['total_amount'], 2)];
+            })->values();
 
-            return response()->json([
-                'topDonors' => $topDonors
-            ], 200);
+            return response()->json(['topDonors' => $all], 200);
 
         } catch (\Exception $e) {
             Log::error('Error fetching top donors', [
@@ -175,28 +188,30 @@ class FinancialController extends Controller
     {
         try {
             $activeCases = PatientCase::where('status', 'active')
-                ->orderByRaw("FIELD(severity, 'high', 'medium', 'low')")
+                ->orderByRaw("CASE severity WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END")
                 ->orderBy('due_date', 'asc')
                 ->limit(6) // Limit to 6 for dashboard
                 ->get()
                 ->map(function ($case) {
-                    $age = Carbon::parse($case->date_of_birth)->age;
-                    $daysRemaining = (int) max(0, Carbon::now()->diffInDays(Carbon::parse($case->due_date), false));
-                    
-                    $donorsCount = $case->financialDonations()
+                    $age = $case->date_of_birth ? Carbon::parse($case->date_of_birth)->age : null;
+                    $daysRemaining = $case->due_date
+                        ? (int) max(0, Carbon::now()->diffInDays(Carbon::parse($case->due_date), false))
+                        : 0;
+
+                    $donorsCount = (int) $case->financialDonations()
                         ->where('status', 'completed')
-                        ->distinct('donor_id')
-                        ->count();
+                        ->selectRaw('COUNT(DISTINCT donor_id) as c')
+                        ->value('c');
 
                     return [
                         'id' => $case->id,
                         'patientName' => $case->full_name,
                         'condition' => $case->case_title,
                         'age' => $age,
-                        'currentFunding' => floatval($case->current_funding),
-                        'targetFunding' => floatval($case->target_amount),
+                        'currentFunding' => floatval($case->current_funding ?? 0),
+                        'targetFunding' => floatval($case->target_amount ?? 0),
                         'donorsCount' => $donorsCount,
-                        'medicalCenter' => $case->hospital_name,
+                        'medicalCenter' => $case->hospital_name ?? 'N/A',
                         'daysRemaining' => $daysRemaining,
                     ];
                 });
@@ -230,10 +245,10 @@ class FinancialController extends Controller
                     $age = Carbon::parse($case->date_of_birth)->age;
                     $daysRemaining = (int) max(0, Carbon::now()->diffInDays(Carbon::parse($case->due_date), false));
                     
-                    $donorsCount = $case->financialDonations()
+                    $donorsCount = (int) $case->financialDonations()
                         ->where('status', 'completed')
-                        ->distinct('donor_id')
-                        ->count();
+                        ->selectRaw('COUNT(DISTINCT donor_id) as c')
+                        ->value('c');
 
                     return [
                         'id' => $case->id,
@@ -268,6 +283,63 @@ class FinancialController extends Controller
                 'total' => 0,
                 'error' => 'Failed to fetch patient cases'
             ], 500);
+        }
+    }
+
+    /**
+     * Get a single transaction by ID or code (for admin view/edit modals)
+     */
+    public function getTransactionDetails($id)
+    {
+        try {
+            $query = FinancialDonation::with(['donor.user', 'patientCase.hospital']);
+            if (is_numeric($id)) {
+                $donation = $query->where('id', $id)->firstOrFail();
+            } else {
+                $donation = $query->where('code', $id)->firstOrFail();
+            }
+
+            $user = $donation->donor?->user;
+            $donorName = $donation->name;
+            if ($user) {
+                $donorName = trim(($user->first_name ?? '') . ' ' . ($user->middle_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $donation->name;
+            }
+
+            return response()->json([
+                'donation' => [
+                    'id' => $donation->id,
+                    'code' => $donation->code,
+                    'status' => $donation->status,
+                    'donation_amount' => floatval($donation->donation_amount),
+                    'amount' => floatval($donation->donation_amount),
+                    'payment_method' => $donation->payment_method,
+                    'name' => $donorName ?? $donation->name,
+                    'email' => $donation->email ?? $user?->email ?? null,
+                    'phone' => $donation->phone ?? $user?->phone_nb ?? null,
+                    'address' => $donation->address,
+                    'donation_type' => $donation->donation_type,
+                    'preference' => $donation->preference,
+                    'created_at' => $donation->created_at?->format('Y-m-d'),
+                    'donor' => $donation->donor && $user ? [
+                        'user' => [
+                            'first_name' => $user->first_name ?? null,
+                            'last_name' => $user->last_name ?? null,
+                            'email' => $user->email ?? null,
+                            'phone_nb' => $user->phone_nb ?? null,
+                        ],
+                    ] : null,
+                    'patientCase' => $donation->patientCase ? [
+                        'full_name' => $donation->patientCase->full_name,
+                        'case_title' => $donation->patientCase->case_title,
+                        'hospital_name' => $donation->patientCase->hospital_name ?? ($donation->patientCase->hospital?->name ?? null),
+                    ] : null,
+                ]
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Transaction not found'], 404);
+        } catch (\Exception $e) {
+            Log::error('Error fetching transaction details', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to fetch transaction details'], 500);
         }
     }
 
@@ -542,8 +614,8 @@ class FinancialController extends Controller
                 'severity' => 'nullable|in:high,medium,low',
                 'target_amount' => 'nullable|numeric|min:0.01',
                 'hospital_id' => 'nullable|integer|exists:hospitals,id',
-                'due_date' => 'nullable|date|after:today',
-                'status' => 'nullable|in:active,funded,expired,cancelled',
+                'due_date' => 'nullable|date',
+                'status' => 'nullable|in:active,funded,done,expired,cancelled',
                 'image' => 'nullable|string', // Base64 image
             ]);
 

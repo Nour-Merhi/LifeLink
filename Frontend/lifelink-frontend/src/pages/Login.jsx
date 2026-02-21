@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import api from "../api/axios";
+import api, { setAuthToken } from "../api/axios";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import loginImg from "../assets/illustrations/login.svg";
 import { useAuth } from "../context/AuthContext";
@@ -19,7 +19,7 @@ const Login = () => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(""); // Clear error on input change
+    setError(""); 
   };
 
   const handleSubmit = async (e) => {
@@ -28,59 +28,40 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // First, get the CSRF cookie from Sanctum
-      await api.get("/sanctum/csrf-cookie");
-
-      // Then, make the login request
-      const response = await api.post("/api/login", {
+      // Use token-based login for cross-site deployments (Vercel -> Railway).
+      const response = await api.post("/api/mobile/login", {
         email: formData.email,
         password: formData.password,
       });
 
-      // Update user state directly from login response for immediate availability
+      const token = response.data?.token;
       const userData = response.data?.user;
       if (!userData) {
         setError("Login successful but user data not received. Please try again.");
         return;
       }
-      
-      // Set user state immediately
+
+      if (token) {
+        setAuthToken(token);
+      }
       if (setUser) {
         setUser(userData);
       }
       
-      // Set loading to false to allow navigation
       if (setLoading) {
         setLoading(false);
       }
       
-      // Fetch user from API to ensure all relationships are loaded properly
-      // This ensures the AuthContext has the complete user object with all relationships
-      // Do this asynchronously so it doesn't block navigation
-      if (fetchUser) {
-        fetchUser(true).catch(err => {
-          console.warn('Error fetching user after login:', err);
-          // Non-critical error - we already have userData from login response
-        });
-      }
-      
-      // Also trigger window event to refresh navbar components that listen to it
+      await new Promise(resolve => setTimeout(resolve, 100));
       window.dispatchEvent(new Event('auth-change'));
       
-      // Small delay to ensure React has processed state updates before navigation
-      // This ensures the dashboard layouts see the user state as set
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Check if there's a redirect path from location state
       const from = location.state?.from;
       const userRole = userData?.role?.toLowerCase();
       
-      // If redirecting from quiz game interface, check if user is a donor
       if (from === "/quizlit/game-interface") {
         if (userRole === 'donor') {
           navigate("/quizlit/game-interface", { replace: true });
         } else {
-          // User is not a donor, redirect to welcome page with message
           navigate("/quizlit/welcome", { 
             replace: true,
             state: { 
@@ -91,7 +72,6 @@ const Login = () => {
         return;
       }
       
-      // Redirect based on user role (default behavior)
       if (userRole === 'admin') {
         navigate("/admin/dashboard", { replace: true });
       } else if (userRole === 'phlebotomist' || userRole === 'nurse') {

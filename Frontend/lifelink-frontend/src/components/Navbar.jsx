@@ -1,6 +1,5 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import api from "../api/axios";
 import lifelink_logo from "../assets/imgs/Logo.png";
 import profile from "../assets/imgs/profile.svg";
 import ProfileDropdown from "./ProfileDropdown";
@@ -11,7 +10,7 @@ import { useEffect, useState } from "react";
 import { IoClose, IoMenu } from "react-icons/io5";
 
 export default function Navbar({ handleContactUsClick }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { systemLogo, platformName } = useSystemSettings();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -24,7 +23,7 @@ export default function Navbar({ handleContactUsClick }) {
 
   const handleLogout = async () => {
     try {
-      await api.post("/api/logout");
+      await logout();
       // Trigger auth change to update context
       window.dispatchEvent(new Event('auth-change'));
       navigate("/home");

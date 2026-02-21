@@ -12,15 +12,24 @@ return new class extends Migration
             return;
         }
 
-        // Backfill snapshot for existing rows.
-        // Use the appointment's assigned phlebotomist_id at the time of backfill.
-        DB::table('home_appointment_ratings')
-            ->join('home_appointments', 'home_appointments.id', '=', 'home_appointment_ratings.home_appointment_id')
-            ->whereNull('home_appointment_ratings.phlebotomist_id')
-            ->whereNotNull('home_appointments.phlebotomist_id')
-            ->update([
-                'home_appointment_ratings.phlebotomist_id' => DB::raw('home_appointments.phlebotomist_id'),
-            ]);
+        if (DB::getDriverName() === 'pgsql') {
+            // PostgreSQL version
+            DB::statement("
+                UPDATE home_appointment_ratings AS r
+                SET phlebotomist_id = ha.phlebotomist_id
+                FROM home_appointments AS ha
+                WHERE ha.id = r.home_appointment_id
+                  AND r.phlebotomist_id IS NULL
+                  AND ha.phlebotomist_id IS NOT NULL
+            ");
+        } else {
+            // MySQL version
+            DB::table('home_appointment_ratings as r')
+                ->join('home_appointments as ha', 'ha.id', '=', 'r.home_appointment_id')
+                ->whereNull('r.phlebotomist_id')
+                ->whereNotNull('ha.phlebotomist_id')
+                ->update(['r.phlebotomist_id' => DB::raw('ha.phlebotomist_id')]);
+        }
     }
 
     public function down(): void
@@ -28,4 +37,3 @@ return new class extends Migration
         // no-op (data backfill)
     }
 };
-

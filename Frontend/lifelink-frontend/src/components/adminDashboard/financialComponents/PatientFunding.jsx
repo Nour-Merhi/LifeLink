@@ -35,7 +35,9 @@ export default function PatientFunding({ patientCases, onPatientCaseUpdated }){
     const filteredPatientCases = patientCases ? patientCases.filter((patientCase) => {
         const matchesSearch = patientCase.patientName?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesSeverity = caseSeverity === "all-severity" || patientCase.severity?.toLowerCase() === caseSeverity.toLowerCase();
-        const matchesStatus = patientState === "all-states" || patientCase.status?.toLowerCase() === patientState.toLowerCase();
+        const matchesStatus = patientState === "all-states" || 
+            patientCase.status?.toLowerCase() === patientState.toLowerCase() ||
+            (patientState === "done" && (patientCase.status?.toLowerCase() === "funded" || patientCase.status?.toLowerCase() === "done"));
 
         return matchesSearch && matchesSeverity && matchesStatus;
     }) : [];
@@ -108,7 +110,7 @@ export default function PatientFunding({ patientCases, onPatientCaseUpdated }){
             {/*Patient card Case*/}
             <div className="cases-grid">
                 {currentPatientCase.map((p) => {
-                    const fundingPercentage = Math.round((p.currentFunding / p.targetFunding) * 100);
+                    const fundingPercentage = p.targetFunding > 0 ? Math.round((p.currentFunding / p.targetFunding) * 100) : 0;
 
                     return(
                         <div key={p.id} className="patient-case-design">

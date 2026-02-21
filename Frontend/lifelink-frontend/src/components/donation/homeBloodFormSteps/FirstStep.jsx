@@ -95,7 +95,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 <div>
                                     <label htmlFor="first-name">First Name</label>
                                     <input 
-                                        readOnly
+                                        onChange={ handleChange }
                                         type="text" 
                                         id="first-name"
                                         name="first_name"
@@ -107,7 +107,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 <div>
                                     <label for="last-name">Last Name</label>
                                     <input 
-                                        readOnly
+                                        onChange={ handleChange }
                                         type="text" 
                                         id="last-name"
                                         name="last_name"
@@ -144,7 +144,7 @@ export default function FirstStep({ nextStep, homeBloodFormData, setHomeBloodFor
                                 <div>
                                     <label for="birth-date">Date of Birth</label>
                                     <input 
-                                        readOnly
+                                        onChange={ handleChange }
                                         type="date" 
                                         id="birth-date" 
                                         name="date_of_birth"

@@ -24,15 +24,15 @@ class HospitalDonorManagementController extends Controller
     {
         try {
             // Get hospital ID from parameter, request, or authenticated user
-            // Resolve hospital from authenticated manager regardless of role casing ("manager" vs "Manager").
-            // This prevents 400s when role is stored with different capitalization.
             if ($request->user()) {
                 $user = $request->user();
-                if ($user->healthCenterManager && $user->healthCenterManager->hospital_id) {
+                $user->loadMissing('healthCenterManager');
+                $role = strtolower((string)($user->role ?? ''));
+                if (in_array($role, ['manager', 'health_center_manager', 'hospital_manager'], true) && $user->healthCenterManager && $user->healthCenterManager->hospital_id) {
                     $hospitalId = $user->healthCenterManager->hospital_id;
                 }
             }
-            
+
             $hospitalId = $hospitalId ?? $request->input('hospital_id');
             
             if (!$hospitalId) {
@@ -60,7 +60,7 @@ class HospitalDonorManagementController extends Controller
             $homeAppointmentDonorIds = collect();
 
             // Filter hospital appointments
-            $hospitalApptQuery = HospitalAppointment::where('hospital_Id', $hospitalId);
+            $hospitalApptQuery = HospitalAppointment::where('hospital_id', $hospitalId);
             
             if ($status) {
                 $hospitalApptQuery->where('state', $status);
@@ -119,7 +119,7 @@ class HospitalDonorManagementController extends Controller
                         }
                     },
                     'hospitalAppointments' => function($query) use ($hospitalId, $status) {
-                        $query->where('hospital_Id', $hospitalId);
+                        $query->where('hospital_id', $hospitalId);
                         if ($status) {
                             $query->where('state', $status);
                         }
@@ -333,7 +333,7 @@ class HospitalDonorManagementController extends Controller
 
         try {
             $result = DB::transaction(function () use ($hospitalId, $donorIds) {
-                $deletedHospitalAppointments = HospitalAppointment::where('hospital_Id', $hospitalId)
+                $deletedHospitalAppointments = HospitalAppointment::where('hospital_id', $hospitalId)
                     ->whereIn('donor_id', $donorIds)
                     ->delete();
 
@@ -387,8 +387,8 @@ class HospitalDonorManagementController extends Controller
                     'hospitalAppointments.appointments.hospital',
                     'homeAppointments.appointment.hospital',
                     'hospitalAppointments' => function($query) use ($hospitalId) {
-                        // Note: Using 'hospital_Id' (capital I) to match database column
-                        $query->where('hospital_Id', $hospitalId)
+                        // Note: Using 'hospital_id' (capital I) to match database column
+                        $query->where('hospital_id', $hospitalId)
                               ->orderBy('created_at', 'desc');
                     },
                     'homeAppointments' => function($query) use ($hospitalId) {
@@ -509,7 +509,7 @@ class HospitalDonorManagementController extends Controller
             // Verify the appointment belongs to this hospital and donor
             if ($validated['appointment_type'] === 'hospital') {
                 $appointment = HospitalAppointment::where('id', $validated['appointment_id'])
-                    ->where('hospital_Id', $hospitalId)
+                    ->where('hospital_id', $hospitalId)
                     ->where('donor_id', $donorId)
                     ->firstOrFail();
                 
@@ -662,7 +662,7 @@ class HospitalDonorManagementController extends Controller
             $hospital = Hospital::findOrFail($hospitalId);
 
             // Get latest hospital appointment
-            $latestHospitalAppt = HospitalAppointment::where('hospital_Id', $hospitalId)
+            $latestHospitalAppt = HospitalAppointment::where('hospital_id', $hospitalId)
                 ->where('donor_id', $donorId)
                 ->with('appointments')
                 ->latest('created_at')

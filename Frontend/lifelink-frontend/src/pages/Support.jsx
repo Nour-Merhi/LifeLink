@@ -118,16 +118,7 @@ export default function Support() {
                         <IoArrowBack />
                         <h1 className="support-title !ml-2">Support</h1>
                     </button>
-                <div className="support-nav-info">
-                    <MdOutlineNotificationsActive className="support-notification-icon"/>
-                        <div className="support-user-info">
-                        <img src={profile} alt="profile" style={{ width: '40px', height: '40px' }} />
-                        <div className="support-user-details">
-                            <h3>{user?.name || user?.username || "Guest"}</h3>
-                            <small>{user?.donor?.blood_type ? `Blood Type ${user.donor.blood_type}` : "Not a donor"}</small>
-                        </div>
-                    </div>
-                </div>
+               
             </div>
 
             {/* Main Content */}
@@ -179,7 +170,7 @@ export default function Support() {
                                 <p className="support-card-description">Send us a detailed message</p>
                             </div>
                             <div>
-                                <p className="support-card-contact email-text" style={{ color: '#4CAF50' }}>support@lifelink.org</p>
+                                <p className="support-card-contact email-text" style={{ color: '#4CAF50' }}>lifelink.org.team@gmail.com</p>
                                 <p className="support-card-hours">Response within 24 hours</p>
                             </div>
                         </div>

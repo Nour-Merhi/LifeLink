@@ -4,11 +4,12 @@ namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\SerializesModels;
 use App\Models\Donor;
 use App\Models\HospitalAppointment;
 
-class HospitalDonationRegistered extends Mailable
+class HospitalDonationRegistered extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

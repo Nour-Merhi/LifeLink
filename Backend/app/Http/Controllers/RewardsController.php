@@ -260,13 +260,10 @@ class RewardsController extends Controller
 
         try {
             $result = DB::transaction(function () use ($donor, $normalized, $totalCost) {
-                // Lock the donor's XP transactions to prevent concurrent overspending.
-                $row = XpTransaction::where('donor_id', $donor->id)
-                    ->selectRaw('COALESCE(SUM(xp_amount), 0) as total')
-                    ->lockForUpdate()
-                    ->first();
+                // Lock the donor row first to prevent concurrent overspending.
+                Donor::where('id', $donor->id)->lockForUpdate()->first();
 
-                $currentXp = (int) ($row->total ?? 0);
+                $currentXp = (int) XpTransaction::where('donor_id', $donor->id)->sum('xp_amount');
                 if ($currentXp < $totalCost) {
                     return [
                         'ok' => false,
@@ -329,13 +326,22 @@ class RewardsController extends Controller
                     'created_at' => data_get($result, 'order.created_at'),
                 ],
             ], 200);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Log::error('Error processing rewards purchase:', [
                 'donor_id' => $donor->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            return response()->json(['message' => 'Failed to process purchase'], 500);
+            $message = 'Failed to process purchase';
+            $detail = null;
+            if (config('app.debug')) {
+                $message .= ': ' . $e->getMessage();
+                $detail = $e->getFile() . ':' . $e->getLine();
+            }
+            return response()->json([
+                'message' => $message,
+                'error_detail' => $detail,
+            ], 500);
         }
     }
 

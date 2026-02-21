@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 import { SpinnerDotted } from 'spinners-react';
 import api from "../../../api/axios";
+import { getApiBaseUrl } from "../../../config/api";
 
 export default function EditPatientCaseModal({ onClose, onPatientCaseUpdated, patientCaseId }) {
     const [loading, setLoading] = useState(false);
@@ -65,9 +66,9 @@ export default function EditPatientCaseModal({ onClose, onPatientCaseUpdated, pa
                 description: patientCase.description || "",
                 severity: patientCase.severity || "",
                 target_amount: patientCase.targetFunding || '',
-                hospital_id: patientCase.hospitalId || '',
-                due_date: patientCase.dueDate || '',
-                status: patientCase.status || 'active',
+                hospital_id: patientCase.hospitalId || patientCase.hospital_id || '',
+                due_date: patientCase.dueDate || patientCase.due_date || '',
+                status: (patientCase.status === 'done' ? 'funded' : patientCase.status) || 'active',
                 image: null,
             });
 
@@ -75,7 +76,7 @@ export default function EditPatientCaseModal({ onClose, onPatientCaseUpdated, pa
             if (patientCase.image) {
                 const imageSrc = patientCase.image.startsWith('http') 
                     ? patientCase.image 
-                    : `http://localhost:8000/${patientCase.image}`;
+                    : `${getApiBaseUrl()}/${patientCase.image}`;
                 setImagePreview(imageSrc);
             }
         } catch (error) {
@@ -147,7 +148,10 @@ export default function EditPatientCaseModal({ onClose, onPatientCaseUpdated, pa
 
         try {
             await api.get("/sanctum/csrf-cookie");
-            await api.put(`/api/admin/dashboard/financial/patient-cases/${patientCaseId}`, editData);
+            const payload = { ...editData };
+            if (payload.hospital_id === '' || payload.hospital_id == null) payload.hospital_id = null;
+            if (payload.due_date === '') payload.due_date = null;
+            await api.put(`/api/admin/dashboard/financial/patient-cases/${patientCaseId}`, payload);
 
             if (onPatientCaseUpdated) {
                 onPatientCaseUpdated();

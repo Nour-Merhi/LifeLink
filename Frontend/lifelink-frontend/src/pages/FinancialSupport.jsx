@@ -16,10 +16,11 @@ import Financial_Img from "../assets/imgs/image.png";
 import FinancialSupportForm from "../components/donation/FinancialSupportForm";
 import ThankModal from "../components/donation/ThankModals/ThankYou";
 import api from "../api/axios";
+import { getApiBaseUrl } from "../config/api";
 import Patient from "../assets/imgs/patient.jpg";
 import "../styles/Dashboard.css";
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 export default function FinancialSupport() {
   const [thankModal, setThankModal] = useState(false);

@@ -63,9 +63,7 @@ export default function DonorManagement() {
     };
 
     const handleApproveDonation = (donorId) => {
-        // In production: axios.post(`/api/hospital/donors/${donorId}/approve`)
         console.log("Approve donation for:", donorId);
-        // Trigger notification
     };
 
     const handleClearFilters = () => {

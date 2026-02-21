@@ -13,6 +13,7 @@ import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import api from "../../api/axios";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { useSystemSettings } from "../../context/SystemSettingsContext";
 
 export default function HospitalSidebar({openSidebar, setOpenSidebar}){
@@ -28,18 +29,13 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
     const toggleOrganMenu = () => {
         setOpenMenuOrgan((prev) => !prev);
     };
+    const { logout } = useAuth();
+    
     const handleLogout = async () => {
-        try {
-          await api.post("/api/logout");
-          // Trigger auth change to update context
-          window.dispatchEvent(new Event('auth-change'));
-          navigate("/home");
-        } catch (error) {
-          console.error('Logout error:', error);
-          // Trigger auth change anyway
-          window.dispatchEvent(new Event('auth-change'));
-          navigate("/home");
+        if (logout) {
+          await logout();
         }
+        navigate("/home", { replace: true });
       };
     
     return (
@@ -104,14 +100,14 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                             <div className="drop-down-items" style={{ display: 'flex', flexDirection: 'column' }}>
                                 <div className="link-item appointments-link">
                                     <NavLink to="/hospital/appointments">
-                                         Regular Requests
+                                        Donor Regular Requests
                                     </NavLink>
                                 </div>
                                 <div className="link-item appointments-link">
                                     <NavLink 
                                         to="/hospital/urgent-requests"
                                     >
-                                        Urgent Requests
+                                        DonorUrgent Requests
                                     </NavLink>
                                 </div>
                                 <div className="link-item appointments-link">
@@ -176,7 +172,7 @@ export default function HospitalSidebar({openSidebar, setOpenSidebar}){
                     )
                 }>
                     <PiHeartbeatFill className="icon-size text-white"/>
-                    <NavLink to="/hospital/inventory">Inventory</NavLink>
+                    <NavLink to="/hospital/inventory">Blood Inventory</NavLink>
                 </div>
 
                 <div className="link-item" onClick = {

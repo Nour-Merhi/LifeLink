@@ -45,8 +45,8 @@ export default function UrgentRequests() {
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [selectedAppointmentForAssign, setSelectedAppointmentForAssign] = useState(null);
 
-    // Get hospital ID from user's health center manager relationship
-    const hospitalId = user?.health_center_manager?.hospital_id || user?.healthCenterManager?.hospital_id;
+    // Get hospital ID: mobile login returns user.hospital_id; session login returns healthCenterManager.hospital_id
+    const hospitalId = user?.health_center_manager?.hospital_id ?? user?.healthCenterManager?.hospital_id ?? user?.hospital_id;
 
     useEffect(() => {
         if (user && hospitalId) {
@@ -248,7 +248,9 @@ export default function UrgentRequests() {
             }
         } catch (err) {
             console.error('Error updating appointment:', err);
-            setEditError(err.response?.data?.message || err.message || "Failed to update appointment");
+            const detail = err.response?.data?.error_detail;
+            const msg = err.response?.data?.message || err.message || "Failed to update appointment";
+            setEditError(detail ? `${msg}: ${detail}` : msg);
         } finally {
             setEditLoading(false);
         }
@@ -267,7 +269,7 @@ export default function UrgentRequests() {
             await api.get("/sanctum/csrf-cookie");
             
             const deletePromises = deleteConfirm.requestIds.map(requestId => 
-                api.delete(`/api/admin/dashboard/appointments/${requestId}`)
+                api.delete(`/api/hospital/dashboard/appointments/${requestId}`)
             );
 
             const results = await Promise.allSettled(deletePromises);

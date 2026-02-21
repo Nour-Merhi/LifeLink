@@ -162,6 +162,51 @@ export default function HomeBloodForm({ onSelect, pageType = "home" }){
 
     const [homeBloodFormData, setHomeBloodFormData] = useState(getInitialFormData());
 
+    // When user first loads (e.g. after login), pre-fill form with registration/donor data
+    useEffect(() => {
+        if (!user) return;
+        const bookingData = getBookingData();
+        const donor = user.donor || {};
+        const bloodType = donor.bloodType || donor.blood_type || null;
+        const bloodTypeString = bloodType ? `${bloodType.type || ''}${bloodType.rh_factor || ''}` : '';
+        let formattedDob = '';
+        if (donor.date_of_birth) {
+            const dobDate = new Date(donor.date_of_birth);
+            formattedDob = dobDate.toISOString().split('T')[0];
+        }
+        let formattedLastDonation = '';
+        if (donor.last_donation) {
+            const lastDonationDate = new Date(donor.last_donation);
+            formattedLastDonation = lastDonationDate.toISOString().split('T')[0];
+        }
+        const phoneNumber = user.phone_nb && !String(user.phone_nb).startsWith('temp_') ? user.phone_nb : '';
+        const userData = {
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            email: user.email || '',
+            phone_nb: phoneNumber,
+            date_of_birth: formattedDob,
+            gender: donor.gender || '',
+            blood_type: bloodTypeString,
+            last_donation: formattedLastDonation,
+        };
+        const lastDonationLocked = Boolean(donor.last_donation);
+        setHomeBloodFormData((prev) => ({
+            ...prev,
+            ...userData,
+            last_donation_locked: lastDonationLocked,
+            last_donation: lastDonationLocked ? formattedLastDonation : (prev.last_donation || formattedLastDonation),
+            address: prev.address || '',
+            latitude: prev.latitude ?? null,
+            longitude: prev.longitude ?? null,
+            weight: prev.weight || '',
+            emerg_contact: prev.emerg_contact || '',
+            emerg_phone: prev.emerg_phone || '',
+            medical_conditions: prev.medical_conditions || {},
+            ...bookingData,
+        }));
+    }, [user?.id]); // Run when user id is set (e.g. after login)
+
     // Clear form data when user changes (different user logged in)
     useEffect(() => {
         if (!user) return;

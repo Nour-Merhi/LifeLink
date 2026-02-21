@@ -5,6 +5,7 @@ import { FiSearch } from "react-icons/fi";
 import Navbar from "../components/Navbar";
 import { useArticles } from "../context/ArticlesContext";
 import api from "../api/axios";
+import { getApiBaseUrl } from "../config/api";
 import "../styles/Articles.css";
 
 export default function ArticlePage() {
@@ -25,7 +26,7 @@ export default function ArticlePage() {
         article.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const baseURL = api?.defaults?.baseURL || "http://localhost:8000";
+    const baseURL = api?.defaults?.baseURL || getApiBaseUrl();
     const resolveImageSrc = (image) => {
         if (!image) return "/image.png";
         const img = String(image);
