@@ -1,10 +1,8 @@
 # 🩸 LifeLink – Blood & Organ Donation Management System
 
-LifeLink is a smart web platform created to connect blood, organ, and financial supporters with hospitals that need help. 
+LifeLink, the 3rd place for Project Excellence Award, is a smart web platform created to connect blood, organ, and financial supporters with hospitals that need help. 
 
-LifeLink makes the donation process easy, fast, and friendly by using modern technology. Donors can create profiles, track their donation history, get updates, and book home appointments. Hospitals can manage requests and plan schedules. 
-
-The system also includes a chatbot to guide users, a human body visual to educate donors, and a reward system to keep people motivated. 
+LifeLink makes the donation process easy, fast, and friendly by using modern technology. Donors can create profiles, track their donation history, get updates, and book home appointments. Hospitals can manage requests and plan schedules. The system also includes a chatbot to guide users, a human body visual to educate donors, and a reward system to keep people motivated. 
 
 This project was developed as a capstone graduation project following complete Software Engineering lifecycle practices, including system analysis, UML modeling, database design, implementation, and deployment.
 
